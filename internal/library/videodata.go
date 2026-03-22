@@ -2,7 +2,6 @@ package library
 
 import (
 	"stash-vr/internal/stash/gql"
-	"stash-vr/internal/util"
 )
 
 type VideoData struct {
@@ -10,9 +9,21 @@ type VideoData struct {
 }
 
 func (vd VideoData) Title() string {
-	return util.FirstNonEmpty(vd.SceneParts.Title, &vd.SceneParts.Files[0].Basename)
+	if vd.SceneParts == nil {
+		return ""
+	}
+	if vd.SceneParts.Title != nil && *vd.SceneParts.Title != "" {
+		return *vd.SceneParts.Title
+	}
+	if len(vd.SceneParts.Files) > 0 && vd.SceneParts.Files[0] != nil && vd.SceneParts.Files[0].Basename != "" {
+		return vd.SceneParts.Files[0].Basename
+	}
+	return vd.Id()
 }
 
 func (vd VideoData) Id() string {
+	if vd.SceneParts == nil {
+		return ""
+	}
 	return vd.SceneParts.Id
 }

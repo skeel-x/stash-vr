@@ -3,10 +3,11 @@ package library
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"stash-vr/internal/stash/gql"
 	"strconv"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func (libraryService *Service) GetScenes(ctx context.Context) (map[string]*VideoData, error) {
@@ -56,10 +57,16 @@ func (libraryService *Service) GetScene(ctx context.Context, id string, forceFet
 			return vd, nil
 		}
 	}
-	iid, _ := strconv.Atoi(id)
+	iid, err := strconv.Atoi(id)
+	if err != nil {
+		return nil, nil
+	}
 	vds, err := libraryService.fetchVideoData(ctx, []int{iid})
 	if err != nil {
 		return nil, err
+	}
+	if len(vds) == 0 || vds[0] == nil {
+		return nil, nil
 	}
 
 	libraryService.muVdCache.Lock()

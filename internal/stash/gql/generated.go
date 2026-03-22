@@ -134,6 +134,117 @@ var AllFilterMode = []FilterMode{
 	FilterModeTags,
 }
 
+// FindAllPerformersFindPerformersFindPerformersResultType includes the requested fields of the GraphQL type FindPerformersResultType.
+type FindAllPerformersFindPerformersFindPerformersResultType struct {
+	Count      int                                                                           `json:"count"`
+	Performers []*FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer `json:"performers"`
+}
+
+// GetCount returns FindAllPerformersFindPerformersFindPerformersResultType.Count, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersFindPerformersFindPerformersResultType) GetCount() int { return v.Count }
+
+// GetPerformers returns FindAllPerformersFindPerformersFindPerformersResultType.Performers, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersFindPerformersFindPerformersResultType) GetPerformers() []*FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer {
+	return v.Performers
+}
+
+// FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer includes the requested fields of the GraphQL type Performer.
+type FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer struct {
+	PerformerListParts `json:"-"`
+}
+
+// GetId returns FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Id, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetId() string {
+	return v.PerformerListParts.Id
+}
+
+// GetName returns FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Name, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetName() string {
+	return v.PerformerListParts.Name
+}
+
+// GetImage_path returns FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Image_path, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetImage_path() *string {
+	return v.PerformerListParts.Image_path
+}
+
+// GetAlias_list returns FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Alias_list, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetAlias_list() []string {
+	return v.PerformerListParts.Alias_list
+}
+
+// GetScene_count returns FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Scene_count, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetScene_count() int {
+	return v.PerformerListParts.Scene_count
+}
+
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.PerformerListParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Image_path *string `json:"image_path"`
+
+	Alias_list []string `json:"alias_list"`
+
+	Scene_count int `json:"scene_count"`
+}
+
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer) __premarshalJSON() (*__premarshalFindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer, error) {
+	var retval __premarshalFindAllPerformersFindPerformersFindPerformersResultTypePerformersPerformer
+
+	retval.Id = v.PerformerListParts.Id
+	retval.Name = v.PerformerListParts.Name
+	retval.Image_path = v.PerformerListParts.Image_path
+	retval.Alias_list = v.PerformerListParts.Alias_list
+	retval.Scene_count = v.PerformerListParts.Scene_count
+	return &retval, nil
+}
+
+// FindAllPerformersResponse is returned by FindAllPerformers on success.
+type FindAllPerformersResponse struct {
+	// A function which queries Performer objects
+	FindPerformers *FindAllPerformersFindPerformersFindPerformersResultType `json:"findPerformers"`
+}
+
+// GetFindPerformers returns FindAllPerformersResponse.FindPerformers, and is useful for accessing the field via an interface.
+func (v *FindAllPerformersResponse) GetFindPerformers() *FindAllPerformersFindPerformersFindPerformersResultType {
+	return v.FindPerformers
+}
+
 // FindAllSceneIdsFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
 type FindAllSceneIdsFindScenesFindScenesResultType struct {
 	Scenes []*FindAllSceneIdsFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
@@ -161,6 +272,117 @@ type FindAllSceneIdsResponse struct {
 // GetFindScenes returns FindAllSceneIdsResponse.FindScenes, and is useful for accessing the field via an interface.
 func (v *FindAllSceneIdsResponse) GetFindScenes() *FindAllSceneIdsFindScenesFindScenesResultType {
 	return v.FindScenes
+}
+
+// FindAllStudiosFindStudiosFindStudiosResultType includes the requested fields of the GraphQL type FindStudiosResultType.
+type FindAllStudiosFindStudiosFindStudiosResultType struct {
+	Count   int                                                            `json:"count"`
+	Studios []*FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio `json:"studios"`
+}
+
+// GetCount returns FindAllStudiosFindStudiosFindStudiosResultType.Count, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosFindStudiosFindStudiosResultType) GetCount() int { return v.Count }
+
+// GetStudios returns FindAllStudiosFindStudiosFindStudiosResultType.Studios, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosFindStudiosFindStudiosResultType) GetStudios() []*FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio {
+	return v.Studios
+}
+
+// FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio includes the requested fields of the GraphQL type Studio.
+type FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio struct {
+	StudioListParts `json:"-"`
+}
+
+// GetId returns FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio.Id, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) GetId() string {
+	return v.StudioListParts.Id
+}
+
+// GetName returns FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio.Name, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) GetName() string {
+	return v.StudioListParts.Name
+}
+
+// GetImage_path returns FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio.Image_path, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) GetImage_path() *string {
+	return v.StudioListParts.Image_path
+}
+
+// GetAliases returns FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio.Aliases, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) GetAliases() []string {
+	return v.StudioListParts.Aliases
+}
+
+// GetScene_count returns FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio.Scene_count, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) GetScene_count() int {
+	return v.StudioListParts.Scene_count
+}
+
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.StudioListParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Image_path *string `json:"image_path"`
+
+	Aliases []string `json:"aliases"`
+
+	Scene_count int `json:"scene_count"`
+}
+
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio) __premarshalJSON() (*__premarshalFindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio, error) {
+	var retval __premarshalFindAllStudiosFindStudiosFindStudiosResultTypeStudiosStudio
+
+	retval.Id = v.StudioListParts.Id
+	retval.Name = v.StudioListParts.Name
+	retval.Image_path = v.StudioListParts.Image_path
+	retval.Aliases = v.StudioListParts.Aliases
+	retval.Scene_count = v.StudioListParts.Scene_count
+	return &retval, nil
+}
+
+// FindAllStudiosResponse is returned by FindAllStudios on success.
+type FindAllStudiosResponse struct {
+	// A function which queries Studio objects
+	FindStudios *FindAllStudiosFindStudiosFindStudiosResultType `json:"findStudios"`
+}
+
+// GetFindStudios returns FindAllStudiosResponse.FindStudios, and is useful for accessing the field via an interface.
+func (v *FindAllStudiosResponse) GetFindStudios() *FindAllStudiosFindStudiosFindStudiosResultType {
+	return v.FindStudios
 }
 
 // FindAllTagsFindTagsFindTagsResultType includes the requested fields of the GraphQL type FindTagsResultType.
@@ -358,6 +580,127 @@ type FindPerformerByNameResponse struct {
 // GetFindPerformers returns FindPerformerByNameResponse.FindPerformers, and is useful for accessing the field via an interface.
 func (v *FindPerformerByNameResponse) GetFindPerformers() *FindPerformerByNameFindPerformersFindPerformersResultType {
 	return v.FindPerformers
+}
+
+// FindPerformerFindPerformer includes the requested fields of the GraphQL type Performer.
+type FindPerformerFindPerformer struct {
+	PerformerParts `json:"-"`
+}
+
+// GetBirthdate returns FindPerformerFindPerformer.Birthdate, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetBirthdate() *string { return v.PerformerParts.Birthdate }
+
+// GetCountry returns FindPerformerFindPerformer.Country, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetCountry() *string { return v.PerformerParts.Country }
+
+// GetDetails returns FindPerformerFindPerformer.Details, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetDetails() *string { return v.PerformerParts.Details }
+
+// GetScenes returns FindPerformerFindPerformer.Scenes, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetScenes() []*PerformerPartsScenesScene {
+	return v.PerformerParts.Scenes
+}
+
+// GetId returns FindPerformerFindPerformer.Id, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetId() string { return v.PerformerParts.PerformerListParts.Id }
+
+// GetName returns FindPerformerFindPerformer.Name, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetName() string {
+	return v.PerformerParts.PerformerListParts.Name
+}
+
+// GetImage_path returns FindPerformerFindPerformer.Image_path, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetImage_path() *string {
+	return v.PerformerParts.PerformerListParts.Image_path
+}
+
+// GetAlias_list returns FindPerformerFindPerformer.Alias_list, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetAlias_list() []string {
+	return v.PerformerParts.PerformerListParts.Alias_list
+}
+
+// GetScene_count returns FindPerformerFindPerformer.Scene_count, and is useful for accessing the field via an interface.
+func (v *FindPerformerFindPerformer) GetScene_count() int {
+	return v.PerformerParts.PerformerListParts.Scene_count
+}
+
+func (v *FindPerformerFindPerformer) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindPerformerFindPerformer
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindPerformerFindPerformer = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.PerformerParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindPerformerFindPerformer struct {
+	Birthdate *string `json:"birthdate"`
+
+	Country *string `json:"country"`
+
+	Details *string `json:"details"`
+
+	Scenes []*PerformerPartsScenesScene `json:"scenes"`
+
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Image_path *string `json:"image_path"`
+
+	Alias_list []string `json:"alias_list"`
+
+	Scene_count int `json:"scene_count"`
+}
+
+func (v *FindPerformerFindPerformer) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindPerformerFindPerformer) __premarshalJSON() (*__premarshalFindPerformerFindPerformer, error) {
+	var retval __premarshalFindPerformerFindPerformer
+
+	retval.Birthdate = v.PerformerParts.Birthdate
+	retval.Country = v.PerformerParts.Country
+	retval.Details = v.PerformerParts.Details
+	retval.Scenes = v.PerformerParts.Scenes
+	retval.Id = v.PerformerParts.PerformerListParts.Id
+	retval.Name = v.PerformerParts.PerformerListParts.Name
+	retval.Image_path = v.PerformerParts.PerformerListParts.Image_path
+	retval.Alias_list = v.PerformerParts.PerformerListParts.Alias_list
+	retval.Scene_count = v.PerformerParts.PerformerListParts.Scene_count
+	return &retval, nil
+}
+
+// FindPerformerResponse is returned by FindPerformer on success.
+type FindPerformerResponse struct {
+	// Find a performer by ID
+	FindPerformer *FindPerformerFindPerformer `json:"findPerformer"`
+}
+
+// GetFindPerformer returns FindPerformerResponse.FindPerformer, and is useful for accessing the field via an interface.
+func (v *FindPerformerResponse) GetFindPerformer() *FindPerformerFindPerformer {
+	return v.FindPerformer
 }
 
 // FindSampleSceneCoverFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
@@ -931,6 +1274,99 @@ type FindStudioByNameResponse struct {
 func (v *FindStudioByNameResponse) GetFindStudios() *FindStudioByNameFindStudiosFindStudiosResultType {
 	return v.FindStudios
 }
+
+// FindStudioFindStudio includes the requested fields of the GraphQL type Studio.
+type FindStudioFindStudio struct {
+	StudioParts `json:"-"`
+}
+
+// GetDetails returns FindStudioFindStudio.Details, and is useful for accessing the field via an interface.
+func (v *FindStudioFindStudio) GetDetails() *string { return v.StudioParts.Details }
+
+// GetId returns FindStudioFindStudio.Id, and is useful for accessing the field via an interface.
+func (v *FindStudioFindStudio) GetId() string { return v.StudioParts.StudioListParts.Id }
+
+// GetName returns FindStudioFindStudio.Name, and is useful for accessing the field via an interface.
+func (v *FindStudioFindStudio) GetName() string { return v.StudioParts.StudioListParts.Name }
+
+// GetImage_path returns FindStudioFindStudio.Image_path, and is useful for accessing the field via an interface.
+func (v *FindStudioFindStudio) GetImage_path() *string {
+	return v.StudioParts.StudioListParts.Image_path
+}
+
+// GetAliases returns FindStudioFindStudio.Aliases, and is useful for accessing the field via an interface.
+func (v *FindStudioFindStudio) GetAliases() []string { return v.StudioParts.StudioListParts.Aliases }
+
+// GetScene_count returns FindStudioFindStudio.Scene_count, and is useful for accessing the field via an interface.
+func (v *FindStudioFindStudio) GetScene_count() int { return v.StudioParts.StudioListParts.Scene_count }
+
+func (v *FindStudioFindStudio) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindStudioFindStudio
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindStudioFindStudio = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.StudioParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindStudioFindStudio struct {
+	Details *string `json:"details"`
+
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Image_path *string `json:"image_path"`
+
+	Aliases []string `json:"aliases"`
+
+	Scene_count int `json:"scene_count"`
+}
+
+func (v *FindStudioFindStudio) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindStudioFindStudio) __premarshalJSON() (*__premarshalFindStudioFindStudio, error) {
+	var retval __premarshalFindStudioFindStudio
+
+	retval.Details = v.StudioParts.Details
+	retval.Id = v.StudioParts.StudioListParts.Id
+	retval.Name = v.StudioParts.StudioListParts.Name
+	retval.Image_path = v.StudioParts.StudioListParts.Image_path
+	retval.Aliases = v.StudioParts.StudioListParts.Aliases
+	retval.Scene_count = v.StudioParts.StudioListParts.Scene_count
+	return &retval, nil
+}
+
+// FindStudioResponse is returned by FindStudio on success.
+type FindStudioResponse struct {
+	// Find a studio by ID
+	FindStudio *FindStudioFindStudio `json:"findStudio"`
+}
+
+// GetFindStudio returns FindStudioResponse.FindStudio, and is useful for accessing the field via an interface.
+func (v *FindStudioResponse) GetFindStudio() *FindStudioFindStudio { return v.FindStudio }
 
 // FindTagByNameFindTagsFindTagsResultType includes the requested fields of the GraphQL type FindTagsResultType.
 type FindTagByNameFindTagsFindTagsResultType struct {
@@ -2014,6 +2450,154 @@ func (v *PerformerFilterType) GetUrl() *StringCriterionInput { return v.Url }
 // GetWeight returns PerformerFilterType.Weight, and is useful for accessing the field via an interface.
 func (v *PerformerFilterType) GetWeight() *IntCriterionInput { return v.Weight }
 
+// PerformerListParts includes the GraphQL fields of Performer requested by the fragment PerformerListParts.
+type PerformerListParts struct {
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Image_path  *string  `json:"image_path"`
+	Alias_list  []string `json:"alias_list"`
+	Scene_count int      `json:"scene_count"`
+}
+
+// GetId returns PerformerListParts.Id, and is useful for accessing the field via an interface.
+func (v *PerformerListParts) GetId() string { return v.Id }
+
+// GetName returns PerformerListParts.Name, and is useful for accessing the field via an interface.
+func (v *PerformerListParts) GetName() string { return v.Name }
+
+// GetImage_path returns PerformerListParts.Image_path, and is useful for accessing the field via an interface.
+func (v *PerformerListParts) GetImage_path() *string { return v.Image_path }
+
+// GetAlias_list returns PerformerListParts.Alias_list, and is useful for accessing the field via an interface.
+func (v *PerformerListParts) GetAlias_list() []string { return v.Alias_list }
+
+// GetScene_count returns PerformerListParts.Scene_count, and is useful for accessing the field via an interface.
+func (v *PerformerListParts) GetScene_count() int { return v.Scene_count }
+
+// PerformerParts includes the GraphQL fields of Performer requested by the fragment PerformerParts.
+type PerformerParts struct {
+	PerformerListParts `json:"-"`
+	Birthdate          *string                      `json:"birthdate"`
+	Country            *string                      `json:"country"`
+	Details            *string                      `json:"details"`
+	Scenes             []*PerformerPartsScenesScene `json:"scenes"`
+}
+
+// GetBirthdate returns PerformerParts.Birthdate, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetBirthdate() *string { return v.Birthdate }
+
+// GetCountry returns PerformerParts.Country, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetCountry() *string { return v.Country }
+
+// GetDetails returns PerformerParts.Details, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetDetails() *string { return v.Details }
+
+// GetScenes returns PerformerParts.Scenes, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetScenes() []*PerformerPartsScenesScene { return v.Scenes }
+
+// GetId returns PerformerParts.Id, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetId() string { return v.PerformerListParts.Id }
+
+// GetName returns PerformerParts.Name, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetName() string { return v.PerformerListParts.Name }
+
+// GetImage_path returns PerformerParts.Image_path, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetImage_path() *string { return v.PerformerListParts.Image_path }
+
+// GetAlias_list returns PerformerParts.Alias_list, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetAlias_list() []string { return v.PerformerListParts.Alias_list }
+
+// GetScene_count returns PerformerParts.Scene_count, and is useful for accessing the field via an interface.
+func (v *PerformerParts) GetScene_count() int { return v.PerformerListParts.Scene_count }
+
+func (v *PerformerParts) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*PerformerParts
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.PerformerParts = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.PerformerListParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalPerformerParts struct {
+	Birthdate *string `json:"birthdate"`
+
+	Country *string `json:"country"`
+
+	Details *string `json:"details"`
+
+	Scenes []*PerformerPartsScenesScene `json:"scenes"`
+
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Image_path *string `json:"image_path"`
+
+	Alias_list []string `json:"alias_list"`
+
+	Scene_count int `json:"scene_count"`
+}
+
+func (v *PerformerParts) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *PerformerParts) __premarshalJSON() (*__premarshalPerformerParts, error) {
+	var retval __premarshalPerformerParts
+
+	retval.Birthdate = v.Birthdate
+	retval.Country = v.Country
+	retval.Details = v.Details
+	retval.Scenes = v.Scenes
+	retval.Id = v.PerformerListParts.Id
+	retval.Name = v.PerformerListParts.Name
+	retval.Image_path = v.PerformerListParts.Image_path
+	retval.Alias_list = v.PerformerListParts.Alias_list
+	retval.Scene_count = v.PerformerListParts.Scene_count
+	return &retval, nil
+}
+
+// PerformerPartsScenesScene includes the requested fields of the GraphQL type Scene.
+type PerformerPartsScenesScene struct {
+	Studio *PerformerPartsScenesSceneStudio `json:"studio"`
+}
+
+// GetStudio returns PerformerPartsScenesScene.Studio, and is useful for accessing the field via an interface.
+func (v *PerformerPartsScenesScene) GetStudio() *PerformerPartsScenesSceneStudio { return v.Studio }
+
+// PerformerPartsScenesSceneStudio includes the requested fields of the GraphQL type Studio.
+type PerformerPartsScenesSceneStudio struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// GetId returns PerformerPartsScenesSceneStudio.Id, and is useful for accessing the field via an interface.
+func (v *PerformerPartsScenesSceneStudio) GetId() string { return v.Id }
+
+// GetName returns PerformerPartsScenesSceneStudio.Name, and is useful for accessing the field via an interface.
+func (v *PerformerPartsScenesSceneStudio) GetName() string { return v.Name }
+
 type PhashDistanceCriterionInput struct {
 	Distance *int              `json:"distance"`
 	Modifier CriterionModifier `json:"modifier"`
@@ -2910,11 +3494,23 @@ func (v *ScenePartsPathsScenePathsType) GetCaption() *string { return v.Caption 
 
 // ScenePartsPerformersPerformer includes the requested fields of the GraphQL type Performer.
 type ScenePartsPerformersPerformer struct {
-	Name string `json:"name"`
+	Id         string   `json:"id"`
+	Name       string   `json:"name"`
+	Image_path *string  `json:"image_path"`
+	Alias_list []string `json:"alias_list"`
 }
+
+// GetId returns ScenePartsPerformersPerformer.Id, and is useful for accessing the field via an interface.
+func (v *ScenePartsPerformersPerformer) GetId() string { return v.Id }
 
 // GetName returns ScenePartsPerformersPerformer.Name, and is useful for accessing the field via an interface.
 func (v *ScenePartsPerformersPerformer) GetName() string { return v.Name }
+
+// GetImage_path returns ScenePartsPerformersPerformer.Image_path, and is useful for accessing the field via an interface.
+func (v *ScenePartsPerformersPerformer) GetImage_path() *string { return v.Image_path }
+
+// GetAlias_list returns ScenePartsPerformersPerformer.Alias_list, and is useful for accessing the field via an interface.
+func (v *ScenePartsPerformersPerformer) GetAlias_list() []string { return v.Alias_list }
 
 // ScenePartsSceneStreamsSceneStreamEndpoint includes the requested fields of the GraphQL type SceneStreamEndpoint.
 type ScenePartsSceneStreamsSceneStreamEndpoint struct {
@@ -3014,11 +3610,19 @@ func (v *ScenePartsScene_markersSceneMarker) __premarshalJSON() (*__premarshalSc
 
 // ScenePartsStudio includes the requested fields of the GraphQL type Studio.
 type ScenePartsStudio struct {
-	Name string `json:"name"`
+	Id         string  `json:"id"`
+	Name       string  `json:"name"`
+	Image_path *string `json:"image_path"`
 }
+
+// GetId returns ScenePartsStudio.Id, and is useful for accessing the field via an interface.
+func (v *ScenePartsStudio) GetId() string { return v.Id }
 
 // GetName returns ScenePartsStudio.Name, and is useful for accessing the field via an interface.
 func (v *ScenePartsStudio) GetName() string { return v.Name }
+
+// GetImage_path returns ScenePartsStudio.Image_path, and is useful for accessing the field via an interface.
+func (v *ScenePartsStudio) GetImage_path() *string { return v.Image_path }
 
 // SceneUpdateOrganizedResponse is returned by SceneUpdateOrganized on success.
 type SceneUpdateOrganizedResponse struct {
@@ -3234,6 +3838,113 @@ func (v *StudioFilterType) GetUpdated_at() *TimestampCriterionInput { return v.U
 
 // GetUrl returns StudioFilterType.Url, and is useful for accessing the field via an interface.
 func (v *StudioFilterType) GetUrl() *StringCriterionInput { return v.Url }
+
+// StudioListParts includes the GraphQL fields of Studio requested by the fragment StudioListParts.
+type StudioListParts struct {
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Image_path  *string  `json:"image_path"`
+	Aliases     []string `json:"aliases"`
+	Scene_count int      `json:"scene_count"`
+}
+
+// GetId returns StudioListParts.Id, and is useful for accessing the field via an interface.
+func (v *StudioListParts) GetId() string { return v.Id }
+
+// GetName returns StudioListParts.Name, and is useful for accessing the field via an interface.
+func (v *StudioListParts) GetName() string { return v.Name }
+
+// GetImage_path returns StudioListParts.Image_path, and is useful for accessing the field via an interface.
+func (v *StudioListParts) GetImage_path() *string { return v.Image_path }
+
+// GetAliases returns StudioListParts.Aliases, and is useful for accessing the field via an interface.
+func (v *StudioListParts) GetAliases() []string { return v.Aliases }
+
+// GetScene_count returns StudioListParts.Scene_count, and is useful for accessing the field via an interface.
+func (v *StudioListParts) GetScene_count() int { return v.Scene_count }
+
+// StudioParts includes the GraphQL fields of Studio requested by the fragment StudioParts.
+type StudioParts struct {
+	StudioListParts `json:"-"`
+	Details         *string `json:"details"`
+}
+
+// GetDetails returns StudioParts.Details, and is useful for accessing the field via an interface.
+func (v *StudioParts) GetDetails() *string { return v.Details }
+
+// GetId returns StudioParts.Id, and is useful for accessing the field via an interface.
+func (v *StudioParts) GetId() string { return v.StudioListParts.Id }
+
+// GetName returns StudioParts.Name, and is useful for accessing the field via an interface.
+func (v *StudioParts) GetName() string { return v.StudioListParts.Name }
+
+// GetImage_path returns StudioParts.Image_path, and is useful for accessing the field via an interface.
+func (v *StudioParts) GetImage_path() *string { return v.StudioListParts.Image_path }
+
+// GetAliases returns StudioParts.Aliases, and is useful for accessing the field via an interface.
+func (v *StudioParts) GetAliases() []string { return v.StudioListParts.Aliases }
+
+// GetScene_count returns StudioParts.Scene_count, and is useful for accessing the field via an interface.
+func (v *StudioParts) GetScene_count() int { return v.StudioListParts.Scene_count }
+
+func (v *StudioParts) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*StudioParts
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.StudioParts = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.StudioListParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalStudioParts struct {
+	Details *string `json:"details"`
+
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Image_path *string `json:"image_path"`
+
+	Aliases []string `json:"aliases"`
+
+	Scene_count int `json:"scene_count"`
+}
+
+func (v *StudioParts) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *StudioParts) __premarshalJSON() (*__premarshalStudioParts, error) {
+	var retval __premarshalStudioParts
+
+	retval.Details = v.Details
+	retval.Id = v.StudioListParts.Id
+	retval.Name = v.StudioListParts.Name
+	retval.Image_path = v.StudioListParts.Image_path
+	retval.Aliases = v.StudioListParts.Aliases
+	retval.Scene_count = v.StudioListParts.Scene_count
+	return &retval, nil
+}
 
 // TagCreateResponse is returned by TagCreate on success.
 type TagCreateResponse struct {
@@ -3573,6 +4284,14 @@ type __FindPerformerByNameInput struct {
 // GetName returns __FindPerformerByNameInput.Name, and is useful for accessing the field via an interface.
 func (v *__FindPerformerByNameInput) GetName() string { return v.Name }
 
+// __FindPerformerInput is used internally by genqlient
+type __FindPerformerInput struct {
+	Id string `json:"id"`
+}
+
+// GetId returns __FindPerformerInput.Id, and is useful for accessing the field via an interface.
+func (v *__FindPerformerInput) GetId() string { return v.Id }
+
 // __FindSceneIdsByFilterInput is used internally by genqlient
 type __FindSceneIdsByFilterInput struct {
 	Scene_filter *SceneFilterType `json:"scene_filter,omitempty"`
@@ -3616,6 +4335,14 @@ type __FindStudioByNameInput struct {
 
 // GetName returns __FindStudioByNameInput.Name, and is useful for accessing the field via an interface.
 func (v *__FindStudioByNameInput) GetName() string { return v.Name }
+
+// __FindStudioInput is used internally by genqlient
+type __FindStudioInput struct {
+	Id string `json:"id"`
+}
+
+// GetId returns __FindStudioInput.Id, and is useful for accessing the field via an interface.
+func (v *__FindStudioInput) GetId() string { return v.Id }
 
 // __FindTagByNameInput is used internally by genqlient
 type __FindTagByNameInput struct {
@@ -3801,6 +4528,46 @@ type __TagCreateInput struct {
 // GetName returns __TagCreateInput.Name, and is useful for accessing the field via an interface.
 func (v *__TagCreateInput) GetName() string { return v.Name }
 
+// The query executed by FindAllPerformers.
+const FindAllPerformers_Operation = `
+query FindAllPerformers {
+	findPerformers(filter: {per_page:-1}) {
+		count
+		performers {
+			... PerformerListParts
+		}
+	}
+}
+fragment PerformerListParts on Performer {
+	id
+	name
+	image_path
+	alias_list
+	scene_count
+}
+`
+
+func FindAllPerformers(
+	ctx_ context.Context,
+	client_ graphql.Client,
+) (data_ *FindAllPerformersResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindAllPerformers",
+		Query:  FindAllPerformers_Operation,
+	}
+
+	data_ = &FindAllPerformersResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
 // The query executed by FindAllSceneIds.
 const FindAllSceneIds_Operation = `
 query FindAllSceneIds {
@@ -3822,6 +4589,46 @@ func FindAllSceneIds(
 	}
 
 	data_ = &FindAllSceneIdsResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindAllStudios.
+const FindAllStudios_Operation = `
+query FindAllStudios {
+	findStudios(filter: {per_page:-1}) {
+		count
+		studios {
+			... StudioListParts
+		}
+	}
+}
+fragment StudioListParts on Studio {
+	id
+	name
+	image_path
+	aliases
+	scene_count
+}
+`
+
+func FindAllStudios(
+	ctx_ context.Context,
+	client_ graphql.Client,
+) (data_ *FindAllStudiosResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindAllStudios",
+		Query:  FindAllStudios_Operation,
+	}
+
+	data_ = &FindAllStudiosResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
@@ -3898,6 +4705,59 @@ func FindCredentials(
 	}
 
 	data_ = &FindCredentialsResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindPerformer.
+const FindPerformer_Operation = `
+query FindPerformer ($id: ID!) {
+	findPerformer(id: $id) {
+		... PerformerParts
+	}
+}
+fragment PerformerParts on Performer {
+	... PerformerListParts
+	birthdate
+	country
+	details
+	scenes {
+		studio {
+			id
+			name
+		}
+	}
+}
+fragment PerformerListParts on Performer {
+	id
+	name
+	image_path
+	alias_list
+	scene_count
+}
+`
+
+func FindPerformer(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+) (data_ *FindPerformerResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindPerformer",
+		Query:  FindPerformer_Operation,
+		Variables: &__FindPerformerInput{
+			Id: id,
+		},
+	}
+
+	data_ = &FindPerformerResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
@@ -4176,13 +5036,18 @@ fragment SceneParts on Scene {
 		video_codec
 	}
 	studio {
+		id
 		name
+		image_path
 	}
 	scene_markers {
 		... SceneMarkerParts
 	}
 	performers {
+		id
 		name
+		image_path
+		alias_list
 	}
 	groups {
 		group {
@@ -4254,6 +5119,51 @@ func FindScenes(
 	}
 
 	data_ = &FindScenesResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindStudio.
+const FindStudio_Operation = `
+query FindStudio ($id: ID!) {
+	findStudio(id: $id) {
+		... StudioParts
+	}
+}
+fragment StudioParts on Studio {
+	... StudioListParts
+	details
+}
+fragment StudioListParts on Studio {
+	id
+	name
+	image_path
+	aliases
+	scene_count
+}
+`
+
+func FindStudio(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+) (data_ *FindStudioResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindStudio",
+		Query:  FindStudio_Operation,
+		Variables: &__FindStudioInput{
+			Id: id,
+		},
+	}
+
+	data_ = &FindStudioResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
