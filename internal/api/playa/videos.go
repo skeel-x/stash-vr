@@ -7,6 +7,9 @@ import (
 	"slices"
 	"stash-vr/internal/library"
 	"strings"
+	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type videoSortItem struct {
@@ -74,13 +77,16 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery) (Page
 		candidateSet = map[string]struct{}{}
 	}
 
-	videoData, err := h.libraryService.GetScenesByIDs(ctx, setToSortedSlice(candidateSet))
+	startFetch := time.Now()
+	allScenesMap, err := h.libraryService.GetScenes(ctx)
 	if err != nil {
 		return Page[VideoListView]{}, err
 	}
+	log.Ctx(ctx).Debug().Dur("duration", time.Since(startFetch)).Msg("Successfully fetched scenes from cache")
 
-	filtered := make([]*library.VideoData, 0, len(videoData))
-	for _, vd := range videoData {
+	filtered := make([]*library.VideoData, 0, len(candidateSet))
+	for id := range candidateSet {
+		vd := allScenesMap[id]
 		if vd == nil {
 			continue
 		}
