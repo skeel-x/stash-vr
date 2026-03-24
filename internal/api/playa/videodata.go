@@ -2,7 +2,6 @@ package playa
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/library"
@@ -14,15 +13,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var resolutionFromLabel = regexp.MustCompile(`\((\d+)p\)`)
-
-type videoLinkKey struct {
+type videoChoiceKey struct {
 	isStream     bool
 	isDownload   bool
-	url          string
 	projection   string
 	stereo       string
 	qualityOrder int
+}
+
+type videoLinkCandidate struct {
+	link       VideoLinkView
+	resolution int
+	isDirect   bool
 }
 
 func buildVideoListView(vd *library.VideoData) VideoListView {
@@ -44,6 +46,7 @@ func buildVideoListView(vd *library.VideoData) VideoListView {
 }
 
 func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSceneSet) VideoView {
+	videoID := vd.Id()
 	var releaseDate *int64
 	var views *int
 	if vd != nil && vd.SceneParts != nil {
@@ -51,7 +54,7 @@ func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSce
 		views = vd.SceneParts.Play_count
 	}
 	view := VideoView{
-		ID:           vd.Id(),
+		ID:           videoID,
 		Title:        vd.Title(),
 		Status:       publishedStatusID,
 		PreviewImage: previewImage(vd),
@@ -72,11 +75,8 @@ func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSce
 		}
 	}
 	for _, filter := range savedFilters {
-		for _, id := range filter.SceneIDs {
-			if id == vd.Id() {
-				view.Categories = append(view.Categories, CategoryRef{ID: savedFilterCategoryPrefix + filter.ID, Title: filter.Name})
-				break
-			}
+		if slices.Contains(filter.SceneIDs, videoID) {
+			view.Categories = append(view.Categories, CategoryRef{ID: savedFilterCategoryPrefix + filter.ID, Title: filter.Name})
 		}
 	}
 	for _, tag := range realSceneTags(vd) {
@@ -160,11 +160,14 @@ func buildVideoLinks(vd *library.VideoData, trailer bool) []VideoLinkView {
 		if vd.SceneParts.Paths == nil || vd.SceneParts.Paths.Preview == nil {
 			return nil
 		}
-		keyed := stash.ApiKeyed(*vd.SceneParts.Paths.Preview)
+		previewURL := keyedURL(vd.SceneParts.Paths.Preview)
+		if previewURL == nil {
+			return []VideoLinkView{unavailableVideoLink(false, projection, stereo, qualityName(resolution), qualityOrder(resolution), "offline")}
+		}
 		return []VideoLinkView{{
 			IsStream:     true,
 			IsDownload:   false,
-			URL:          &keyed,
+			URL:          previewURL,
 			Projection:   projection,
 			Stereo:       stereo,
 			QualityName:  qualityName(resolution),
@@ -172,69 +175,112 @@ func buildVideoLinks(vd *library.VideoData, trailer bool) []VideoLinkView {
 		}}
 	}
 
-	links := make([]VideoLinkView, 0, 1)
-	if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Stream != nil {
-		keyed := stash.ApiKeyed(*vd.SceneParts.Paths.Stream)
-		links = append(links, VideoLinkView{
-			IsStream:     true,
-			IsDownload:   true,
-			URL:          &keyed,
-			Projection:   projection,
-			Stereo:       stereo,
-			QualityName:  "Direct Stream",
-			QualityOrder: qualityOrder(resolution),
-		})
+	candidates := buildPlayableLinkCandidates(vd, projection, stereo)
+	if len(candidates) == 0 {
+		return []VideoLinkView{unavailableVideoLink(true, projection, stereo, qualityNameWithDirectSuffix(resolution), qualityOrder(resolution), "offline")}
 	}
 
-	for _, stream := range vd.SceneParts.SceneStreams {
-		if stream == nil || stream.Url == "" {
-			continue
-		}
-		if stream.Label != nil && *stream.Label == "Direct stream" {
-			continue
-		}
-		res := resolution
-		if stream.Label != nil {
-			res = resolutionFromStreamLabel(*stream.Label, resolution)
-		}
-		if resolution > 0 && res > resolution {
-			// Skip transcoded versions that are higher than the original resolution to avoid upscaling
-			continue
-		}
-		keyed := stash.ApiKeyed(stream.Url)
-		links = append(links, VideoLinkView{
-			IsStream:     true,
-			IsDownload:   true,
-			URL:          &keyed,
-			Projection:   projection,
-			Stereo:       stereo,
-			QualityName:  qualityName(res),
-			QualityOrder: qualityOrder(res) - 1,
-		})
-	}
-	slices.SortFunc(links, func(a, b VideoLinkView) int {
+	slices.SortFunc(candidates, func(a, b videoLinkCandidate) int {
 		switch {
-		case a.QualityOrder > b.QualityOrder:
+		case a.link.QualityOrder > b.link.QualityOrder:
 			return -1
-		case a.QualityOrder < b.QualityOrder:
+		case a.link.QualityOrder < b.link.QualityOrder:
+			return 1
+		case a.isDirect && !b.isDirect:
+			return -1
+		case !a.isDirect && b.isDirect:
+			return 1
+		case a.resolution > b.resolution:
+			return -1
+		case a.resolution < b.resolution:
 			return 1
 		default:
 			return 0
 		}
 	})
-	deduped := dedupeLinks(links)
+	deduped := dedupeLinks(candidates)
 	log.Debug().Str("video_id", vd.Id()).Interface("links", deduped).Msg("Generated video links")
 	return deduped
 }
 
-func dedupeLinks(links []VideoLinkView) []VideoLinkView {
-	seen := map[videoLinkKey]struct{}{}
-	out := make([]VideoLinkView, 0, len(links))
-	for _, link := range links {
-		key := videoLinkKey{
+func buildPlayableLinkCandidates(vd *library.VideoData, projection string, stereo string) []videoLinkCandidate {
+	sp := vd.SceneParts
+	nativeResolution := fileResolution(vd)
+	candidates := make([]videoLinkCandidate, 0, 4)
+
+	if sp.Paths != nil && sp.Paths.Stream != nil && *sp.Paths.Stream != "" && len(sp.Files) > 0 && sp.Files[0] != nil {
+		for _, source := range stash.GetDirectStream(sp).Sources {
+			if source.Url == "" {
+				continue
+			}
+			keyed := stash.ApiKeyed(source.Url)
+			directOrder := preferredDirectQualityOrder(source.Resolution)
+			candidates = append(candidates, videoLinkCandidate{
+				link: VideoLinkView{
+					IsStream:     true,
+					IsDownload:   true,
+					URL:          &keyed,
+					Projection:   projection,
+					Stereo:       stereo,
+					QualityName:  qualityNameWithDirectSuffix(source.Resolution),
+					QualityOrder: directOrder,
+				},
+				resolution: source.Resolution,
+				isDirect:   true,
+			})
+		}
+	}
+
+	if len(sp.Files) == 0 || sp.Files[0] == nil {
+		return candidates
+	}
+
+	for _, source := range stash.GetTranscodingStream(sp).Sources {
+		if source.Url == "" {
+			continue
+		}
+		if nativeResolution > 0 && source.Resolution > nativeResolution {
+			continue
+		}
+		keyed := stash.ApiKeyed(source.Url)
+		candidates = append(candidates, videoLinkCandidate{
+			link: VideoLinkView{
+				IsStream:     true,
+				IsDownload:   true,
+				URL:          &keyed,
+				Projection:   projection,
+				Stereo:       stereo,
+				QualityName:  qualityName(source.Resolution),
+				QualityOrder: qualityOrder(source.Resolution),
+			},
+			resolution: source.Resolution,
+		})
+	}
+
+	return candidates
+}
+
+func unavailableVideoLink(isDownload bool, projection string, stereo string, quality string, order int, reason string) VideoLinkView {
+	message := reason
+	return VideoLinkView{
+		IsStream:          true,
+		IsDownload:        isDownload,
+		Projection:        projection,
+		Stereo:            stereo,
+		QualityName:       quality,
+		QualityOrder:      order,
+		UnavailableReason: &message,
+	}
+}
+
+func dedupeLinks(candidates []videoLinkCandidate) []VideoLinkView {
+	seen := map[videoChoiceKey]struct{}{}
+	out := make([]VideoLinkView, 0, len(candidates))
+	for _, candidate := range candidates {
+		link := candidate.link
+		key := videoChoiceKey{
 			isStream:     link.IsStream,
 			isDownload:   link.IsDownload,
-			url:          derefString(link.URL),
 			projection:   link.Projection,
 			stereo:       link.Stereo,
 			qualityOrder: link.QualityOrder,
@@ -407,6 +453,27 @@ func qualityName(resolution int) string {
 	return fmt.Sprintf("%dp", resolution)
 }
 
+func qualityNameWithDirectSuffix(resolution int) string {
+	return qualityName(resolution) + " (DS)"
+}
+
+func preferredDirectQualityOrder(resolution int) int {
+	switch {
+	case resolution >= 2160:
+		return 45
+	case resolution >= 1440:
+		return 35
+	case resolution >= 1080:
+		return 25
+	case resolution >= 720:
+		return 15
+	case resolution >= 480:
+		return 10
+	default:
+		return 5
+	}
+}
+
 func qualityOrder(resolution int) int {
 	switch {
 	case resolution >= 4320:
@@ -428,19 +495,6 @@ func qualityOrder(resolution int) int {
 	default:
 		return 5
 	}
-}
-
-func resolutionFromStreamLabel(label string, fallback int) int {
-	match := resolutionFromLabel.FindStringSubmatch(label)
-	if len(match) != 2 {
-		return fallback
-	}
-	var resolution int
-	_, err := fmt.Sscanf(match[1], "%d", &resolution)
-	if err != nil {
-		return fallback
-	}
-	return resolution
 }
 
 func derefString(value *string) string {

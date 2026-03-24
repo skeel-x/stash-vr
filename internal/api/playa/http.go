@@ -2,6 +2,7 @@ package playa
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"stash-vr/internal/library"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -82,18 +84,35 @@ func (h httpHandler) videosHandler(w http.ResponseWriter, req *http.Request) {
 func (h httpHandler) videoHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	videoID := chi.URLParam(req, "videoId")
-	vd, err := h.libraryService.GetScene(ctx, videoID, false)
-	if err != nil {
-		h.writeInternalError(ctx, w, err, "failed to load video")
+	var (
+		vd           *library.VideoData
+		savedFilters []library.SavedFilterSceneSet
+		sceneErr     error
+		filterErr    error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		vd, sceneErr = h.libraryService.GetScene(ctx, videoID, false)
+	}()
+	go func() {
+		defer wg.Done()
+		savedFilters, filterErr = h.libraryService.GetSavedFilterSceneSets(ctx)
+	}()
+	wg.Wait()
+
+	if sceneErr != nil {
+		h.writeInternalError(ctx, w, sceneErr, "failed to load video")
 		return
 	}
 	if vd == nil || vd.SceneParts == nil || vd.SceneParts.Id == "" {
 		h.writeJSON(req, w, notFoundRsp("Video", videoID))
 		return
 	}
-	savedFilters, err := h.libraryService.GetSavedFilterSceneSets(ctx)
-	if err != nil {
-		h.writeInternalError(ctx, w, err, "failed to load saved filters")
+	if filterErr != nil {
+		h.writeInternalError(ctx, w, filterErr, "failed to load saved filters")
 		return
 	}
 	view := buildVideoView(vd, savedFilters)
@@ -185,7 +204,16 @@ func (h httpHandler) writeJSON(req *http.Request, w http.ResponseWriter, data an
 
 func (h httpHandler) writeInternalError(ctx context.Context, w http.ResponseWriter, err error, message string) {
 	if err != nil {
-		log.Ctx(ctx).Error().Err(fmt.Errorf("%s: %w", message, err)).Msg("playa request failed")
+		if errors.Is(err, context.Canceled) {
+			log.Ctx(ctx).Debug().Msgf("%s: client disconnected (context canceled)", message)
+			w.WriteHeader(499)
+			return
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Ctx(ctx).Warn().Msgf("%s: server processing timeout (deadline exceeded)", message)
+		} else {
+			log.Ctx(ctx).Error().Err(fmt.Errorf("%s: %w", message, err)).Msg("playa request failed")
+		}
 	} else {
 		log.Ctx(ctx).Error().Msg(message)
 	}
