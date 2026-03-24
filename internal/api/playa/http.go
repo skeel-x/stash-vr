@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"net/http"
 	"net/url"
 	"stash-vr/internal/api/internal"
@@ -73,12 +74,42 @@ func (h httpHandler) videosHandler(w http.ResponseWriter, req *http.Request) {
 		h.writeJSON(req, w, handled)
 		return
 	}
-	page, err := h.buildVideoPage(req.Context(), query)
+	page, err := h.buildVideoPage(req.Context(), query, internal.GetBaseUrl(req))
 	if err != nil {
 		h.writeInternalError(req.Context(), w, err, "failed to build video page")
 		return
 	}
 	h.writeJSON(req, w, okRsp(page))
+}
+
+func (h httpHandler) posterHandler(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+	videoID := chi.URLParam(req, "videoId")
+	vd, err := h.libraryService.GetScene(ctx, videoID, false)
+	if err != nil {
+		h.writeInternalError(ctx, w, err, "failed to load poster")
+		return
+	}
+	if vd == nil || vd.SceneParts == nil || vd.SceneParts.Paths == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	poster, err := buildPosterImage(ctx, vd)
+	if err != nil {
+		if errors.Is(err, errPosterNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		h.writeInternalError(ctx, w, err, "failed to build poster")
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	if err := jpeg.Encode(w, poster, nil); err != nil {
+		log.Ctx(ctx).Error().Err(err).Msg("error writing Playa poster")
+	}
 }
 
 func (h httpHandler) videoHandler(w http.ResponseWriter, req *http.Request) {
@@ -115,7 +146,7 @@ func (h httpHandler) videoHandler(w http.ResponseWriter, req *http.Request) {
 		h.writeInternalError(ctx, w, filterErr, "failed to load saved filters")
 		return
 	}
-	view := buildVideoView(vd, savedFilters)
+	view := buildVideoView(vd, savedFilters, internal.GetBaseUrl(req))
 	log.Ctx(ctx).Info().Interface("videoView", view).Msg("Serving video details")
 	h.writeJSON(req, w, okRsp(view))
 }

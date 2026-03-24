@@ -36,7 +36,7 @@ type videoQuery struct {
 	ExcludedStatuses   []string
 }
 
-func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery) (Page[VideoListView], error) {
+func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseURL string) (Page[VideoListView], error) {
 	allIDs, err := h.libraryService.GetAllSceneIDs(ctx)
 	if err != nil {
 		return Page[VideoListView]{}, err
@@ -105,7 +105,7 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery) (Page
 	sortVideoData(filtered, query.Order, query.Direction)
 	items := make([]VideoListView, 0, len(filtered))
 	for _, vd := range filtered {
-		items = append(items, buildVideoListView(vd))
+		items = append(items, buildVideoListView(vd, baseURL))
 	}
 	return paginate(items, query.PageIndex, query.PageSize), nil
 }

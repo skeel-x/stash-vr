@@ -14,6 +14,7 @@ func Router(libraryService *library.Service) http.Handler {
 
 	r.Get("/version", internal.LogRoute("version", httpHandler.versionHandler))
 	r.Get("/config", internal.LogRoute("config", httpHandler.configHandler))
+	r.Get("/poster/{videoId}", internal.LogRoute("poster", httpHandler.posterHandler))
 	r.Get("/videos", internal.LogRoute("videos", httpHandler.videosHandler))
 	r.Get("/video/{videoId}", internal.LogRoute("video", httpHandler.videoHandler))
 	r.Get("/categories", internal.LogRoute("categories", httpHandler.categoriesHandler))

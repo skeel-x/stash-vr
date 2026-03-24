@@ -3,20 +3,31 @@ package heatmap
 import (
 	"context"
 	"errors"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/image/draw"
-	"golang.org/x/sync/errgroup"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
 	"math"
 	"net/http"
 	"stash-vr/internal/config"
+
+	"github.com/rs/zerolog/log"
+	"golang.org/x/image/draw"
+	"golang.org/x/sync/errgroup"
+
+	_ "golang.org/x/image/webp"
 )
 
 var errImageNotFound = errors.New("image not found")
 var errScreenshotImageNotFound = errors.New("screenshot image not found")
 var errHeatmapImageNotFound = errors.New("heatmap image not found")
+
+func ErrImageNotFound() error {
+	return errImageNotFound
+}
+
+func BuildCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.Image, error) {
+	return buildHeatmapCover(ctx, coverUrl, heatmapUrl)
+}
 
 func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 	log.Ctx(ctx).Trace().Str("url", fileUrl).Msg("Fetching image")
@@ -77,6 +88,10 @@ func buildHeatmapCover(ctx context.Context, coverUrl string, heatmapUrl string) 
 
 	cover := <-chCover
 	heatmap := <-chHeatmap
+
+	if cover == nil {
+		return nil, errScreenshotImageNotFound
+	}
 
 	err := g.Wait()
 	if err != nil {

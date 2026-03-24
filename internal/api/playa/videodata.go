@@ -27,7 +27,7 @@ type videoLinkCandidate struct {
 	isDirect   bool
 }
 
-func buildVideoListView(vd *library.VideoData) VideoListView {
+func buildVideoListView(vd *library.VideoData, baseURL string) VideoListView {
 	var releaseDate *int64
 	if vd != nil && vd.SceneParts != nil {
 		releaseDate = releaseDateUnix(vd.SceneParts.Date)
@@ -36,7 +36,7 @@ func buildVideoListView(vd *library.VideoData) VideoListView {
 		ID:           vd.Id(),
 		Title:        vd.Title(),
 		Status:       publishedStatusID,
-		PreviewImage: previewImage(vd),
+		PreviewImage: previewImage(vd, baseURL),
 		HasScripts:   hasScripts(vd),
 		ReleaseDate:  releaseDate,
 		Details:      buildVideoListDetails(vd),
@@ -45,7 +45,7 @@ func buildVideoListView(vd *library.VideoData) VideoListView {
 	return view
 }
 
-func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSceneSet) VideoView {
+func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSceneSet, baseURL string) VideoView {
 	videoID := vd.Id()
 	var releaseDate *int64
 	var views *int
@@ -57,7 +57,7 @@ func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSce
 		ID:           videoID,
 		Title:        vd.Title(),
 		Status:       publishedStatusID,
-		PreviewImage: previewImage(vd),
+		PreviewImage: previewImage(vd, baseURL),
 		ReleaseDate:  releaseDate,
 		Views:        views,
 		Details:      buildVideoDetails(vd),
@@ -410,12 +410,13 @@ func keyedURL(value *string) *string {
 	return &keyed
 }
 
-func previewImage(vd *library.VideoData) *string {
-	if vd == nil || vd.SceneParts == nil || vd.SceneParts.Paths == nil {
+func previewImage(vd *library.VideoData, baseURL string) *string {
+	if vd == nil || vd.SceneParts == nil || vd.SceneParts.Paths == nil || baseURL == "" {
 		return nil
 	}
-	if preview := keyedURL(vd.SceneParts.Paths.Screenshot); preview != nil {
-		return preview
+	if vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
+		posterURL := baseURL + "/api/playa/v2/poster/" + vd.Id()
+		return &posterURL
 	}
 	return keyedURL(vd.SceneParts.Paths.Preview)
 }
