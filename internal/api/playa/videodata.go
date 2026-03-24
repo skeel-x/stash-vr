@@ -181,7 +181,7 @@ func buildVideoLinks(vd *library.VideoData, trailer bool) []VideoLinkView {
 			URL:          &keyed,
 			Projection:   projection,
 			Stereo:       stereo,
-			QualityName:  qualityName(resolution),
+			QualityName:  "Direct Stream",
 			QualityOrder: qualityOrder(resolution),
 		})
 	}
@@ -196,6 +196,10 @@ func buildVideoLinks(vd *library.VideoData, trailer bool) []VideoLinkView {
 		res := resolution
 		if stream.Label != nil {
 			res = resolutionFromStreamLabel(*stream.Label, resolution)
+		}
+		if resolution > 0 && res > resolution {
+			// Skip transcoded versions that are higher than the original resolution to avoid upscaling
+			continue
 		}
 		keyed := stash.ApiKeyed(stream.Url)
 		links = append(links, VideoLinkView{
@@ -218,7 +222,9 @@ func buildVideoLinks(vd *library.VideoData, trailer bool) []VideoLinkView {
 			return 0
 		}
 	})
-	return dedupeLinks(links)
+	deduped := dedupeLinks(links)
+	log.Debug().Str("video_id", vd.Id()).Interface("links", deduped).Msg("Generated video links")
+	return deduped
 }
 
 func dedupeLinks(links []VideoLinkView) []VideoLinkView {
