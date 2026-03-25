@@ -14,6 +14,8 @@ const (
 	actorPrefix               = "actor:"
 	studioPrefix              = "studio:"
 	publishedStatusID         = "published"
+	randomCategoryKey         = "random"
+	randomCategoryID          = savedFilterCategoryPrefix + randomCategoryKey
 )
 
 type categoryKey struct {
@@ -40,6 +42,8 @@ func parseCategoryList(raw string) ([]categoryKey, error) {
 
 func parseCategoryKey(raw string) (categoryKey, error) {
 	switch {
+	case raw == randomCategoryID:
+		return categoryKey{Raw: raw, Kind: "system", ID: randomCategoryKey}, nil
 	case strings.HasPrefix(raw, tagCategoryPrefix):
 		id := strings.TrimPrefix(raw, tagCategoryPrefix)
 		if id == "" {

@@ -1,20 +1,22 @@
 # Stash-VR
 
 ## Playa integration
->
+
 > [!IMPORTANT]
 > This is a specialized fork of [o-fl0w/stash-vr](https://github.com/o-fl0w/stash-vr) that adds native support for the [Playa VR Video player](https://playavr.com/).
->
+
 ### Playa Features
 
-* **Native Integration**: Browsing and streaming directly, just visit the stash-vr page and it auto detects.
-* User made *saved filter* will be shown as category along with the stash tags.
-* Current Limitations:
-  * only tested on Android phone version (works fine for 6K resolution or low bitrate. lags on 8K or too high bitrate).
-  * only work on direct stream. transcoding doesnt work.
-  * No trailer or "preview", only thumbnails.
-  * might have to tinker on the graphql url or docker container network if you get timeout error.
-  * No write-back updates to the stash like play count, favorites, etc. mostly just the read only feature.
+- **Native Integration**: Browsing and streaming directly, just visit the stash-vr page and it auto detects.
+- User made _saved filter_ will be shown as category along with the stash tags.
+- A synthetic `Random` category is exposed under saved filter/topmost list; selecting it randomizes the `/videos` feed, and it can be combined with other categories like tags or saved filters.
+- Current Limitations:
+  - only tested on Android phone version (works fine for 6K resolution or low bitrate. lags on 8K or too high bitrate).
+  - only work on direct stream (selected as default). transcoding doesnt work.
+  - No trailer or "preview", only thumbnails.
+  - might have to tinker on the graphql url or docker container network if you get timeout error.
+  - No write-back updates to the stash like play count, favorites, etc. mostly just the read only feature.
+  - some edge cases like setting 2K for web video playback and playing 4K video could cause timeout error. I did initial testing on android and its fine to set the setting resolution to 4K.
 
 ---
 Watch your [Stash](https://github.com/stashapp/stash) library in VR for that full immersion effect.

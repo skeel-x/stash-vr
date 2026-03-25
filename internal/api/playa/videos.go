@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"math/rand"
 	"slices"
 	"stash-vr/internal/library"
 	"strings"
@@ -27,6 +28,7 @@ type videoQuery struct {
 	PageSize           int
 	Order              string
 	Direction          string
+	Randomize          bool
 	Title              string
 	ActorID            string
 	StudioID           string
@@ -102,12 +104,26 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseU
 		filtered = append(filtered, vd)
 	}
 
-	sortVideoData(filtered, query.Order, query.Direction)
+	if query.Randomize {
+		shuffleVideoData(filtered)
+	} else {
+		sortVideoData(filtered, query.Order, query.Direction)
+	}
 	items := make([]VideoListView, 0, len(filtered))
 	for _, vd := range filtered {
 		items = append(items, buildVideoListView(vd, baseURL))
 	}
 	return paginate(items, query.PageIndex, query.PageSize), nil
+}
+
+func shuffleVideoData(items []*library.VideoData) {
+	if len(items) < 2 {
+		return
+	}
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng.Shuffle(len(items), func(i int, j int) {
+		items[i], items[j] = items[j], items[i]
+	})
 }
 
 func sortVideoData(items []*library.VideoData, order string, direction string) {

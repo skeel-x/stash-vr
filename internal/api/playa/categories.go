@@ -3,7 +3,8 @@ package playa
 import "stash-vr/internal/library"
 
 func buildCategories(savedFilters []library.SavedFilterSceneSet, tags []library.Tag) []CategoryListView {
-	items := make([]CategoryListView, 0, len(savedFilters)+len(tags))
+	items := make([]CategoryListView, 0, len(savedFilters)+len(tags)+1)
+	items = append(items, CategoryListView{ID: randomCategoryID, Title: "Random"})
 	for _, filter := range savedFilters {
 		items = append(items, CategoryListView{ID: savedFilterCategoryPrefix + filter.ID, Title: filter.Name})
 	}
@@ -15,13 +16,12 @@ func buildCategories(savedFilters []library.SavedFilterSceneSet, tags []library.
 
 func buildCategoryGroups(savedFilters []library.SavedFilterSceneSet, tags []library.Tag) []CategoriesGroup {
 	groups := make([]CategoriesGroup, 0, 2)
-	if len(savedFilters) > 0 {
-		items := make([]CategoryListView, 0, len(savedFilters))
-		for _, filter := range savedFilters {
-			items = append(items, CategoryListView{ID: savedFilterCategoryPrefix + filter.ID, Title: filter.Name})
-		}
-		groups = append(groups, CategoriesGroup{ID: "custom-filters", Title: "Custom Filters", Items: items})
+	items := make([]CategoryListView, 0, len(savedFilters)+1)
+	items = append(items, CategoryListView{ID: randomCategoryID, Title: "Random"})
+	for _, filter := range savedFilters {
+		items = append(items, CategoryListView{ID: savedFilterCategoryPrefix + filter.ID, Title: filter.Name})
 	}
+	groups = append(groups, CategoriesGroup{ID: "custom-filters", Title: "Custom Filters", Items: items})
 	if len(tags) > 0 {
 		items := make([]CategoryListView, 0, len(tags))
 		for _, tag := range tags {

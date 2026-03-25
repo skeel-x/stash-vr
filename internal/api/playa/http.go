@@ -314,6 +314,25 @@ func parseVideoQuery(values url.Values) (videoQuery, *Rsp) {
 	if err != nil {
 		return videoQuery{}, &Rsp{Status: Status{Code: statusError, Message: err.Error()}}
 	}
+	randomize := false
+	filteredIncludedCategories := make([]categoryKey, 0, len(includedCategories))
+	for _, category := range includedCategories {
+		if category.Kind == "system" {
+			if category.ID == randomCategoryKey {
+				randomize = true
+				continue
+			}
+			return videoQuery{}, &Rsp{Status: Status{Code: statusError, Message: "unsupported category ID: " + category.Raw}}
+		}
+		filteredIncludedCategories = append(filteredIncludedCategories, category)
+	}
+	filteredExcludedCategories := make([]categoryKey, 0, len(excludedCategories))
+	for _, category := range excludedCategories {
+		if category.Kind == "system" {
+			return videoQuery{}, &Rsp{Status: Status{Code: statusError, Message: "unsupported excluded category: " + category.Raw}}
+		}
+		filteredExcludedCategories = append(filteredExcludedCategories, category)
+	}
 	actorID, err := parseEntityID(strings.TrimSpace(values.Get("actor")), actorPrefix, "actor")
 	if err != nil {
 		return videoQuery{}, &Rsp{Status: Status{Code: statusError, Message: err.Error()}}
@@ -327,11 +346,12 @@ func parseVideoQuery(values url.Values) (videoQuery, *Rsp) {
 		PageSize:           pageSize,
 		Order:              order,
 		Direction:          direction,
+		Randomize:          randomize,
 		Title:              strings.TrimSpace(values.Get("title")),
 		ActorID:            actorID,
 		StudioID:           studioID,
-		IncludedCategories: includedCategories,
-		ExcludedCategories: excludedCategories,
+		IncludedCategories: filteredIncludedCategories,
+		ExcludedCategories: filteredExcludedCategories,
 		IncludedStatuses:   includedStatuses,
 		ExcludedStatuses:   excludedStatuses,
 	}, nil
