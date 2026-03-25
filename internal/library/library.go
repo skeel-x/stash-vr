@@ -38,6 +38,13 @@ func NewService(client graphql.Client) *Service {
 	}
 }
 
+func (libraryService *Service) Warmup(ctx context.Context) error {
+	if _, err := libraryService.GetSections(ctx); err != nil {
+		return fmt.Errorf("get sections: %w", err)
+	}
+	return nil
+}
+
 type Stats struct {
 	Links  int
 	Scenes int

@@ -3,15 +3,16 @@ package internal
 import (
 	"context"
 	"fmt"
-	"github.com/Khan/genqlient/graphql"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"stash-vr/internal/build"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/logger"
 	"stash-vr/internal/server"
 	"stash-vr/internal/stash"
+
+	"github.com/Khan/genqlient/graphql"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func Run(ctx context.Context) error {
@@ -25,6 +26,9 @@ func Run(ctx context.Context) error {
 	logVersions(ctx, stashClient)
 
 	libraryService := library.NewService(stashClient)
+	if err := libraryService.Warmup(ctx); err != nil {
+		return fmt.Errorf("warm up library: %w", err)
+	}
 
 	err := server.Listen(ctx, config.Application().ListenAddress, libraryService)
 	if err != nil {
