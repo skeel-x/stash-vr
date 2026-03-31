@@ -17,8 +17,8 @@ type videoSortItem struct {
 	vd         *library.VideoData
 	lowerTitle string
 	playCount  int
-	release    int64
-	hasRelease bool
+	createdAt  int64
+	hasCreated bool
 	numericID  int
 	hasID      bool
 }
@@ -134,9 +134,9 @@ func sortVideoData(items []*library.VideoData, order string, direction string) {
 			if vd.SceneParts.Play_count != nil {
 				item.playCount = *vd.SceneParts.Play_count
 			}
-			if released := releaseDateUnix(vd.SceneParts.Date); released != nil {
-				item.release = *released
-				item.hasRelease = true
+			if !vd.SceneParts.Created_at.IsZero() {
+				item.createdAt = vd.SceneParts.Created_at.Unix()
+				item.hasCreated = true
 			}
 		}
 		item.numericID, item.hasID = numericID(vd.Id())
@@ -146,20 +146,20 @@ func sortVideoData(items []*library.VideoData, order string, direction string) {
 	slices.SortStableFunc(decorated, func(left, right videoSortItem) int {
 		switch order {
 		case "release_date":
-			if !left.hasRelease && !right.hasRelease {
+			if !left.hasCreated && !right.hasCreated {
 				c := strings.Compare(left.lowerTitle, right.lowerTitle)
 				if c == 0 {
 					c = compareEntityIDs(left.vd.Id(), left.numericID, left.hasID, right.vd.Id(), right.numericID, right.hasID)
 				}
 				return c
 			}
-			if !left.hasRelease {
+			if !left.hasCreated {
 				return 1
 			}
-			if !right.hasRelease {
+			if !right.hasCreated {
 				return -1
 			}
-			c := cmp.Compare(left.release, right.release)
+			c := cmp.Compare(left.createdAt, right.createdAt)
 			if direction == "desc" {
 				c = -c
 			}
