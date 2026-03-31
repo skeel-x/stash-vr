@@ -35,7 +35,6 @@ func buildVideoListView(vd *library.VideoData, baseURL string) VideoListView {
 	view := VideoListView{
 		ID:           vd.Id(),
 		Title:        vd.Title(),
-		Status:       publishedStatusID,
 		PreviewImage: previewImage(vd, baseURL),
 		HasScripts:   hasScripts(vd),
 		ReleaseDate:  releaseDate,
@@ -56,7 +55,6 @@ func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSce
 	view := VideoView{
 		ID:           videoID,
 		Title:        vd.Title(),
-		Status:       publishedStatusID,
 		PreviewImage: previewImage(vd, baseURL),
 		ReleaseDate:  releaseDate,
 		Views:        views,
