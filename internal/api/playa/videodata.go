@@ -233,7 +233,14 @@ func buildPlayableLinkCandidates(vd *library.VideoData, projection string, stere
 		return candidates
 	}
 
-	for _, source := range stash.GetTranscodingStream(sp).Sources {
+	// HLS, not stash's mp4 transcode (which heresphere/deovr use): that mp4 is a
+	// chunked empty_moov fragment stream with no Content-Length and no Range
+	// support, so PLAYA reads ftyp+moov, finds duration 0 and no index, and hangs
+	// up after ~1299 bytes without ever playing. The HLS VOD playlist carries real
+	// durations and seekable segments.
+	// Caveat: playlist segment URLs are relative and unkeyed, so a stash behind
+	// STASH_API_KEY will 401 on them.
+	for _, source := range stash.GetHLSStream(sp).Sources {
 		if source.Url == "" {
 			continue
 		}

@@ -33,10 +33,21 @@ func GetDirectStream(sp *gql.SceneParts) Stream {
 	}
 }
 func GetTranscodingStream(sp *gql.SceneParts) Stream {
+	return transcodingStream(sp, "video/mp4", "transcoding")
+}
+
+// GetHLSStream returns stash's segmented HLS transcodes, for players that
+// cannot start on the mp4 transcode. See buildPlayableLinkCandidates in
+// internal/api/playa for why PLAYA needs these.
+func GetHLSStream(sp *gql.SceneParts) Stream {
+	return transcodingStream(sp, "application/vnd.apple.mpegurl", "hls")
+}
+
+func transcodingStream(sp *gql.SceneParts, mimePrefix string, name string) Stream {
 	mp4Sources := make([]Source, 0)
 	seenResolutions := make(map[int]struct{})
 	for _, stream := range sp.SceneStreams {
-		if strings.HasPrefix(*stream.Mime_type, "video/mp4") && *stream.Label != "Direct stream" {
+		if strings.HasPrefix(*stream.Mime_type, mimePrefix) && *stream.Label != "Direct stream" {
 			resolution, err := parseResolutionFromLabel(*stream.Label)
 			if err != nil {
 				resolution = sp.Files[0].Height
@@ -54,7 +65,7 @@ func GetTranscodingStream(sp *gql.SceneParts) Stream {
 	slices.SortFunc(mp4Sources, func(a, b Source) int { return b.Resolution - a.Resolution })
 
 	return Stream{
-		Name:    "transcoding",
+		Name:    name,
 		Sources: mp4Sources,
 	}
 }
