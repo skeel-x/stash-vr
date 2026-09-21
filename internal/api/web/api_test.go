@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
+	"github.com/rs/zerolog"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 )
@@ -381,5 +382,32 @@ func TestHostChanged_Table(t *testing.T) {
 		if got := hostChanged(c.cur, c.next); got != c.want {
 			t.Errorf("hostChanged(%q, %q) = %v, want %v", c.cur, c.next, got, c.want)
 		}
+	}
+}
+
+func TestPutConfig_LogLevelChangeSetsGlobalLevel(t *testing.T) {
+	t.Cleanup(func() { zerolog.SetGlobalLevel(zerolog.InfoLevel) })
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "debug",
+	}
+
+	rec, _ := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	if zerolog.GlobalLevel() != zerolog.DebugLevel {
+		t.Fatalf("expected the global level to be debug, got %v", zerolog.GlobalLevel())
+	}
+
+	body["log_level"] = "info"
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 {
+		t.Fatalf("restore status %d: %s", rec.Code, rec.Body.String())
+	}
+	if zerolog.GlobalLevel() != zerolog.InfoLevel {
+		t.Fatalf("expected the global level back to info, got %v", zerolog.GlobalLevel())
 	}
 }
