@@ -229,7 +229,6 @@ func (h httpHandler) studioHandler(w http.ResponseWriter, req *http.Request) {
 func (h httpHandler) writeJSON(req *http.Request, w http.ResponseWriter, data any) {
 	if err := internal.WriteJson(req.Context(), w, data); err != nil {
 		log.Ctx(req.Context()).Error().Err(err).Msg("error writing Playa response")
-		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
