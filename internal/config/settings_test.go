@@ -136,3 +136,15 @@ func TestSet_RejectsInvalidAndLeavesStoreUnchanged(t *testing.T) {
 		t.Fatalf("store must be unchanged after rejected Set, got %#v", got)
 	}
 }
+
+func TestApplication_ReturnedFiltersDoNotAliasNextSet(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Application()
+	cfg.Filters = append(cfg.Filters, Filter{ID: "x"})
+	if got := Application().Filters; len(got) != 0 {
+		t.Fatalf("appending to a returned config must not change the store, got %v", got)
+	}
+}

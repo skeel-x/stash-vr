@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 )
 
 // Filter is a per-saved-filter override: display order, optional rename,
@@ -39,15 +40,27 @@ type fileConfig struct {
 }
 
 var (
-	mu      sync.RWMutex
-	current ApplicationConfig
+	// mu serialises writers only; readers go through the atomic pointer.
+	mu      sync.Mutex
+	current atomic.Pointer[ApplicationConfig]
 )
 
-// Application returns a copy of the current settings.
+// Application returns the current settings. It neither locks nor allocates,
+// so it is cheap enough for the per-tag player hot paths.
+//
+// The returned Filters slice is shared and must be treated as read-only;
+// writers always store a fresh slice.
 func Application() ApplicationConfig {
-	mu.RLock()
-	defer mu.RUnlock()
-	return cloneConfig(current)
+	if p := current.Load(); p != nil {
+		return *p
+	}
+	return ApplicationConfig{}
+}
+
+// store publishes c as the current settings. The caller must hold mu and must
+// pass a value whose Filters slice is not shared with anyone else.
+func store(c ApplicationConfig) {
+	current.Store(&c)
 }
 
 func cloneConfig(c ApplicationConfig) ApplicationConfig {
@@ -98,7 +111,7 @@ func Load(seed ApplicationConfig) error {
 			return err
 		}
 		mu.Lock()
-		current = cloneConfig(seed)
+		store(cloneConfig(seed))
 		mu.Unlock()
 		return nil
 	case err != nil:
@@ -114,7 +127,7 @@ func Load(seed ApplicationConfig) error {
 		return fmt.Errorf("config %s: %w", path, err)
 	}
 	mu.Lock()
-	current = cloneConfig(merged)
+	store(cloneConfig(merged))
 	mu.Unlock()
 	return nil
 }
@@ -156,11 +169,12 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
+	cur := Application()
 	next := cloneConfig(cfg)
-	next.ListenAddress = current.ListenAddress
-	next.DisableLogColor = current.DisableLogColor
-	next.IsRedactDisabled = current.IsRedactDisabled
-	next.ConfigPath = current.ConfigPath
+	next.ListenAddress = cur.ListenAddress
+	next.DisableLogColor = cur.DisableLogColor
+	next.IsRedactDisabled = cur.IsRedactDisabled
+	next.ConfigPath = cur.ConfigPath
 	if next.Filters == nil {
 		next.Filters = []Filter{}
 	}
@@ -170,7 +184,7 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	if err := write(FilePath(next), next); err != nil {
 		return ApplicationConfig{}, err
 	}
-	current = next
+	store(next)
 	return cloneConfig(next), nil
 }
 
