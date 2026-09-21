@@ -12,8 +12,8 @@ services:
       STASH_GRAPHQL_URL: "http://localhost:9999/graphql"
       #STASH_API_KEY: "xxx"
 
-      ## For configurations in status page to persist a path must be provided that Stash-VR has write access to.
-      #CONFIG_PATH: /config
+      ## Where config.json is stored; mount a directory writable by uid 65532.
+      CONFIG_PATH: /config
 
       #FAVORITE_TAG: "FAVORITE"
       #EXCLUDE_SORT_NAME: "hidden"

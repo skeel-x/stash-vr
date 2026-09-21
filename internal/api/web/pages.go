@@ -73,6 +73,9 @@ func render(w http.ResponseWriter, r *http.Request, t *template.Template, data p
 }
 
 func (h pageHandler) dashboard(w http.ResponseWriter, r *http.Request) {
+	// The page embeds the keyed sample cover URL for the headset check, so it
+	// must not be cached by a browser or an intermediary.
+	w.Header().Set("Cache-Control", "no-store")
 	data := h.base("Dashboard", "dashboard")
 	data.Status = BuildStatus(r.Context(), h.lib)
 	data.Links = LinksFor(r)

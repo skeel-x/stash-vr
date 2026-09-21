@@ -46,6 +46,10 @@ func TestDashboard_RendersPlayerLinksFromForwardedProto(t *testing.T) {
 	if !strings.Contains(body, `data-cover="http://stash:9999/scene/1/screenshot?apikey=secret"`) {
 		t.Fatal("expected the keyed sample cover only in the data-cover attribute")
 	}
+	// It embeds the keyed cover URL, so the page must not be cached.
+	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Fatalf("expected Cache-Control no-store, got %q", cc)
+	}
 }
 
 func TestDashboard_WarnsAboutPlainHttpForDeoVR(t *testing.T) {

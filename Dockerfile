@@ -28,13 +28,21 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -ldflags "-s -w -X stash-vr/internal/build.Version=$BUILD_VERSION -X stash-vr/internal/build.SHA=$BUILD_SHA" \
       -o /out/stash-vr ./cmd/stash-vr
 
+# The final image has no shell, so the config directory is created here and
+# copied in with the right ownership.
+RUN mkdir -p /out/config
+
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /app
 COPY --from=build /out/stash-vr /app/stash-vr
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=build --chown=nonroot:nonroot /out/config /config
 
 ENV STASH_GRAPHQL_URL=http://localhost:9999/graphql
+ENV CONFIG_PATH=/config
+
+VOLUME /config
 
 EXPOSE 9666
 USER nonroot:nonroot
