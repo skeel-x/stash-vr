@@ -44,7 +44,7 @@ type Status struct {
 // BuildStatus probes Stash and the library. It never returns an error: every
 // failure is reported inside the status so the page can explain it.
 func BuildStatus(ctx context.Context, lib *library.Service) Status {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	cfg := config.Application()
@@ -59,7 +59,7 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 		s.ConfigFileExists = true
 	}
 
-	version, err := stash.GetVersion(ctx, lib.Client())
+	version, err := stash.GetVersion(probeCtx, lib.Client())
 	if err != nil {
 		var httpErr *graphql.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
@@ -74,6 +74,10 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 	s.Connection = ConnectionOk
 	s.StashVersion = version
 
+	// GetSections runs its build under a singleflight shared with player index
+	// requests (HereSphere/DeoVR); the probe timeout must not govern that
+	// shared build, so the original request context is used here, not
+	// probeCtx.
 	sections, err := lib.GetSections(ctx)
 	if err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve sections")
@@ -83,7 +87,7 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 		s.Scenes = lib.Stats.Scenes
 	}
 
-	cover, err := gql.FindSampleSceneCover(ctx, lib.Client())
+	cover, err := gql.FindSampleSceneCover(probeCtx, lib.Client())
 	if err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve sample scene cover url")
 	} else if cover.FindScenes != nil && len(cover.FindScenes.Scenes) > 0 && cover.FindScenes.Scenes[0].Paths != nil && cover.FindScenes.Scenes[0].Paths.Screenshot != nil {
