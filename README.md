@@ -74,6 +74,12 @@ Example: Connect to Stash running on stash-host:9999 with api key XXX and set St
 
 `stash-vr --STASH_GRAPHQL_URL=http://stash-host:9999/graphql --STASH_API_KEY=XXX --LISTEN_ADDRESS=:9000`
 
+### Settings and the web UI
+
+Open Stash-VR in a browser (for example `http://localhost:9666`). The dashboard shows whether Stash is reachable and gives the address to enter in HereSphere, DeoVR or Playa. **Settings** lets you change every runtime option; changes apply immediately and are stored in `config.json`.
+
+`config.json` lives in the directory given by `CONFIG_PATH` (default: a `config` directory next to the binary; in the Docker image set `CONFIG_PATH=/config` and mount it). The environment variables and flags below only seed the file on first start; after that the file is the source of truth. `LISTEN_ADDRESS`, `DISABLE_LOG_COLOR` and `DISABLE_REDACT` are process settings and stay flags.
+
 ### Configuration
 
 * `STASH_GRAPHQL_URL`
@@ -86,7 +92,7 @@ Example: Connect to Stash running on stash-host:9999 with api key XXX and set St
 <summary>More (click to expand)</summary>
 
 * `CONFIG_PATH`
-  * A path Stash-VR can access and save configuration to. If not specified changes will apply in memory but not persist between restarts.
+  * Directory for `config.json`. Default: `config` next to the binary.
 * `FAVORITE_TAG`
   * Default: `FAVORITE`
   * Name of tag in Stash to hold scenes marked as [favorites](#favorites) (will be created if not present).
