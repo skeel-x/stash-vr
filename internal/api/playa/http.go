@@ -87,6 +87,10 @@ func (h httpHandler) posterHandler(w http.ResponseWriter, req *http.Request) {
 	videoID := chi.URLParam(req, "videoId")
 	vd, err := h.libraryService.GetScene(ctx, videoID, false)
 	if err != nil {
+		if errors.Is(err, library.ErrSceneNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		h.writeInternalError(ctx, w, err, "failed to load poster")
 		return
 	}
@@ -135,6 +139,10 @@ func (h httpHandler) videoHandler(w http.ResponseWriter, req *http.Request) {
 	wg.Wait()
 
 	if sceneErr != nil {
+		if errors.Is(sceneErr, library.ErrSceneNotFound) {
+			h.writeJSON(req, w, notFoundRsp("Video", videoID))
+			return
+		}
 		h.writeInternalError(ctx, w, sceneErr, "failed to load video")
 		return
 	}
