@@ -16,7 +16,9 @@ import (
 )
 
 func Run(ctx context.Context) error {
-	config.Init()
+	if err := config.Init(); err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
 	log.Logger = logger.New(config.Application().LogLevel, config.Application().DisableLogColor)
 	zerolog.DefaultContextLogger = &log.Logger
 

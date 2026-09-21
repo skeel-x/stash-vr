@@ -174,7 +174,7 @@ func (libraryService *Service) getFilters(ctx context.Context) ([]gql.SavedFilte
 
 	var out []gql.SavedFilterParts
 
-	userConfigFilters := config.User(ctx).Filters
+	userConfigFilters := config.Application().Filters
 
 	if len(userConfigFilters) == 0 {
 		out, err = libraryService.buildFiltersByFrontpage(ctx, savedFilters)

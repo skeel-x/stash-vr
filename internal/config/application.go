@@ -35,11 +35,10 @@ type ApplicationConfig struct {
 	ExcludeSortName    string
 	ConfigPath         string
 	GenerateSummaryIds bool
+	Filters            []Filter
 }
 
-var applicationConfig ApplicationConfig
-
-func Init() {
+func Init() error {
 	pflag.String(envKeyListenAddress, ":9666", "Local address for Stash-VR to listen on")
 	_ = viper.BindPFlag(envKeyListenAddress, pflag.Lookup(envKeyListenAddress))
 
@@ -88,23 +87,22 @@ func Init() {
 
 	viper.AutomaticEnv()
 
-	applicationConfig.ListenAddress = viper.GetString(envKeyListenAddress)
-	applicationConfig.StashGraphQLUrl = viper.GetString(envKeyStashGraphQLUrl)
-	applicationConfig.StashApiKey = viper.GetString(envKeyStashApiKey)
-	applicationConfig.FavoriteTag = viper.GetString(envKeyFavoriteTag)
-	applicationConfig.LogLevel = strings.ToLower(viper.GetString(envKeyLogLevel))
-	applicationConfig.DisableLogColor = viper.GetBool(envKeyDisableLogColor)
-	applicationConfig.IsRedactDisabled = viper.GetBool(envKeyDisableRedact)
-	applicationConfig.ForceHTTPS = viper.GetBool(envKeyForceHTTPS)
-	applicationConfig.HeatmapHeightPx = viper.GetInt(envKeyHeatmapHeightPx)
-	applicationConfig.ExcludeSortName = viper.GetString(envKeyExcludeSortName)
-	applicationConfig.ConfigPath = viper.GetString(envKeyUserConfigPath)
-	applicationConfig.GenerateSummaryIds = viper.GetBool(envKeyGenerateSummaryIds)
+	seed := ApplicationConfig{
+		ListenAddress:      viper.GetString(envKeyListenAddress),
+		StashGraphQLUrl:    viper.GetString(envKeyStashGraphQLUrl),
+		StashApiKey:        viper.GetString(envKeyStashApiKey),
+		FavoriteTag:        viper.GetString(envKeyFavoriteTag),
+		LogLevel:           strings.ToLower(viper.GetString(envKeyLogLevel)),
+		DisableLogColor:    viper.GetBool(envKeyDisableLogColor),
+		IsRedactDisabled:   viper.GetBool(envKeyDisableRedact),
+		ForceHTTPS:         viper.GetBool(envKeyForceHTTPS),
+		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
+		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),
+		ConfigPath:         viper.GetString(envKeyUserConfigPath),
+		GenerateSummaryIds: viper.GetBool(envKeyGenerateSummaryIds),
+	}
 
-}
-
-func Application() ApplicationConfig {
-	return applicationConfig
+	return Load(seed)
 }
 
 func (a ApplicationConfig) Redacted() ApplicationConfig {

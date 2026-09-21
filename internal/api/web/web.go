@@ -83,7 +83,7 @@ func stashFilters(ctx context.Context, stashClient graphql.Client) ([]filterData
 }
 
 func filterOverrideRows(ctx context.Context, stashFilters []filterData) []filterOverride {
-	cfg := config.User(ctx)
+	cfg := config.Application()
 
 	rows := make([]filterOverride, 0, len(stashFilters))
 	seen := map[string]struct{}{}
@@ -185,7 +185,11 @@ func FiltersUpdateHandler() http.HandlerFunc {
 
 		ids := r.PostForm["id"]
 		if len(ids) == 0 {
-			config.Save(r.Context(), config.UserConfig{})
+			cfg := config.Application()
+			cfg.Filters = []config.Filter{}
+			if _, err := config.Set(cfg); err != nil {
+				log.Ctx(r.Context()).Warn().Err(err).Msg("failed to save filters")
+			}
 		}
 
 		sourceNames := r.PostForm["sourceName"]
@@ -208,10 +212,11 @@ func FiltersUpdateHandler() http.HandlerFunc {
 			ovs = append(ovs, ov)
 		}
 
-		cfg := config.User(r.Context())
+		cfg := config.Application()
 		cfg.Filters = ovs
-
-		config.Save(r.Context(), cfg)
+		if _, err := config.Set(cfg); err != nil {
+			log.Ctx(r.Context()).Warn().Err(err).Msg("failed to save filters")
+		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
