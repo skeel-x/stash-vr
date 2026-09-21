@@ -147,7 +147,7 @@ func (h httpHandler) videoHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	view := buildVideoView(vd, savedFilters, internal.GetBaseUrl(req))
-	log.Ctx(ctx).Info().Interface("videoView", view).Msg("Serving video details")
+	log.Ctx(ctx).Debug().Str("id", view.ID).Msg("Serving video details")
 	h.writeJSON(req, w, okRsp(view))
 }
 
