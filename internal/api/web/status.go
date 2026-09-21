@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/rs/zerolog/log"
@@ -34,12 +35,18 @@ type Status struct {
 	Sections         int    `json:"sections"`
 	Links            int    `json:"links"`
 	Scenes           int    `json:"scenes"`
-	SampleCoverUrl   string `json:"sample_cover_url,omitempty"`
+	// SampleCoverUrl carries the Stash API key (via stash.ApiKeyed) so the
+	// dashboard's headset-reachability check can load it directly. It must
+	// never be serialised to the browser.
+	SampleCoverUrl string `json:"-"`
 }
 
 // BuildStatus probes Stash and the library. It never returns an error: every
 // failure is reported inside the status so the page can explain it.
 func BuildStatus(ctx context.Context, lib *library.Service) Status {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	cfg := config.Application()
 	s := Status{
 		Version:       build.FullVersion(),

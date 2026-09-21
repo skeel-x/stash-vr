@@ -100,8 +100,24 @@ func TestStatus_ReportsOkWithCounts(t *testing.T) {
 	if out["sections"].(float64) != 1 || out["links"].(float64) != 2 || out["scenes"].(float64) != 2 {
 		t.Fatalf("expected counts 1/2/2, got %v", out)
 	}
-	if out["api_key_set"] != true || out["sample_cover_url"] == "" {
-		t.Fatalf("expected api_key_set and sample cover, got %v", out)
+	if out["api_key_set"] != true {
+		t.Fatalf("expected api_key_set, got %v", out)
+	}
+	if strings.Contains(rec.Body.String(), "secret") {
+		t.Fatal("api key leaked in status response")
+	}
+	if strings.Contains(rec.Body.String(), "sample_cover_url") {
+		t.Fatal("sample cover url must not be serialised")
+	}
+}
+
+func TestBuildStatus_KeepsSampleCoverForPages(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+
+	s := BuildStatus(context.Background(), lib)
+
+	if s.SampleCoverUrl == "" || !strings.Contains(s.SampleCoverUrl, "apikey=") {
+		t.Fatalf("expected sample cover url with apikey, got %q", s.SampleCoverUrl)
 	}
 }
 
@@ -155,7 +171,7 @@ func TestPutConfig_NewUrlSwapsLibraryClient(t *testing.T) {
 	lib, h := newEnv(t, &fakeStash{})
 	before := lib.Client()
 	body := map[string]any{
-		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
+		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "newkey",
 		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
 	}
@@ -167,6 +183,56 @@ func TestPutConfig_NewUrlSwapsLibraryClient(t *testing.T) {
 	}
 	if lib.Client() == before {
 		t.Fatal("expected the library client to be replaced after a URL change")
+	}
+	if config.Application().StashApiKey != "newkey" {
+		t.Fatalf("expected new api key to be stored, got %q", config.Application().StashApiKey)
+	}
+}
+
+func TestPutConfig_NewHostWithoutKeyIs400(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 400 || out["error"] == "" {
+		t.Fatalf("expected 400 with error, got %d %v", rec.Code, out)
+	}
+	if config.Application().StashGraphQLUrl != "http://stash:9999/graphql" {
+		t.Fatal("store must be unchanged")
+	}
+}
+
+func TestTestConfig_NewHostWithoutKeyIsRefused(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
+		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
+	})
+
+	if rec.Code != 200 || out["ok"] != false {
+		t.Fatalf("expected ok=false, got %d %v", rec.Code, out)
+	}
+	errStr, _ := out["error"].(string)
+	if !strings.Contains(errStr, "api key") {
+		t.Fatalf("expected error mentioning api key, got %v", out)
+	}
+}
+
+func TestMutation_RequiresJsonContentType(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	req := httptest.NewRequest(http.MethodPut, "/config", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("expected 415, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

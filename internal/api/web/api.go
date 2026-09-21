@@ -3,6 +3,8 @@ package web
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -76,6 +78,7 @@ type apiHandler struct {
 func ApiRouter(lib *library.Service) http.Handler {
 	h := apiHandler{lib: lib}
 	r := chi.NewRouter()
+	r.Use(requireJsonContentType)
 	r.Get("/status", h.status)
 	r.Get("/config", h.getConfig)
 	r.Put("/config", h.putConfig)
@@ -83,6 +86,33 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Put("/filters", h.putFilters)
 	r.Post("/reindex", h.reindex)
 	return r
+}
+
+// requireJsonContentType rejects PUT/POST requests that are not
+// application/json, so a cross-origin browser request must preflight (and
+// fail) rather than land as a simple request.
+func requireJsonContentType(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut || r.Method == http.MethodPost {
+			if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+				writeError(r.Context(), w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// hostChanged reports whether next names a different Stash host than
+// current, so callers can require the API key to be resupplied rather than
+// silently sending the stored key to a different host.
+func hostChanged(current, next string) bool {
+	cu, err1 := url.Parse(current)
+	nu, err2 := url.Parse(next)
+	if err1 != nil || err2 != nil {
+		return true
+	}
+	return !strings.EqualFold(cu.Host, nu.Host)
 }
 
 func writeError(ctx context.Context, w http.ResponseWriter, code int, msg string) {
@@ -114,6 +144,10 @@ func (h apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prev := config.Application()
+	if hostChanged(prev.StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
+		writeError(ctx, w, http.StatusBadRequest, "api key required when changing the Stash host")
+		return
+	}
 	next := prev
 	next.StashGraphQLUrl = in.StashGraphQLUrl
 	if in.StashApiKey != "" {
@@ -140,6 +174,10 @@ func (h apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 	in, err := internal.UnmarshalBody[testInput](r)
 	if err != nil {
 		writeError(ctx, w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
+		return
+	}
+	if hostChanged(config.Application().StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
+		writeJson(ctx, w, testResult{Ok: false, Error: "api key required when testing a different Stash host"})
 		return
 	}
 	key := in.StashApiKey
