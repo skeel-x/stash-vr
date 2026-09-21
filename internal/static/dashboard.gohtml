@@ -1,0 +1,77 @@
+{{define "content"}}
+<section class="card" id="connection">
+  <h2>Connection</h2>
+  <dl>
+    <dt>Stash-VR → Stash</dt>
+    <dd>
+      {{if eq .Status.Connection "ok"}}<span class="pill ok">Connected</span> Stash {{.Status.StashVersion}}
+      {{else if eq .Status.Connection "unauthorized"}}<span class="pill err">Wrong API key</span> Stash rejected the request. <a href="/settings">Fix the API key</a>.
+      {{else}}<span class="pill err">Unreachable</span> {{.Status.ConnectionError}} <a href="/settings">Check the URL</a>.{{end}}
+    </dd>
+    <dt>Headset → Stash</dt>
+    <dd id="headset-check" data-cover="{{.Status.SampleCoverUrl}}">
+      {{if .Status.SampleCoverUrl}}<span class="pill wait">Checking…</span>{{else}}<span class="pill warn">No sample cover available</span>{{end}}
+    </dd>
+    <dt>API key</dt>
+    <dd>{{if .Status.ApiKeySet}}set{{else}}<span class="pill warn">not set</span> Stash usually requires one{{end}}</dd>
+    <dt>Config file</dt>
+    <dd><code>{{.Status.ConfigPath}}</code>{{if not .Status.ConfigFileExists}} <span class="pill warn">not written yet</span>{{end}}</dd>
+    <dt>Listening on</dt>
+    <dd><code>{{.Status.ListenAddress}}</code> · log level <code>{{.Status.LogLevel}}</code></dd>
+  </dl>
+</section>
+
+<section class="card" id="library">
+  <h2>Library</h2>
+  <div class="stats">
+    <div><strong id="stat-sections">{{.Status.Sections}}</strong><span>sections</span></div>
+    <div><strong id="stat-links">{{.Status.Links}}</strong><span>links</span></div>
+    <div><strong id="stat-scenes">{{.Status.Scenes}}</strong><span>scenes</span></div>
+  </div>
+  <p class="row">
+    <button type="button" id="reindex">Rebuild index</button>
+    <span class="msg" id="reindex-msg"></span>
+    <a class="link" href="/filters">Choose and order sections</a>
+  </p>
+</section>
+
+{{if eq .Status.Connection "ok"}}
+<h2 class="section-title">Connect your player</h2>
+<div class="players">
+  <section class="card player">
+    <h3>HereSphere</h3>
+    <ol>
+      <li>Open the HereSphere web browser.</li>
+      <li>Enter this address and press Go:</li>
+    </ol>
+    <div class="copy"><code>{{.Links.HereSphere}}</code><button type="button" data-copy="{{.Links.HereSphere}}">Copy</button></div>
+    <p class="hint">Bookmark it in HereSphere. Rating, favorites, tags and markers you set in HereSphere are written back to Stash.</p>
+  </section>
+
+  <section class="card player">
+    <h3>DeoVR</h3>
+    <ol>
+      <li>Open the DeoVR browser and enter this address:</li>
+    </ol>
+    <div class="copy"><code>{{.Links.DeoVR}}</code><button type="button" data-copy="{{.Links.DeoVR}}">Copy</button></div>
+    <p class="hint">DeoVR detects the library on this page. If it does not, press the play button in the top-right corner.</p>
+    {{if .Links.PlainHTTP}}<p class="warn-box">DeoVR does not load covers over plain HTTP. Put Stash-VR behind HTTPS (for example a reverse proxy) for covers.</p>{{end}}
+  </section>
+
+  <section class="card player">
+    <h3>Playa</h3>
+    <ol>
+      <li>In Playa, add a server and enter this address:</li>
+    </ol>
+    <div class="copy"><code>{{.Links.Playa}}</code><button type="button" data-copy="{{.Links.Playa}}">Copy</button></div>
+    <p class="hint">Playa detects the API automatically. Browsing is read-only. Use the direct stream: transcoded qualities do not play when an API key is set.</p>
+  </section>
+</div>
+{{else}}
+<section class="card warn-box">
+  <h2>Stash-VR cannot reach Stash</h2>
+  <p>Players will not see a library until this is fixed. Open <a href="/settings">Settings</a>, check the GraphQL URL and API key, and use <em>Test connection</em>.</p>
+  <p>For details, set the log level to <code>debug</code> in Settings and watch the log output. Current level: <code>{{.Status.LogLevel}}</code>.</p>
+</section>
+{{end}}
+{{end}}

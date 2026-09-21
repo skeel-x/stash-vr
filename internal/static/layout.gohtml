@@ -1,0 +1,29 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Stash-VR</title>
+  <link rel="icon" href="/icon.png" type="image/png">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><img src="/icon.png" alt="">Stash-VR</a>
+  <nav>
+    <a href="/"{{if eq .Active "dashboard"}} class="active"{{end}}>Dashboard</a>
+    <a href="/settings"{{if eq .Active "settings"}} class="active"{{end}}>Settings</a>
+    <a href="/filters"{{if eq .Active "filters"}} class="active"{{end}}>Filters</a>
+  </nav>
+  <span class="version" title="Stash-VR version">{{.Version}}</span>
+</header>
+<main>
+{{template "content" .}}
+</main>
+<footer>
+  <a href="https://github.com/o-fl0w/stash-vr" target="_blank" rel="noopener">o-fl0w/stash-vr</a>
+  · Playa integration by RGinting367
+</footer>
+<script src="/app.js"></script>
+</body>
+</html>{{end}}

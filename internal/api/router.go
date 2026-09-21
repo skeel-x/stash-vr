@@ -31,12 +31,11 @@ func Router(libraryService *library.Service) *chi.Mux {
 	router.Mount("/deovr", logMod("deovr", deovr.Router(libraryService)))
 	router.Mount("/api/playa/v2", logMod("playa", playa.Router(libraryService)))
 
-	router.Post("/filters", logMod("filters", web.FiltersUpdateHandler()).ServeHTTP)
 	router.Get("/cover/{videoId}", logMod("heatmap", heatmap.CoverHandler(libraryService)).ServeHTTP)
 
 	router.Mount("/api/ui", logMod("ui", web.ApiRouter(libraryService)))
 
-	router.Get("/", web.IndexHandler(libraryService).ServeHTTP)
+	web.Register(router, libraryService)
 
 	router.Get("/*", http.FileServerFS(static.Fs).ServeHTTP)
 
