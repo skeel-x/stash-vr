@@ -131,7 +131,7 @@ func IndexHandler(libraryService *library.Service) http.HandlerFunc {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if version, err := stash.GetVersion(r.Context(), libraryService.StashClient); err != nil {
+			if version, err := stash.GetVersion(r.Context(), libraryService.Client()); err != nil {
 				var gqlErr *graphql.HTTPError
 				if errors.As(err, &gqlErr) {
 					if gqlErr.StatusCode == 401 {
@@ -142,13 +142,13 @@ func IndexHandler(libraryService *library.Service) http.HandlerFunc {
 			} else {
 				data.StashConnectionResponse = statusOk
 				data.StashData = &stashData{Version: version}
-				data.StashData.FilterData, err = stashFilters(r.Context(), libraryService.StashClient)
+				data.StashData.FilterData, err = stashFilters(r.Context(), libraryService.Client())
 				if err != nil {
 					log.Ctx(r.Context()).Warn().Err(err).Msg("Failed to retrieve stash filters")
 				} else {
 					data.StashData.FilterOverrides = filterOverrideRows(r.Context(), data.StashData.FilterData)
 				}
-				data.StashData.SampleSceneCoverUrl, err = sampleSceneCoverUrl(r.Context(), libraryService.StashClient)
+				data.StashData.SampleSceneCoverUrl, err = sampleSceneCoverUrl(r.Context(), libraryService.Client())
 				if err != nil {
 					log.Ctx(r.Context()).Warn().Err(err).Msg("Failed to retrieve sample scene cover url")
 				}

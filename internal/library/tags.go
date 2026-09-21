@@ -23,7 +23,7 @@ type Tag struct {
 // called on every index build so tag hierarchy changes in Stash show up
 // without a restart.
 func (libraryService *Service) LoadTags(ctx context.Context) error {
-	resp, err := gql.FindAllTags(ctx, libraryService.StashClient)
+	resp, err := gql.FindAllTags(ctx, libraryService.Client())
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (libraryService *Service) GetBrowseTags(ctx context.Context) ([]Tag, error)
 
 func (libraryService *Service) GetTagSceneIDs(ctx context.Context, tagID string) ([]string, error) {
 	allPages := -1
-	resp, err := gql.FindSceneIdsByFilter(ctx, libraryService.StashClient,
+	resp, err := gql.FindSceneIdsByFilter(ctx, libraryService.Client(),
 		&gql.SceneFilterType{Tags: &gql.HierarchicalMultiCriterionInput{Modifier: gql.CriterionModifierIncludes, Value: []string{tagID}}},
 		&gql.FindFilterType{Per_page: &allPages},
 	)

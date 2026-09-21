@@ -80,7 +80,7 @@ func (libraryService *Service) GetScene(ctx context.Context, id string, forceFet
 }
 
 func (libraryService *Service) fetchVideoData(ctx context.Context, sceneIds []int) ([]*VideoData, error) {
-	resp, err := gql.FindScenes(ctx, libraryService.StashClient, sceneIds)
+	resp, err := gql.FindScenes(ctx, libraryService.Client(), sceneIds)
 	if err != nil {
 		return nil, fmt.Errorf("FindScenes: %w", err)
 	}

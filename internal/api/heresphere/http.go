@@ -26,7 +26,7 @@ func (h *httpHandler) indexHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	baseUrl := internal.GetBaseUrl(req)
 
-	mpf := stash.GetMinPlayPercent(ctx, h.libraryService.StashClient) / 100
+	mpf := stash.GetMinPlayPercent(ctx, h.libraryService.Client()) / 100
 	minPlayFraction = &mpf
 
 	sections, err := h.libraryService.GetSections(ctx)

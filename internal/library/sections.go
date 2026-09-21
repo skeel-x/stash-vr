@@ -77,7 +77,7 @@ func (libraryService *Service) GetSections(ctx context.Context) ([]Section, erro
 }
 
 func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Section, error) {
-	resp, err := gql.FindAllSceneIds(ctx, libraryService.StashClient)
+	resp, err := gql.FindAllSceneIds(ctx, libraryService.Client())
 	if err != nil {
 		return nil, fmt.Errorf("FindAllSceneIds: %w", err)
 	}
@@ -132,7 +132,7 @@ func (libraryService *Service) resolveSavedFilterSceneSets(ctx context.Context, 
 				return
 			}
 
-			resp, err := gql.FindSceneIdsByFilter(ctx, libraryService.StashClient, &sceneFilter.SceneFilter, &sceneFilter.FilterOpts)
+			resp, err := gql.FindSceneIdsByFilter(ctx, libraryService.Client(), &sceneFilter.SceneFilter, &sceneFilter.FilterOpts)
 			if err != nil {
 				flog.Err(err).Interface("savedFilter", f).Interface("sceneFilter", sceneFilter).Msg("Failed to find scenes by filter, skipping")
 				return
@@ -163,7 +163,7 @@ func (libraryService *Service) resolveSavedFilterSceneSets(ctx context.Context, 
 }
 
 func (libraryService *Service) getFilters(ctx context.Context) ([]gql.SavedFilterParts, error) {
-	savedFilters, err := gql.FindSavedSceneFilters(ctx, libraryService.StashClient)
+	savedFilters, err := gql.FindSavedSceneFilters(ctx, libraryService.Client())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find saved filters: %w", err)
 	}
@@ -185,7 +185,7 @@ func (libraryService *Service) getFilters(ctx context.Context) ([]gql.SavedFilte
 }
 
 func (libraryService *Service) buildFiltersByFrontpage(ctx context.Context, savedFilters *gql.FindSavedSceneFiltersResponse) ([]gql.SavedFilterParts, error) {
-	fpIds, err := stash.FindSavedFilterIdsByFrontPage(ctx, libraryService.StashClient)
+	fpIds, err := stash.FindSavedFilterIdsByFrontPage(ctx, libraryService.Client())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find frontpage filter IDs: %w", err)
 	}

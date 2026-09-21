@@ -9,20 +9,52 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Khan/genqlient/graphql"
 	"golang.org/x/sync/singleflight"
 )
 
 type Service struct {
-	StashClient graphql.Client
-	vdCache     map[string]*VideoData
-	muVdCache   sync.RWMutex
-	single      singleflight.Group
-	Stats       Stats
+	client    atomic.Pointer[clientBox]
+	vdCache   map[string]*VideoData
+	muVdCache sync.RWMutex
+	single    singleflight.Group
+	Stats     Stats
 
 	tagCache   map[string]*Tag
 	muTagCache sync.RWMutex
+}
+
+// clientBox wraps the client so different concrete client types can be
+// stored atomically.
+type clientBox struct {
+	c graphql.Client
+}
+
+// Client returns the current Stash client.
+func (libraryService *Service) Client() graphql.Client {
+	return libraryService.client.Load().c
+}
+
+// SetStashClient swaps the Stash client and drops every cache so the next
+// request rebuilds the library against the new Stash.
+func (libraryService *Service) SetStashClient(client graphql.Client) {
+	libraryService.client.Store(&clientBox{c: client})
+	libraryService.ResetCaches()
+}
+
+// ResetCaches drops cached scenes, tags and stats; the next index request
+// refetches everything.
+func (libraryService *Service) ResetCaches() {
+	libraryService.muVdCache.Lock()
+	libraryService.vdCache = make(map[string]*VideoData)
+	libraryService.Stats = Stats{}
+	libraryService.muVdCache.Unlock()
+
+	libraryService.muTagCache.Lock()
+	libraryService.tagCache = nil
+	libraryService.muTagCache.Unlock()
 }
 
 func (libraryService *Service) snapshot() map[string]*VideoData {
@@ -32,10 +64,11 @@ func (libraryService *Service) snapshot() map[string]*VideoData {
 }
 
 func NewService(client graphql.Client) *Service {
-	return &Service{
-		StashClient: client,
-		vdCache:     make(map[string]*VideoData),
+	s := &Service{
+		vdCache: make(map[string]*VideoData),
 	}
+	s.client.Store(&clientBox{c: client})
+	return s
 }
 
 func (libraryService *Service) Warmup(ctx context.Context) error {
@@ -77,7 +110,7 @@ type Studio struct {
 }
 
 func (libraryService *Service) GetAllSceneIDs(ctx context.Context) ([]string, error) {
-	resp, err := gql.FindAllSceneIds(ctx, libraryService.StashClient)
+	resp, err := gql.FindAllSceneIds(ctx, libraryService.Client())
 	if err != nil {
 		return nil, fmt.Errorf("FindAllSceneIds: %w", err)
 	}
@@ -119,7 +152,7 @@ func (libraryService *Service) GetScenesByIDs(ctx context.Context, sceneIDs []st
 }
 
 func (libraryService *Service) GetPerformers(ctx context.Context) ([]Performer, error) {
-	resp, err := gql.FindAllPerformers(ctx, libraryService.StashClient)
+	resp, err := gql.FindAllPerformers(ctx, libraryService.Client())
 	if err != nil {
 		return nil, fmt.Errorf("FindAllPerformers: %w", err)
 	}
@@ -146,7 +179,7 @@ func (libraryService *Service) GetPerformers(ctx context.Context) ([]Performer, 
 }
 
 func (libraryService *Service) GetPerformer(ctx context.Context, id string) (*Performer, error) {
-	resp, err := gql.FindPerformer(ctx, libraryService.StashClient, id)
+	resp, err := gql.FindPerformer(ctx, libraryService.Client(), id)
 	if err != nil {
 		return nil, fmt.Errorf("FindPerformer: %w", err)
 	}
@@ -188,7 +221,7 @@ func (libraryService *Service) GetPerformer(ctx context.Context, id string) (*Pe
 }
 
 func (libraryService *Service) GetStudios(ctx context.Context) ([]Studio, error) {
-	resp, err := gql.FindAllStudios(ctx, libraryService.StashClient)
+	resp, err := gql.FindAllStudios(ctx, libraryService.Client())
 	if err != nil {
 		return nil, fmt.Errorf("FindAllStudios: %w", err)
 	}
@@ -215,7 +248,7 @@ func (libraryService *Service) GetStudios(ctx context.Context) ([]Studio, error)
 }
 
 func (libraryService *Service) GetStudio(ctx context.Context, id string) (*Studio, error) {
-	resp, err := gql.FindStudio(ctx, libraryService.StashClient, id)
+	resp, err := gql.FindStudio(ctx, libraryService.Client(), id)
 	if err != nil {
 		return nil, fmt.Errorf("FindStudio: %w", err)
 	}
