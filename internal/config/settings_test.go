@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -146,5 +147,42 @@ func TestApplication_ReturnedFiltersDoNotAliasNextSet(t *testing.T) {
 	cfg.Filters = append(cfg.Filters, Filter{ID: "x"})
 	if got := Application().Filters; len(got) != 0 {
 		t.Fatalf("appending to a returned config must not change the store, got %v", got)
+	}
+}
+
+func TestWrite_LeavesNoTempFileAndIsAtomic(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(seed.ConfigPath)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Fatalf("temp file left behind: %s", e.Name())
+		}
+	}
+	if _, err := os.Stat(FilePath(seed)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoad_UnwritableDirReturnsSeedNotPersisted(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can write anywhere")
+	}
+	seed := seedFor(t)
+	seed.ConfigPath = filepath.Join(seed.ConfigPath, "ro")
+	if err := os.MkdirAll(seed.ConfigPath, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(seed.ConfigPath, 0o700) })
+
+	err := Load(seed)
+
+	if !errors.Is(err, ErrSeedNotPersisted) {
+		t.Fatalf("expected ErrSeedNotPersisted, got %v", err)
+	}
+	if Application().StashGraphQLUrl != seed.StashGraphQLUrl {
+		t.Fatal("seed must still be applied in memory")
 	}
 }

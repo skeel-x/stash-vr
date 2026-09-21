@@ -21,6 +21,11 @@ type Filter struct {
 
 const configFileName = "config.json"
 
+// ErrSeedNotPersisted reports that the seed was applied in memory but could
+// not be written to disk, typically because the config dir is not writable.
+// Callers may continue with the in-memory settings.
+var ErrSeedNotPersisted = errors.New("settings could not be persisted")
+
 var validLogLevels = map[string]struct{}{
 	"trace": {}, "debug": {}, "info": {}, "warn": {}, "error": {},
 }
@@ -107,12 +112,12 @@ func Load(seed ApplicationConfig) error {
 		if err := Validate(seed); err != nil {
 			return err
 		}
-		if err := write(path, seed); err != nil {
-			return err
-		}
 		mu.Lock()
 		store(cloneConfig(seed))
 		mu.Unlock()
+		if err := write(path, seed); err != nil {
+			return fmt.Errorf("%w: %w", ErrSeedNotPersisted, err)
+		}
 		return nil
 	case err != nil:
 		return fmt.Errorf("read config %s: %w", path, err)
@@ -224,15 +229,40 @@ func write(path string, c ApplicationConfig) error {
 	if fc.Filters == nil {
 		fc.Filters = []Filter{}
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
 	data, err := json.MarshalIndent(fc, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create config dir %s: %w", dir, err)
+	}
+	// Write to a temp file in the same directory and rename over the target,
+	// so a crash mid-write cannot leave a truncated config.json behind.
+	tmp := path + ".tmp"
+	if err := writeTemp(tmp, data); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("write config %s: %w", path, err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
 		return fmt.Errorf("write config %s: %w", path, err)
 	}
 	return nil
+}
+
+func writeTemp(tmp string, data []byte) error {
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }

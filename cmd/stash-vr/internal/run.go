@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"stash-vr/internal/build"
 	"stash-vr/internal/config"
@@ -16,11 +17,20 @@ import (
 )
 
 func Run(ctx context.Context) error {
+	var seedNotPersisted error
 	if err := config.Init(); err != nil {
-		return fmt.Errorf("config: %w", err)
+		if !errors.Is(err, config.ErrSeedNotPersisted) {
+			return fmt.Errorf("config: %w", err)
+		}
+		// The settings are in memory and the service is usable; only the
+		// config file is missing. Warn once the logger exists.
+		seedNotPersisted = err
 	}
 	log.Logger = logger.New(config.Application().LogLevel, config.Application().DisableLogColor)
 	zerolog.DefaultContextLogger = &log.Logger
+	if seedNotPersisted != nil {
+		log.Warn().Err(seedNotPersisted).Msg("settings will not persist; check CONFIG_PATH permissions")
+	}
 
 	log.Info().Str("config", fmt.Sprintf("%+v", config.Application().Redacted())).Send()
 
