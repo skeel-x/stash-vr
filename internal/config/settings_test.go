@@ -124,7 +124,7 @@ func TestSet_RejectsInvalidAndLeavesStoreUnchanged(t *testing.T) {
 		"relative url":     func(c *ApplicationConfig) { c.StashGraphQLUrl = "graphql" },
 		"bad log level":    func(c *ApplicationConfig) { c.LogLevel = "loud" },
 		"height too large": func(c *ApplicationConfig) { c.HeatmapHeightPx = 201 },
-		"empty favorite":   func(c *ApplicationConfig) { c.FavoriteTag = "" },
+		"empty exclude":    func(c *ApplicationConfig) { c.ExcludeSortName = "" },
 	}
 	for name, mutate := range cases {
 		cfg := Application()
@@ -184,5 +184,21 @@ func TestLoad_UnwritableDirReturnsSeedNotPersisted(t *testing.T) {
 	}
 	if Application().StashGraphQLUrl != seed.StashGraphQLUrl {
 		t.Fatal("seed must still be applied in memory")
+	}
+}
+
+func TestSet_AllowsEmptyFavoriteTag(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Application()
+	cfg.FavoriteTag = ""
+	if _, err := Set(cfg); err != nil {
+		t.Fatalf("an empty favorite tag disables favorite sync and must be accepted: %v", err)
+	}
+	if got := Application().FavoriteTag; got != "" {
+		t.Fatalf("expected the empty favorite tag to be stored, got %q", got)
 	}
 }

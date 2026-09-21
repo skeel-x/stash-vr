@@ -209,9 +209,8 @@ func Validate(c ApplicationConfig) error {
 	if c.HeatmapHeightPx < 0 || c.HeatmapHeightPx > 200 {
 		return fmt.Errorf("%w: heatmap_height_px must be between 0 and 200, got %d", ErrInvalid, c.HeatmapHeightPx)
 	}
-	if c.FavoriteTag == "" {
-		return fmt.Errorf("%w: favorite_tag must not be empty", ErrInvalid)
-	}
+	// An empty favorite tag is allowed: it disables favorite sync
+	// (see library.Service.UpdateFavorite).
 	if c.ExcludeSortName == "" {
 		return fmt.Errorf("%w: exclude_sort_name must not be empty", ErrInvalid)
 	}
