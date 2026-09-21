@@ -19,14 +19,10 @@ type Tag struct {
 	ParentIds []string
 }
 
+// LoadTags fetches all tags from Stash and replaces the tag cache. It is
+// called on every index build so tag hierarchy changes in Stash show up
+// without a restart.
 func (libraryService *Service) LoadTags(ctx context.Context) error {
-	libraryService.muTagCache.RLock()
-	if libraryService.tagCache != nil {
-		libraryService.muTagCache.RUnlock()
-		return nil
-	}
-	libraryService.muTagCache.RUnlock()
-
 	resp, err := gql.FindAllTags(ctx, libraryService.StashClient)
 	if err != nil {
 		return err
@@ -47,9 +43,7 @@ func (libraryService *Service) LoadTags(ctx context.Context) error {
 	}
 
 	libraryService.muTagCache.Lock()
-	if libraryService.tagCache == nil {
-		libraryService.tagCache = tagCache
-	}
+	libraryService.tagCache = tagCache
 	libraryService.muTagCache.Unlock()
 	return nil
 }
