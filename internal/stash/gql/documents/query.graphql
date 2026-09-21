@@ -1,174 +1,301 @@
-query Version{
-    version {
-        version
-    }
+query Version {
+  version {
+    version
+  }
 }
 
-query UIConfiguration{
-    configuration{
-        ui
-    }
+query UIConfiguration {
+  configuration {
+    ui
+  }
 }
 
-query FindCredentials{
-    configuration {
-        general {
-            username, password
-        }
+query FindCredentials {
+  configuration {
+    general {
+      username
+      password
     }
+  }
 }
 
-query FindSavedSceneFilters{
-    findSavedFilters(mode: SCENES){
-        ...SavedFilterParts
-    }
+query FindSavedSceneFilters {
+  findSavedFilters(mode: SCENES) {
+    ...SavedFilterParts
+  }
 }
 
 query FindTags(
-    $tag_filter: TagFilterType, $sort: String, $direction: SortDirectionEnum){
-    findTags(tag_filter: $tag_filter, filter: {sort: $sort, direction: $direction, per_page: -1}){
-        tags {
-            ...TagParts
-            scene_count
-        }}
+  $tag_filter: TagFilterType
+  $sort: String
+  $direction: SortDirectionEnum
+) {
+  findTags(
+    tag_filter: $tag_filter
+    filter: { sort: $sort, direction: $direction, per_page: -1 }
+  ) {
+    tags {
+      ...TagParts
+      scene_count
+    }
+  }
 }
 
-query FindTagByName($name: String!){
-    findTags(tag_filter: {name: {value: $name, modifier: EQUALS}}){tags {
-        id
-    }}
+query FindTagByName($name: String!) {
+  findTags(tag_filter: { name: { value: $name, modifier: EQUALS } }) {
+    tags {
+      id
+    }
+  }
 }
 
-query FindStudioByName($name: String!){
-    findStudios(studio_filter: {name: {value: $name, modifier: EQUALS}}){studios {
-        id
-    }}
+query FindStudioByName($name: String!) {
+  findStudios(studio_filter: { name: { value: $name, modifier: EQUALS } }) {
+    studios {
+      id
+    }
+  }
 }
 
-query FindPerformerByName($name: String!){
-    findPerformers(performer_filter: {name: {value: $name, modifier: EQUALS}}){performers {
-        id
-    }}
+query FindPerformerByName($name: String!) {
+  findPerformers(
+    performer_filter: { name: { value: $name, modifier: EQUALS } }
+  ) {
+    performers {
+      id
+    }
+  }
+}
+
+query FindAllPerformers {
+  findPerformers(filter: { per_page: -1 }) {
+    count
+    performers {
+      ...PerformerListParts
+    }
+  }
+}
+
+query FindPerformer($id: ID!) {
+  findPerformer(id: $id) {
+    ...PerformerParts
+  }
+}
+
+query FindAllStudios {
+  findStudios(filter: { per_page: -1 }) {
+    count
+    studios {
+      ...StudioListParts
+    }
+  }
+}
+
+query FindStudio($id: ID!) {
+  findStudio(id: $id) {
+    ...StudioParts
+  }
 }
 
 query FindSceneIdsByFilter(
-    $scene_filter: SceneFilterType, $filterOpts: FindFilterType){
-    findScenes(scene_filter: $scene_filter, filter: $filterOpts){
-        scenes {
-            id
-        }}
-}
-
-query FindAllSceneIds{
-    findScenes(filter: {per_page: -1}){
-        scenes {
-            id
-        }}
-}
-
-query FindScenes($scene_ids: [Int!]){
-    findScenes(scene_ids: $scene_ids){
-        scenes {
-            ...SceneParts
-        }
+  $scene_filter: SceneFilterType
+  $filterOpts: FindFilterType
+) {
+  findScenes(scene_filter: $scene_filter, filter: $filterOpts) {
+    scenes {
+      id
     }
+  }
 }
 
-query FindSceneMarkers($scene_id: ID!){
-    findSceneMarkers(scene_marker_filter: {scenes: {value: [$scene_id] modifier: EQUALS}}){
-        scene_markers {
-            ...SceneMarkerParts
-        }
+query FindAllSceneIds {
+  findScenes(filter: { per_page: -1 }) {
+    scenes {
+      id
     }
+  }
 }
 
-query FindSceneTags($scene_id: ID!){
-    findScene(id:$scene_id){
-        ...TagPartsArray
+query FindScenes($scene_ids: [Int!]) {
+  findScenes(scene_ids: $scene_ids) {
+    scenes {
+      ...SceneParts
     }
+  }
 }
 
-query IsSceneOrganized($id: ID){
-    findScene(id:$id){
-        organized
-    }
-}
-
-query FindAllTags{
-    findTags(filter:{per_page:-1}){tags {
-        ...TagParts
-    }}
-}
-
-query FindSampleSceneCover{
-    findScenes(
-        filter: { per_page: 1, sort: "random" }
-        scene_filter: { NOT: { is_missing: "cover" } }
-    ) {
-        scenes {
-            paths {
-                screenshot
-            }
-        }
-    }
-}
-
-fragment SavedFilterParts on SavedFilter{
-    id, name, mode, find_filter {sort, direction}, object_filter
-}
-
-
-fragment SceneParts on Scene{
-    id, title, rating100, created_at, date
-    files{basename, duration, path, height, video_codec}
-    studio{
-        name
-    },
+query FindSceneMarkers($scene_id: ID!) {
+  findSceneMarkers(
+    scene_marker_filter: { scenes: { value: [$scene_id], modifier: EQUALS } }
+  ) {
     scene_markers {
-        ...SceneMarkerParts
-    },
-    performers {
-        name
-    },
-    groups {
-        group {
-            name
-        }
+      ...SceneMarkerParts
     }
-    play_count,
-    o_counter,
-    organized
-    paths{screenshot, preview, stream funscript interactive_heatmap caption},
-    sceneStreams{url, mime_type, label}
-    captions {
-        caption_type language_code
-    }
+  }
+}
 
-    interactive
+query FindSceneTags($scene_id: ID!) {
+  findScene(id: $scene_id) {
     ...TagPartsArray
+  }
 }
 
-fragment SceneMarkerParts on SceneMarker{
-    id, seconds, end_seconds, title, primary_tag {
-        id, name
-    }
+query IsSceneOrganized($id: ID) {
+  findScene(id: $id) {
+    organized
+  }
 }
 
-fragment TagPartsArray on Scene{
+query FindAllTags {
+  findTags(filter: { per_page: -1 }) {
     tags {
-        ...TagParts
+      ...TagParts
     }
+  }
 }
 
+query FindSampleSceneCover {
+  findScenes(
+    filter: { per_page: 1, sort: "random" }
+    scene_filter: { NOT: { is_missing: "cover" } }
+  ) {
+    scenes {
+      paths {
+        screenshot
+      }
+    }
+  }
+}
 
-fragment TagParts on Tag{
-    id,name,
+fragment SavedFilterParts on SavedFilter {
+  id
+  name
+  mode
+  find_filter {
+    sort
+    direction
+  }
+  object_filter
+}
+
+fragment SceneParts on Scene {
+  id
+  title
+  rating100
+  created_at
+  date
+  files {
+    basename
+    duration
+    path
+    height
+    video_codec
+  }
+  studio {
+    id
+    name
+    image_path
+  }
+  scene_markers {
+    ...SceneMarkerParts
+  }
+  performers {
+    id
+    name
+    image_path
+    alias_list
+  }
+  groups {
+    group {
+      name
+    }
+  }
+  play_count
+  o_counter
+  organized
+  paths {
+    screenshot
+    preview
+    stream
+    funscript
+    interactive_heatmap
+    caption
+  }
+  sceneStreams {
+    url
+    mime_type
+    label
+  }
+  captions {
+    caption_type
+    language_code
+  }
+
+  interactive
+  ...TagPartsArray
+}
+
+fragment SceneMarkerParts on SceneMarker {
+  id
+  seconds
+  end_seconds
+  title
+  primary_tag {
+    id
+    name
+  }
+}
+
+fragment TagPartsArray on Scene {
+  tags {
+    ...TagParts
+  }
+}
+
+fragment TagParts on Tag {
+  id
+  name
+  # @genqlient(pointer: false)
+  sort_name
+  aliases
+  parents {
+    id
+    name
     # @genqlient(pointer: false)
     sort_name
-    aliases
-    parents {
-        id name
-        # @genqlient(pointer: false)
-        sort_name
+  }
+}
+
+fragment PerformerListParts on Performer {
+  id
+  name
+  image_path
+  alias_list
+  scene_count
+}
+
+fragment PerformerParts on Performer {
+  ...PerformerListParts
+  birthdate
+  country
+  details
+  scenes {
+    studio {
+      id
+      name
     }
+  }
+}
+
+fragment StudioListParts on Studio {
+  id
+  name
+  image_path
+  aliases
+  scene_count
+}
+
+fragment StudioParts on Studio {
+  ...StudioListParts
+  details
 }

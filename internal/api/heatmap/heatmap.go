@@ -20,6 +20,19 @@ var errImageNotFound = errors.New("image not found")
 var errScreenshotImageNotFound = errors.New("screenshot image not found")
 var errHeatmapImageNotFound = errors.New("heatmap image not found")
 
+// ErrImageNotFound returns the sentinel error other packages use to map a
+// missing screenshot to HTTP 404.
+func ErrImageNotFound() error {
+	return errImageNotFound
+}
+
+// BuildCover fetches the scene screenshot and, when available, overlays the
+// interactive heatmap. It is the exported entry point used by the Playa
+// poster endpoint.
+func BuildCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.Image, error) {
+	return buildHeatmapCover(ctx, coverUrl, heatmapUrl)
+}
+
 func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 	log.Ctx(ctx).Trace().Str("url", fileUrl).Msg("Fetching image")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileUrl, nil)

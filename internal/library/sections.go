@@ -3,18 +3,25 @@ package library
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"slices"
 	"stash-vr/internal/config"
 	"stash-vr/internal/stash"
 	"stash-vr/internal/stash/filter"
 	"stash-vr/internal/stash/gql"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Section struct {
 	Name string
 	Ids  []string
+}
+
+type SavedFilterSceneSet struct {
+	ID       string
+	Name     string
+	SceneIDs []string
 }
 
 func (libraryService *Service) GetSections(ctx context.Context) ([]Section, error) {
@@ -56,7 +63,10 @@ func (libraryService *Service) GetSections(ctx context.Context) ([]Section, erro
 
 		_ = libraryService.LoadTags(ctx)
 
-		log.Ctx(ctx).Debug().Int("tags", len(libraryService.tagCache)).Msg("Cached tags")
+		libraryService.muTagCache.RLock()
+		tagCount := len(libraryService.tagCache)
+		libraryService.muTagCache.RUnlock()
+		log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
 
 		return sections, nil
 	})
@@ -82,7 +92,31 @@ func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Sectio
 }
 
 func (libraryService *Service) getSectionsByFilters(ctx context.Context, filters []gql.SavedFilterParts) ([]Section, error) {
-	sections := make([]Section, len(filters))
+	sets, err := libraryService.resolveSavedFilterSceneSets(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	sections := make([]Section, len(sets))
+	for i, set := range sets {
+		sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
+	}
+	return sections, nil
+}
+
+func (libraryService *Service) GetSavedFilterSceneSets(ctx context.Context) ([]SavedFilterSceneSet, error) {
+	filters, err := libraryService.getFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(filters) == 0 {
+		return []SavedFilterSceneSet{}, nil
+	}
+	return libraryService.resolveSavedFilterSceneSets(ctx, filters)
+}
+
+func (libraryService *Service) resolveSavedFilterSceneSets(ctx context.Context, filters []gql.SavedFilterParts) ([]SavedFilterSceneSet, error) {
+	sections := make([]SavedFilterSceneSet, len(filters))
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(filters))
@@ -109,20 +143,21 @@ func (libraryService *Service) getSectionsByFilters(ctx context.Context, filters
 				return
 			}
 
-			sections[i] = Section{
-				Name: f.Name,
-				Ids:  make([]string, len(resp.FindScenes.Scenes)),
+			sections[i] = SavedFilterSceneSet{
+				ID:       f.Id,
+				Name:     f.Name,
+				SceneIDs: make([]string, len(resp.FindScenes.Scenes)),
 			}
 			for j, v := range resp.FindScenes.Scenes {
-				sections[i].Ids[j] = v.Id
+				sections[i].SceneIDs[j] = v.Id
 			}
 
-			flog.Debug().Int("scenes", len(sections[i].Ids)).Msg("Section built")
+			flog.Debug().Int("scenes", len(sections[i].SceneIDs)).Msg("Section built")
 		}(i, f)
 	}
 	wg.Wait()
-	sections = slices.DeleteFunc(sections, func(s Section) bool {
-		return len(s.Ids) == 0
+	sections = slices.DeleteFunc(sections, func(s SavedFilterSceneSet) bool {
+		return len(s.SceneIDs) == 0
 	})
 	return sections, nil
 }
