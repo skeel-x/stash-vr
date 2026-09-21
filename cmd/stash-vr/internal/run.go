@@ -27,7 +27,9 @@ func Run(ctx context.Context) error {
 
 	libraryService := library.NewService(stashClient)
 	if err := libraryService.Warmup(ctx); err != nil {
-		return fmt.Errorf("warm up library: %w", err)
+		// The systemd unit restarts on exit; a slow or briefly unavailable Stash
+		// must not turn into a restart loop. The first request will retry.
+		log.Ctx(ctx).Warn().Err(err).Msg("library warmup failed, continuing without prebuilt index")
 	}
 
 	err := server.Listen(ctx, config.Application().ListenAddress, libraryService)
