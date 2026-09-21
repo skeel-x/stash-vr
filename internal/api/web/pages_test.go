@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -55,6 +56,21 @@ func TestDashboard_WarnsAboutPlainHttpForDeoVR(t *testing.T) {
 
 	if !strings.Contains(rec.Body.String(), "DeoVR does not load covers over plain HTTP") {
 		t.Fatal("expected plain-http warning for DeoVR")
+	}
+}
+
+func TestDashboard_ShowsTroubleshootingWhenStashUnreachable(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{versionErr: errors.New("dial tcp: connection refused")})
+	h := PagesRouter(lib)
+
+	rec := getPage(t, h, "/", nil)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Stash-VR cannot reach Stash") {
+		t.Fatal("expected the troubleshooting box when Stash is unreachable")
+	}
+	if strings.Contains(body, "Connect your player") {
+		t.Fatal("player cards must be hidden when Stash is unreachable")
 	}
 }
 
