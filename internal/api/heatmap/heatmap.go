@@ -5,8 +5,10 @@ import (
 	"errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 	"golang.org/x/sync/errgroup"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"math"
@@ -45,50 +47,51 @@ func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 }
 
 func buildHeatmapCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.Image, error) {
-	chCover := make(chan draw.Image, 1)
-	chHeatmap := make(chan image.Image, 1)
+	var (
+		cover      draw.Image
+		coverErr   error
+		heatmap    image.Image
+		heatmapErr error
+	)
 
 	g, _ := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		defer close(chCover)
-		cover, err := fetchImage(log.Ctx(ctx).With().Str("image", "cover").Logger().WithContext(ctx), coverUrl)
+		img, err := fetchImage(log.Ctx(ctx).With().Str("image", "cover").Logger().WithContext(ctx), coverUrl)
 		if err != nil {
-			return errors.Join(errScreenshotImageNotFound, err)
+			coverErr = errors.Join(errScreenshotImageNotFound, err)
+			return coverErr
 		}
-		dest, ok := cover.(draw.Image)
+		dest, ok := img.(draw.Image)
 		if !ok {
-			dest = image.NewRGBA(cover.Bounds())
-			draw.Copy(dest, image.Pt(0, 0), cover, cover.Bounds(), draw.Src, nil)
+			dest = image.NewRGBA(img.Bounds())
+			draw.Copy(dest, image.Pt(0, 0), img, img.Bounds(), draw.Src, nil)
 		}
-		chCover <- dest
+		cover = dest
 		return nil
 	})
 
 	g.Go(func() error {
-		defer close(chHeatmap)
-		heatmap, err := fetchImage(log.Ctx(ctx).With().Str("image", "heatmap").Logger().WithContext(ctx), heatmapUrl)
+		img, err := fetchImage(log.Ctx(ctx).With().Str("image", "heatmap").Logger().WithContext(ctx), heatmapUrl)
 		if err != nil {
-			return errors.Join(errHeatmapImageNotFound, err)
+			heatmapErr = errors.Join(errHeatmapImageNotFound, err)
+			return heatmapErr
 		}
-		chHeatmap <- heatmap
+		heatmap = img
 		return nil
 	})
 
-	cover := <-chCover
-	heatmap := <-chHeatmap
+	_ = g.Wait()
 
-	err := g.Wait()
-	if err != nil {
-		if errors.Is(err, errScreenshotImageNotFound) {
-			return nil, err
-		} else {
-			return cover, nil
-		}
+	if coverErr != nil {
+		return nil, coverErr
+	}
+	if heatmapErr != nil {
+		// No heatmap available: serve the plain screenshot instead.
+		return cover, nil
 	}
 
-	heatmapCover := overlay(cover, heatmap)
-	return heatmapCover, nil
+	return overlay(cover, heatmap), nil
 }
 
 func overlay(dest draw.Image, heatmap image.Image) image.Image {
