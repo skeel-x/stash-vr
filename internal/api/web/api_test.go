@@ -1,0 +1,230 @@
+package web
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/Khan/genqlient/graphql"
+	"stash-vr/internal/config"
+	"stash-vr/internal/library"
+)
+
+// fakeStash answers generated queries by operation name.
+type fakeStash struct {
+	versionErr error
+	calls      map[string]int
+}
+
+func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
+	if f.calls == nil {
+		f.calls = map[string]int{}
+	}
+	f.calls[req.OpName]++
+	var payload string
+	switch req.OpName {
+	case "Version":
+		if f.versionErr != nil {
+			return f.versionErr
+		}
+		payload = `{"version":{"version":"v0.31.1"}}`
+	case "FindSavedSceneFilters":
+		payload = `{"findSavedFilters":[]}`
+	case "FindAllSceneIds":
+		payload = `{"findScenes":{"scenes":[{"id":"1"},{"id":"2"}]}}`
+	case "FindAllTags":
+		payload = `{"findTags":{"tags":[]}}`
+	case "FindSampleSceneCover":
+		payload = `{"findScenes":{"scenes":[{"paths":{"screenshot":"http://stash:9999/scene/1/screenshot"}}]}}`
+	default:
+		payload = `{}`
+	}
+	return json.Unmarshal([]byte(payload), resp.Data)
+}
+
+func newEnv(t *testing.T, stash *fakeStash) (*library.Service, http.Handler) {
+	t.Helper()
+	seed := config.ApplicationConfig{
+		ListenAddress:   ":9666",
+		StashGraphQLUrl: "http://stash:9999/graphql",
+		StashApiKey:     "secret",
+		FavoriteTag:     "FAVORITE",
+		LogLevel:        "info",
+		ExcludeSortName: "hidden",
+		ConfigPath:      t.TempDir(),
+	}
+	if err := config.Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	lib := library.NewService(stash)
+	return lib, ApiRouter(lib)
+}
+
+func do(t *testing.T, h http.Handler, method, path string, body any) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	var buf bytes.Buffer
+	if body != nil {
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	req := httptest.NewRequest(method, path, &buf)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var out map[string]any
+	if rec.Body.Len() > 0 && strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatalf("invalid json body: %v: %s", err, rec.Body.String())
+		}
+	}
+	return rec, out
+}
+
+func TestStatus_ReportsOkWithCounts(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodGet, "/status", nil)
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	if out["connection"] != "ok" || out["stash_version"] != "v0.31.1" {
+		t.Fatalf("expected ok connection, got %v", out)
+	}
+	if out["sections"].(float64) != 1 || out["links"].(float64) != 2 || out["scenes"].(float64) != 2 {
+		t.Fatalf("expected counts 1/2/2, got %v", out)
+	}
+	if out["api_key_set"] != true || out["sample_cover_url"] == "" {
+		t.Fatalf("expected api_key_set and sample cover, got %v", out)
+	}
+}
+
+func TestStatus_ReportsUnauthorizedOn401(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{versionErr: &graphql.HTTPError{StatusCode: 401}})
+
+	_, out := do(t, h, http.MethodGet, "/status", nil)
+
+	if out["connection"] != "unauthorized" {
+		t.Fatalf("expected unauthorized, got %v", out["connection"])
+	}
+}
+
+func TestGetConfig_NeverExposesApiKey(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodGet, "/config", nil)
+
+	if strings.Contains(rec.Body.String(), "secret") {
+		t.Fatal("api key leaked in config response")
+	}
+	if out["stash_api_key_set"] != true {
+		t.Fatalf("expected stash_api_key_set true, got %v", out)
+	}
+}
+
+func TestPutConfig_BlankKeyKeepsCurrentAndPersists(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "LOVED", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
+	}
+
+	rec, _ := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	cfg := config.Application()
+	if cfg.StashApiKey != "secret" || cfg.FavoriteTag != "LOVED" {
+		t.Fatalf("expected key kept and tag updated, got %#v", cfg)
+	}
+	data, _ := os.ReadFile(config.FilePath(cfg))
+	if !strings.Contains(string(data), "LOVED") {
+		t.Fatal("expected change persisted to config.json")
+	}
+}
+
+func TestPutConfig_NewUrlSwapsLibraryClient(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	before := lib.Client()
+	body := map[string]any{
+		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
+	}
+
+	rec, _ := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	if lib.Client() == before {
+		t.Fatal("expected the library client to be replaced after a URL change")
+	}
+}
+
+func TestPutConfig_InvalidIs400AndUnchanged(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "nope", "stash_api_key": "", "favorite_tag": "FAVORITE",
+		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info",
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 400 || out["error"] == "" {
+		t.Fatalf("expected 400 with error, got %d %v", rec.Code, out)
+	}
+	if config.Application().StashGraphQLUrl != "http://stash:9999/graphql" {
+		t.Fatal("store must be unchanged")
+	}
+}
+
+func TestTestConfig_DoesNotPersist(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
+		"stash_graphql_url": "http://127.0.0.1:1/graphql", "stash_api_key": "",
+	})
+
+	if rec.Code != 200 || out["ok"] != false || out["error"] == "" {
+		t.Fatalf("expected ok=false with error, got %d %v", rec.Code, out)
+	}
+	if config.Application().StashGraphQLUrl != "http://stash:9999/graphql" {
+		t.Fatal("test must not persist the url")
+	}
+}
+
+func TestPutFilters_PersistsOrder(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, _ := do(t, h, http.MethodPut, "/filters", []map[string]any{
+		{"id": "2", "name": "", "disabled": false},
+		{"id": "1", "name": "Renamed", "disabled": true},
+	})
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	f := config.Application().Filters
+	if len(f) != 2 || f[0].ID != "2" || f[1].Name != "Renamed" || !f[1].Disabled {
+		t.Fatalf("unexpected filters %#v", f)
+	}
+}
+
+func TestReindex_ReturnsCounts(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodPost, "/reindex", nil)
+
+	if rec.Code != 200 || out["sections"].(float64) != 1 || out["scenes"].(float64) != 2 {
+		t.Fatalf("unexpected reindex response %d %v", rec.Code, out)
+	}
+}

@@ -1,0 +1,86 @@
+package web
+
+import (
+	"context"
+	"errors"
+	"os"
+
+	"github.com/Khan/genqlient/graphql"
+	"github.com/rs/zerolog/log"
+	"stash-vr/internal/build"
+	"stash-vr/internal/config"
+	"stash-vr/internal/library"
+	"stash-vr/internal/stash"
+	"stash-vr/internal/stash/gql"
+)
+
+const (
+	ConnectionOk           = "ok"
+	ConnectionUnauthorized = "unauthorized"
+	ConnectionUnreachable  = "unreachable"
+)
+
+// Status is what the dashboard and GET /api/ui/status show.
+type Status struct {
+	Version          string `json:"version"`
+	StashVersion     string `json:"stash_version,omitempty"`
+	Connection       string `json:"connection"`
+	ConnectionError  string `json:"connection_error,omitempty"`
+	ListenAddress    string `json:"listen_address"`
+	ConfigPath       string `json:"config_path"`
+	ConfigFileExists bool   `json:"config_file_exists"`
+	ApiKeySet        bool   `json:"api_key_set"`
+	LogLevel         string `json:"log_level"`
+	Sections         int    `json:"sections"`
+	Links            int    `json:"links"`
+	Scenes           int    `json:"scenes"`
+	SampleCoverUrl   string `json:"sample_cover_url,omitempty"`
+}
+
+// BuildStatus probes Stash and the library. It never returns an error: every
+// failure is reported inside the status so the page can explain it.
+func BuildStatus(ctx context.Context, lib *library.Service) Status {
+	cfg := config.Application()
+	s := Status{
+		Version:       build.FullVersion(),
+		ListenAddress: cfg.ListenAddress,
+		ConfigPath:    config.FilePath(cfg),
+		ApiKeySet:     cfg.StashApiKey != "",
+		LogLevel:      cfg.LogLevel,
+	}
+	if _, err := os.Stat(s.ConfigPath); err == nil {
+		s.ConfigFileExists = true
+	}
+
+	version, err := stash.GetVersion(ctx, lib.Client())
+	if err != nil {
+		var httpErr *graphql.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
+			s.Connection = ConnectionUnauthorized
+		} else {
+			s.Connection = ConnectionUnreachable
+		}
+		s.ConnectionError = err.Error()
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve stash version")
+		return s
+	}
+	s.Connection = ConnectionOk
+	s.StashVersion = version
+
+	sections, err := lib.GetSections(ctx)
+	if err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve sections")
+	} else {
+		s.Sections = len(sections)
+		s.Links = lib.Stats.Links
+		s.Scenes = lib.Stats.Scenes
+	}
+
+	cover, err := gql.FindSampleSceneCover(ctx, lib.Client())
+	if err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve sample scene cover url")
+	} else if cover.FindScenes != nil && len(cover.FindScenes.Scenes) > 0 && cover.FindScenes.Scenes[0].Paths != nil && cover.FindScenes.Scenes[0].Paths.Screenshot != nil {
+		s.SampleCoverUrl = stash.ApiKeyed(*cover.FindScenes.Scenes[0].Paths.Screenshot)
+	}
+	return s
+}

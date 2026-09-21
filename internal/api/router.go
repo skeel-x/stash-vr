@@ -34,6 +34,8 @@ func Router(libraryService *library.Service) *chi.Mux {
 	router.Post("/filters", logMod("filters", web.FiltersUpdateHandler()).ServeHTTP)
 	router.Get("/cover/{videoId}", logMod("heatmap", heatmap.CoverHandler(libraryService)).ServeHTTP)
 
+	router.Mount("/api/ui", logMod("ui", web.ApiRouter(libraryService)))
+
 	router.Get("/", web.IndexHandler(libraryService).ServeHTTP)
 
 	router.Get("/*", http.FileServerFS(static.Fs).ServeHTTP)
