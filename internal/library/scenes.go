@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"stash-vr/internal/stash/gql"
 	"strconv"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 )
+
+var ErrSceneNotFound = errors.New("scene not found")
 
 func (libraryService *Service) GetScenes(ctx context.Context) (map[string]*VideoData, error) {
 	res, err, _ := libraryService.single.Do("scenes", func() (interface{}, error) {
@@ -59,14 +62,14 @@ func (libraryService *Service) GetScene(ctx context.Context, id string, forceFet
 	}
 	iid, err := strconv.Atoi(id)
 	if err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("%w: %q is not a scene id", ErrSceneNotFound, id)
 	}
 	vds, err := libraryService.fetchVideoData(ctx, []int{iid})
 	if err != nil {
 		return nil, err
 	}
-	if len(vds) == 0 || vds[0] == nil {
-		return nil, nil
+	if len(vds) == 0 {
+		return nil, fmt.Errorf("%w: %s", ErrSceneNotFound, id)
 	}
 
 	libraryService.muVdCache.Lock()
