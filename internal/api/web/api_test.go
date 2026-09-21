@@ -199,8 +199,11 @@ func TestPutConfig_NewHostWithoutKeyIs400(t *testing.T) {
 
 	rec, out := do(t, h, http.MethodPut, "/config", body)
 
-	if rec.Code != 400 || out["error"] == "" {
-		t.Fatalf("expected 400 with error, got %d %v", rec.Code, out)
+	if msg, _ := out["error"].(string); rec.Code != 400 || msg == "" {
+		t.Fatalf("expected 400 with a non-empty error string, got %d %v", rec.Code, out)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected a JSON error body, got Content-Type %q", ct)
 	}
 	if config.Application().StashGraphQLUrl != "http://stash:9999/graphql" {
 		t.Fatal("store must be unchanged")
@@ -234,6 +237,9 @@ func TestMutation_RequiresJsonContentType(t *testing.T) {
 	if rec.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf("expected 415, got %d: %s", rec.Code, rec.Body.String())
 	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected a JSON error body, got Content-Type %q", ct)
+	}
 }
 
 func TestPutConfig_InvalidIs400AndUnchanged(t *testing.T) {
@@ -245,8 +251,11 @@ func TestPutConfig_InvalidIs400AndUnchanged(t *testing.T) {
 
 	rec, out := do(t, h, http.MethodPut, "/config", body)
 
-	if rec.Code != 400 || out["error"] == "" {
-		t.Fatalf("expected 400 with error, got %d %v", rec.Code, out)
+	if msg, _ := out["error"].(string); rec.Code != 400 || msg == "" {
+		t.Fatalf("expected 400 with a non-empty error string, got %d %v", rec.Code, out)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("expected a JSON error body, got Content-Type %q", ct)
 	}
 	if config.Application().StashGraphQLUrl != "http://stash:9999/graphql" {
 		t.Fatal("store must be unchanged")
@@ -260,8 +269,8 @@ func TestTestConfig_DoesNotPersist(t *testing.T) {
 		"stash_graphql_url": "http://127.0.0.1:1/graphql", "stash_api_key": "",
 	})
 
-	if rec.Code != 200 || out["ok"] != false || out["error"] == "" {
-		t.Fatalf("expected ok=false with error, got %d %v", rec.Code, out)
+	if msg, _ := out["error"].(string); rec.Code != 200 || out["ok"] != false || msg == "" {
+		t.Fatalf("expected ok=false with a non-empty error string, got %d %v", rec.Code, out)
 	}
 	if config.Application().StashGraphQLUrl != "http://stash:9999/graphql" {
 		t.Fatal("test must not persist the url")
@@ -292,5 +301,85 @@ func TestReindex_ReturnsCounts(t *testing.T) {
 
 	if rec.Code != 200 || out["sections"].(float64) != 1 || out["scenes"].(float64) != 2 {
 		t.Fatalf("unexpected reindex response %d %v", rec.Code, out)
+	}
+}
+
+func TestTestConfig_DoesNotEchoResponseBody(t *testing.T) {
+	// A fake HTTP server that answers 401 with a secret-looking body.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"private":"do-not-leak"}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, h := newEnv(t, &fakeStash{})
+
+	_, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
+		"stash_graphql_url": srv.URL + "/graphql", "stash_api_key": "k",
+	})
+
+	if out["ok"] != false || strings.Contains(out["error"].(string), "do-not-leak") {
+		t.Fatalf("response body must not be echoed, got %v", out)
+	}
+	if !strings.Contains(out["error"].(string), "401") {
+		t.Fatalf("expected the status code in the message, got %v", out["error"])
+	}
+}
+
+// A body that is not a GraphQL response is carried verbatim inside
+// genqlient's HTTPError, so this is the case that actually leaks.
+func TestTestConfig_DoesNotEchoNonJsonResponseBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("<html>internal proxy says: do-not-leak</html>"))
+	}))
+	t.Cleanup(srv.Close)
+	_, h := newEnv(t, &fakeStash{})
+
+	_, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
+		"stash_graphql_url": srv.URL + "/graphql", "stash_api_key": "k",
+	})
+
+	msg, _ := out["error"].(string)
+	if out["ok"] != false || strings.Contains(msg, "do-not-leak") {
+		t.Fatalf("response body must not be echoed, got %v", out)
+	}
+	if !strings.Contains(msg, "401") {
+		t.Fatalf("expected the status code in the message, got %q", msg)
+	}
+}
+
+func TestPutConfig_InvalidUrlReportsValidationNotHostRule(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{"stash_graphql_url": "nope", "stash_api_key": "", "favorite_tag": "FAVORITE",
+		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info"}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 400 || rec.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("expected JSON 400, got %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	msg, _ := out["error"].(string)
+	if !strings.Contains(msg, "absolute http(s) URL") {
+		t.Fatalf("expected URL validation message, got %q", msg)
+	}
+}
+
+func TestHostChanged_Table(t *testing.T) {
+	cases := []struct {
+		cur, next string
+		want      bool
+	}{
+		{"https://stash:9999/graphql", "https://stash:9999/graphql", false},
+		{"https://stash:9999/graphql", "https://STASH:9999/graphql", false},
+		{"https://stash:9999/graphql", "https://stash:9998/graphql", true},
+		{"https://stash:9999/graphql", "http://stash:9999/graphql", true}, // scheme downgrade
+		{"http://stash:9999/graphql", "https://stash:9999/graphql", false},
+		{"https://stash:9999/graphql", "https://[::1]:9999/graphql", true},
+		{"https://stash:9999/graphql", "nope", true},
+	}
+	for _, c := range cases {
+		if got := hostChanged(c.cur, c.next); got != c.want {
+			t.Errorf("hostChanged(%q, %q) = %v, want %v", c.cur, c.next, got, c.want)
+		}
 	}
 }

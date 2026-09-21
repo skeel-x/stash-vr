@@ -67,7 +67,7 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 		} else {
 			s.Connection = ConnectionUnreachable
 		}
-		s.ConnectionError = err.Error()
+		s.ConnectionError = describeStashError(err)
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve stash version")
 		return s
 	}

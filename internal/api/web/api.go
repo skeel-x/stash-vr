@@ -2,16 +2,32 @@ package web
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/Khan/genqlient/graphql"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
+)
+
+const (
+	// maxRequestBody caps PUT/POST bodies; the settings documents are tiny.
+	maxRequestBody = 1 << 20
+	// stashProbeTimeout bounds the connection test.
+	stashProbeTimeout = 10 * time.Second
+	// maxStashErrorLen caps a message coming from the Stash client.
+	maxStashErrorLen = 200
 )
 
 // ConfigView is the settings as sent to the browser: the API key is replaced
@@ -72,11 +88,14 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 
 type apiHandler struct {
 	lib *library.Service
+	// writeMu serialises the read-modify-write cycles of the mutating
+	// endpoints so two concurrent settings changes cannot interleave.
+	writeMu sync.Mutex
 }
 
 // ApiRouter serves the JSON API used by the pages. Mounted at /api/ui.
 func ApiRouter(lib *library.Service) http.Handler {
-	h := apiHandler{lib: lib}
+	h := &apiHandler{lib: lib}
 	r := chi.NewRouter()
 	r.Use(requireJsonContentType)
 	r.Get("/status", h.status)
@@ -98,26 +117,66 @@ func requireJsonContentType(next http.Handler) http.Handler {
 				writeError(r.Context(), w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
 				return
 			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
 // hostChanged reports whether next names a different Stash host than
-// current, so callers can require the API key to be resupplied rather than
-// silently sending the stored key to a different host.
+// current, or downgrades the same host from https to http, so callers can
+// require the API key to be resupplied rather than silently sending the
+// stored key to a different host or over an unencrypted connection.
 func hostChanged(current, next string) bool {
 	cu, err1 := url.Parse(current)
 	nu, err2 := url.Parse(next)
 	if err1 != nil || err2 != nil {
 		return true
 	}
-	return !strings.EqualFold(cu.Host, nu.Host)
+	if !strings.EqualFold(cu.Host, nu.Host) {
+		return true
+	}
+	return strings.EqualFold(cu.Scheme, "https") && !strings.EqualFold(nu.Scheme, "https")
+}
+
+// describeStashError turns an error from the Stash client into a message that
+// is safe to show in the UI: a response body from an arbitrary host is never
+// echoed, only its status code.
+func describeStashError(err error) string {
+	var httpErr *graphql.HTTPError
+	if errors.As(err, &httpErr) {
+		return fmt.Sprintf("Stash returned HTTP %d", httpErr.StatusCode)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Sprintf("timed out after %d seconds", int(stashProbeTimeout.Seconds()))
+	}
+	msg := err.Error()
+	if len(msg) > maxStashErrorLen {
+		msg = strings.ToValidUTF8(msg[:maxStashErrorLen], "") + "..."
+	}
+	return msg
+}
+
+// settingsErrorCode maps a config.Set failure to a status code: a rejected
+// value is the caller's fault, a failed write is ours.
+func settingsErrorCode(err error) int {
+	if errors.Is(err, config.ErrInvalid) {
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
 }
 
 func writeError(ctx context.Context, w http.ResponseWriter, code int, msg string) {
+	body, err := json.Marshal(map[string]string{"error": msg})
+	if err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("encode error response")
+		body = []byte(`{"error":"internal error"}`)
+	}
+	// The headers must be set before WriteHeader or they are dropped.
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(code)
-	if err := internal.WriteJson(ctx, w, map[string]string{"error": msg}); err != nil {
+	if _, err := w.Write(body); err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("write error response")
 	}
 }
@@ -128,26 +187,26 @@ func writeJson(ctx context.Context, w http.ResponseWriter, v any) {
 	}
 }
 
-func (h apiHandler) status(w http.ResponseWriter, r *http.Request) {
+func (h *apiHandler) status(w http.ResponseWriter, r *http.Request) {
 	writeJson(r.Context(), w, BuildStatus(r.Context(), h.lib))
 }
 
-func (h apiHandler) getConfig(w http.ResponseWriter, r *http.Request) {
+func (h *apiHandler) getConfig(w http.ResponseWriter, r *http.Request) {
 	writeJson(r.Context(), w, MaskedConfig(config.Application()))
 }
 
-func (h apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
+func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, err := internal.UnmarshalBody[configInput](r)
 	if err != nil {
 		writeError(ctx, w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
 		return
 	}
+
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+
 	prev := config.Application()
-	if hostChanged(prev.StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
-		writeError(ctx, w, http.StatusBadRequest, "api key required when changing the Stash host")
-		return
-	}
 	next := prev
 	next.StashGraphQLUrl = in.StashGraphQLUrl
 	if in.StashApiKey != "" {
@@ -160,62 +219,84 @@ func (h apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	next.ForceHTTPS = in.ForceHTTPS
 	next.LogLevel = in.LogLevel
 
+	// Validate before the host rule so an unusable URL is reported as such
+	// rather than as a missing API key.
+	if err := config.Validate(next); err != nil {
+		writeError(ctx, w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if hostChanged(prev.StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
+		writeError(ctx, w, http.StatusBadRequest, "api key required when changing the Stash host")
+		return
+	}
+
 	saved, err := config.Set(next)
 	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err.Error())
+		writeError(ctx, w, settingsErrorCode(err), err.Error())
 		return
 	}
 	ApplyChanges(prev, saved, h.lib)
 	writeJson(ctx, w, MaskedConfig(saved))
 }
 
-func (h apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
+func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, err := internal.UnmarshalBody[testInput](r)
 	if err != nil {
 		writeError(ctx, w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
 		return
 	}
-	if hostChanged(config.Application().StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
-		writeJson(ctx, w, testResult{Ok: false, Error: "api key required when testing a different Stash host"})
-		return
-	}
-	key := in.StashApiKey
-	if key == "" {
-		key = config.Application().StashApiKey
-	}
-	probe := config.Application()
+	cur := config.Application()
+
+	// Validate before the host rule so an unusable URL is reported as such
+	// rather than as a missing API key.
+	probe := cur
 	probe.StashGraphQLUrl = in.StashGraphQLUrl
 	if err := config.Validate(probe); err != nil {
 		writeJson(ctx, w, testResult{Ok: false, Error: err.Error()})
 		return
 	}
-	version, err := stash.GetVersion(ctx, stash.NewClient(in.StashGraphQLUrl, key))
+	if hostChanged(cur.StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
+		writeJson(ctx, w, testResult{Ok: false, Error: "api key required when testing a different Stash host"})
+		return
+	}
+	key := in.StashApiKey
+	if key == "" {
+		key = cur.StashApiKey
+	}
+
+	probeCtx, cancel := context.WithTimeout(ctx, stashProbeTimeout)
+	defer cancel()
+	version, err := stash.GetVersion(probeCtx, stash.NewClient(in.StashGraphQLUrl, key))
 	if err != nil {
-		writeJson(ctx, w, testResult{Ok: false, Error: err.Error()})
+		log.Ctx(ctx).Warn().Err(err).Msg("Stash connection test failed")
+		writeJson(ctx, w, testResult{Ok: false, Error: describeStashError(err)})
 		return
 	}
 	writeJson(ctx, w, testResult{Ok: true, StashVersion: version})
 }
 
-func (h apiHandler) putFilters(w http.ResponseWriter, r *http.Request) {
+func (h *apiHandler) putFilters(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, err := internal.UnmarshalBody[[]config.Filter](r)
 	if err != nil {
 		writeError(ctx, w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
 		return
 	}
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+
 	cfg := config.Application()
 	cfg.Filters = in
 	saved, err := config.Set(cfg)
 	if err != nil {
-		writeError(ctx, w, http.StatusBadRequest, err.Error())
+		writeError(ctx, w, settingsErrorCode(err), err.Error())
 		return
 	}
 	writeJson(ctx, w, map[string]any{"filters": saved.Filters})
 }
 
-func (h apiHandler) reindex(w http.ResponseWriter, r *http.Request) {
+func (h *apiHandler) reindex(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	h.lib.ResetCaches()
 	sections, err := h.lib.GetSections(ctx)

@@ -21,6 +21,10 @@ type Filter struct {
 
 const configFileName = "config.json"
 
+// ErrInvalid marks a settings value rejected by Validate, so API callers can
+// tell a bad request from a failed write.
+var ErrInvalid = errors.New("invalid settings")
+
 // ErrSeedNotPersisted reports that the seed was applied in memory but could
 // not be written to disk, typically because the config dir is not writable.
 // Callers may continue with the in-memory settings.
@@ -197,19 +201,19 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 func Validate(c ApplicationConfig) error {
 	u, err := url.Parse(c.StashGraphQLUrl)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return fmt.Errorf("stash_graphql_url must be an absolute http(s) URL, got %q", c.StashGraphQLUrl)
+		return fmt.Errorf("%w: stash_graphql_url must be an absolute http(s) URL, got %q", ErrInvalid, c.StashGraphQLUrl)
 	}
 	if _, ok := validLogLevels[c.LogLevel]; !ok {
-		return fmt.Errorf("log_level must be one of trace, debug, info, warn, error, got %q", c.LogLevel)
+		return fmt.Errorf("%w: log_level must be one of trace, debug, info, warn, error, got %q", ErrInvalid, c.LogLevel)
 	}
 	if c.HeatmapHeightPx < 0 || c.HeatmapHeightPx > 200 {
-		return fmt.Errorf("heatmap_height_px must be between 0 and 200, got %d", c.HeatmapHeightPx)
+		return fmt.Errorf("%w: heatmap_height_px must be between 0 and 200, got %d", ErrInvalid, c.HeatmapHeightPx)
 	}
 	if c.FavoriteTag == "" {
-		return errors.New("favorite_tag must not be empty")
+		return fmt.Errorf("%w: favorite_tag must not be empty", ErrInvalid)
 	}
 	if c.ExcludeSortName == "" {
-		return errors.New("exclude_sort_name must not be empty")
+		return fmt.Errorf("%w: exclude_sort_name must not be empty", ErrInvalid)
 	}
 	return nil
 }
