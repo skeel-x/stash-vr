@@ -49,6 +49,14 @@ func classifyIncomingTags(ctx context.Context, tags []tagDto) incomingTags {
 		if key == "" {
 			continue
 		}
+		// A rating is only ever set on markers we sent out (it carries the
+		// Stash marker id), so it wins over every legend match: a marker whose
+		// primary tag happens to be named "O" or "Studio" must survive the
+		// round trip, or UpdateMarkers would destroy it.
+		if t.Rating != nil {
+			in.markers = append(in.markers, newMarker(key, arg, t))
+			continue
+		}
 		switch key {
 		case internal.LegendPerformer, internal.LegendSceneStudio, internal.LegendSceneGroup,
 			internal.LegendMetaResolution, internal.LegendSummary, internal.LegendSummaryId,
@@ -85,16 +93,21 @@ func classifyIncomingTags(ctx context.Context, tags []tagDto) incomingTags {
 			log.Ctx(ctx).Debug().Str("tag", t.Name).Msg("Ignoring untimed tag with an unknown legend")
 			continue
 		}
-		m := library.MarkerDto{
-			PrimaryTagName: key,
-			StartSecond:    t.Start / 1000,
-			MarkerId:       markerID(t.Rating),
-			Title:          arg,
-		}
-		if t.End != nil {
-			m.EndSecond = util.Ptr(*t.End / 1000)
-		}
-		in.markers = append(in.markers, m)
+		in.markers = append(in.markers, newMarker(key, arg, t))
 	}
 	return in
+}
+
+// newMarker builds the marker a HereSphere tag describes; times arrive in ms.
+func newMarker(key, arg string, t tagDto) library.MarkerDto {
+	m := library.MarkerDto{
+		PrimaryTagName: key,
+		StartSecond:    t.Start / 1000,
+		MarkerId:       markerID(t.Rating),
+		Title:          arg,
+	}
+	if t.End != nil {
+		m.EndSecond = util.Ptr(*t.End / 1000)
+	}
+	return m
 }
