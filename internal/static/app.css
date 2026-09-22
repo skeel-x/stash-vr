@@ -7,13 +7,28 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{background:var(--bg)}
-body{margin:0;color:var(--text);background:var(--bg);font:18px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif}
+body{margin:0;color:var(--text);background:transparent;position:relative;min-height:100vh;font:18px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif}
+/* A still, out-of-focus wash of the page's own colours behind everything.
+   It is a fixed layer so it never scrolls or animates; the extra inset hides
+   the blur's soft edges. */
+body::before{
+  content:"";position:fixed;inset:-15%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(40% 35% at 18% 12%, rgba(196,236,86,.38), transparent 62%),
+    radial-gradient(34% 30% at 78% 18%, rgba(95,211,154,.34), transparent 62%),
+    radial-gradient(46% 40% at 72% 82%, rgba(91,156,255,.24), transparent 62%),
+    radial-gradient(30% 28% at 22% 86%, rgba(255,159,67,.20), transparent 62%),
+    radial-gradient(36% 32% at 50% 52%, rgba(63,199,194,.20), transparent 62%);
+  filter:blur(70px) saturate(1.05);
+  opacity:.85;
+}
+@media (max-width:560px){body::before{filter:blur(40px)}}
 a{color:var(--text)}
 main{max-width:720px;margin:0 auto;padding:24px 16px 56px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;word-break:break-all}
 
 /* header */
-.bar{display:flex;align-items:center;gap:24px;max-width:720px;margin:0 auto;padding:16px}
+.bar{display:flex;align-items:center;gap:24px;max-width:720px;margin:0 auto;padding:16px;background:rgba(15,22,34,.72);backdrop-filter:blur(8px)}
 .bar .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:20px}
 .bar .brand img{width:28px;height:28px}
 .bar nav{display:flex;gap:6px;margin-left:auto}
@@ -76,6 +91,7 @@ button:disabled{opacity:.6;cursor:default}
 .copy{flex:none;min-width:96px}
 
 /* forms */
+.form{background:var(--surface);border-radius:8px;padding:20px 24px 24px}
 .form h1{font-size:28px;margin:0 0 16px}
 .form h2{font-size:22px;margin:28px 0 12px;padding-top:20px;border-top:1px solid var(--line)}
 .form h2:first-of-type{border-top:0;padding-top:0;margin-top:8px}
@@ -93,7 +109,7 @@ input:disabled{color:var(--muted)}
 .msg.err{color:var(--err)}
 
 /* sections table */
-table.sections{width:100%;border-collapse:collapse;margin:0 0 16px}
+table.sections{width:100%;border-collapse:collapse;margin:0 0 16px;background:var(--surface)}
 table.sections th{text-align:left;color:var(--muted);font-weight:500;font-size:16px;padding:8px;border-bottom:1px solid var(--line)}
 table.sections td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle;min-height:56px}
 table.sections td input.name{margin:0;min-height:48px}
