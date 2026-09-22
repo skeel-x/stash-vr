@@ -21,6 +21,18 @@ var (
 	CommandSetOrganizedTrue = "/org"
 )
 
+// legacyLegends are prefixes older stash-vr releases used. HereSphere may
+// still send them back from its cache; they are metadata, never markers.
+var legacyLegends = map[string]struct{}{
+	"P": {}, "Org": {}, "O": {}, "movie": {}, "Movie": {}, "Performer": {}, "Tag": {}, "?": {}, "Σ": {},
+}
+
+// IsLegacyLegend reports whether key was a legend in an earlier release.
+func IsLegacyLegend(key string) bool {
+	_, ok := legacyLegends[key]
+	return ok
+}
+
 var (
 	TagVR_DOME    = "DOME"
 	TagVR_SPHERE  = "SPHERE"
