@@ -41,6 +41,7 @@ type ConfigView struct {
 	HeatmapHeightPx    int             `json:"heatmap_height_px"`
 	ForceHTTPS         bool            `json:"force_https"`
 	LogLevel           string          `json:"log_level"`
+	SmartSectionSize   int             `json:"smart_section_size"`
 	ListenAddress      string          `json:"listen_address"`
 	ConfigPath         string          `json:"config_path"`
 	Filters            []config.Filter `json:"filters"`
@@ -57,6 +58,7 @@ type configInput struct {
 	HeatmapHeightPx    int    `json:"heatmap_height_px"`
 	ForceHTTPS         bool   `json:"force_https"`
 	LogLevel           string `json:"log_level"`
+	SmartSectionSize   int    `json:"smart_section_size"`
 }
 
 type testInput struct {
@@ -80,6 +82,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		HeatmapHeightPx:    cfg.HeatmapHeightPx,
 		ForceHTTPS:         cfg.ForceHTTPS,
 		LogLevel:           cfg.LogLevel,
+		SmartSectionSize:   cfg.SmartSectionSize,
 		ListenAddress:      cfg.ListenAddress,
 		ConfigPath:         config.FilePath(cfg),
 		Filters:            cfg.Filters,
@@ -218,6 +221,7 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	next.HeatmapHeightPx = in.HeatmapHeightPx
 	next.ForceHTTPS = in.ForceHTTPS
 	next.LogLevel = in.LogLevel
+	next.SmartSectionSize = in.SmartSectionSize
 
 	// Validate before the host rule so an unusable URL is reported as such
 	// rather than as a missing API key.

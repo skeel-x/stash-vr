@@ -131,6 +131,35 @@ func TestGetSections_OverridesOrderAndHideSmartSections(t *testing.T) {
 	}
 }
 
+func TestSectionRows_MixesSavedFiltersAndSmartSections(t *testing.T) {
+	saved := []gql.SavedFilterParts{{Id: "10", Name: "VR Blowjob"}, {Id: "11", Name: "2D Anal"}}
+	overrides := []config.Filter{
+		{ID: "11", Name: "Anal (2D)"},
+		{ID: "smart:random"},
+		{ID: "99"}, // deleted in Stash since the override was saved
+		{ID: "smart:recent", Disabled: true},
+	}
+
+	rows := sectionRows(saved, smartSections(), overrides)
+
+	got := make([]string, len(rows))
+	for i, r := range rows {
+		got[i] = r.ID
+	}
+	// Un-overridden smart sections first (continue, unwatched, toprated, withscript, noscript),
+	// then overrides in order (99 dropped), then the remaining saved filter.
+	want := []string{"smart:continue", "smart:unwatched", "smart:toprated", "smart:withscript", "smart:noscript", "11", "smart:random", "smart:recent", "10"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("rows = %v, want %v", got, want)
+	}
+	if rows[5].Name != "Anal (2D)" || rows[5].SourceName != "2D Anal" || rows[5].Smart {
+		t.Fatalf("renamed saved filter row wrong: %+v", rows[5])
+	}
+	if !rows[7].Disabled || rows[1].Disabled == false && rows[1].ID != "smart:unwatched" {
+		t.Fatalf("disabled flags wrong: %+v", rows)
+	}
+}
+
 func TestSectionRows_ListsEverySmartSectionWithDefaults(t *testing.T) {
 	loadConfig(t, nil)
 	svc := NewService(&routingStash{})

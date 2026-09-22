@@ -9,7 +9,6 @@ import (
 	"stash-vr/internal/build"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
-	"stash-vr/internal/stash/gql"
 	"stash-vr/internal/static"
 )
 
@@ -27,6 +26,7 @@ type FilterRow struct {
 	SourceName string
 	Name       string
 	Disabled   bool
+	Smart      bool
 }
 
 type pageData struct {
@@ -98,44 +98,12 @@ func (h pageHandler) setup(w http.ResponseWriter, r *http.Request) {
 
 func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
 	data := h.base("Sections", "sections")
-	rows, err := h.filterRows(r)
+	rows, err := h.lib.SectionRows(r.Context())
 	if err != nil {
 		data.FilterError = err.Error()
 	}
-	data.FilterRows = rows
+	for _, row := range rows {
+		data.FilterRows = append(data.FilterRows, FilterRow{ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled, Smart: row.Smart})
+	}
 	render(w, r, sectionsTmpl, data)
-}
-
-// filterRows lists Stash's saved scene filters in the configured order:
-// overridden ones first (in override order), then the rest as Stash returns them.
-func (h pageHandler) filterRows(r *http.Request) ([]FilterRow, error) {
-	resp, err := gql.FindSavedSceneFilters(r.Context(), h.lib.Client())
-	if err != nil {
-		return nil, err
-	}
-	sourceNames := make(map[string]string, len(resp.FindSavedFilters))
-	for _, sf := range resp.FindSavedFilters {
-		sourceNames[sf.Id] = sf.Name
-	}
-	rows := make([]FilterRow, 0, len(resp.FindSavedFilters))
-	seen := map[string]struct{}{}
-	for _, cf := range config.Application().Filters {
-		src, ok := sourceNames[cf.ID]
-		if !ok {
-			continue
-		}
-		name := cf.Name
-		if name == "" {
-			name = src
-		}
-		rows = append(rows, FilterRow{ID: cf.ID, SourceName: src, Name: name, Disabled: cf.Disabled})
-		seen[cf.ID] = struct{}{}
-	}
-	for _, sf := range resp.FindSavedFilters {
-		if _, ok := seen[sf.Id]; ok {
-			continue
-		}
-		rows = append(rows, FilterRow{ID: sf.Id, SourceName: sf.Name, Name: sf.Name})
-	}
-	return rows, nil
 }

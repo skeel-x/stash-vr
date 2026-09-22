@@ -76,7 +76,7 @@ Example: Connect to Stash running on stash-host:9999 with api key XXX and set St
 
 ### Settings and the web UI
 
-Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`.
+Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Smart sections (Continue watching, Recently added, Random and more) can be switched on and ordered on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`.
 
 `config.json` lives in the directory given by `CONFIG_PATH` (default: a `config` directory next to the binary). In Docker the image sets `CONFIG_PATH=/config`; mount a directory that is writable by uid 65532 (the image's non-root user). The environment variables and flags below only seed the file on first start; after that the file is the source of truth. `LISTEN_ADDRESS`, `DISABLE_LOG_COLOR` and `DISABLE_REDACT` are process settings and stay flags.
 

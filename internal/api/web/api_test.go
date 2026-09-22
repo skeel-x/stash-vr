@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
@@ -19,14 +20,17 @@ import (
 // fakeStash answers generated queries by operation name.
 type fakeStash struct {
 	versionErr error
+	mu         sync.Mutex
 	calls      map[string]int
 }
 
 func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
+	f.mu.Lock()
 	if f.calls == nil {
 		f.calls = map[string]int{}
 	}
 	f.calls[req.OpName]++
+	f.mu.Unlock()
 	var payload string
 	switch req.OpName {
 	case "Version":
@@ -175,6 +179,24 @@ func TestPutConfig_BlankKeyKeepsCurrentAndPersists(t *testing.T) {
 	data, _ := os.ReadFile(config.FilePath(cfg))
 	if !strings.Contains(string(data), "LOVED") {
 		t.Fatal("expected change persisted to config.json")
+	}
+}
+
+func TestPutConfig_PersistsSmartSectionSize(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 120,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["smart_section_size"].(float64) != 120 {
+		t.Fatalf("expected 200 with smart_section_size 120, got %d %v", rec.Code, out)
+	}
+	if config.Application().SmartSectionSize != 120 {
+		t.Fatal("expected the size to be stored")
 	}
 }
 

@@ -102,6 +102,7 @@ table.sections td input.enabled{width:26px;height:26px}
 .handle:hover{background:var(--raised)}
 tr.dragging{opacity:.5}
 .id{margin-left:8px;color:var(--muted);font-size:14px}
+.badge{margin-left:8px;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;vertical-align:middle}
 @media (max-width:560px){
   .bar{flex-wrap:wrap}
   .launch .action{font-size:28px}

@@ -110,8 +110,15 @@ func TestSections_RendersPage(t *testing.T) {
 
 	rec := getPage(t, h, "/sections", nil)
 
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Reset to Stash order") {
+	body := rec.Body.String()
+	if rec.Code != 200 || !strings.Contains(body, "Reset to Stash order") {
 		t.Fatalf("expected sections page, got %d", rec.Code)
+	}
+	if !strings.Contains(body, "Continue watching") {
+		t.Fatal("expected disabled smart sections to still be listed")
+	}
+	if !strings.Contains(body, ">smart<") {
+		t.Fatal("expected the smart badge")
 	}
 }
 

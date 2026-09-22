@@ -30,6 +30,10 @@
     <input name="heatmap_height_px" type="number" min="0" max="200" value="{{.Config.HeatmapHeightPx}}">
     <small>0 keeps the height Stash generates.</small>
   </label>
+  <label>Scenes per smart section
+    <input name="smart_section_size" type="number" min="10" max="500" value="{{.Config.SmartSectionSize}}">
+    <small>Continue watching, Recently added, Random and the other computed sections show this many scenes.</small>
+  </label>
   <label class="check"><input name="force_https" type="checkbox" {{if .Config.ForceHTTPS}}checked{{end}}> Always build https links (only if your proxy does not send X-Forwarded-Proto)</label>
 
   <h2>Server</h2>

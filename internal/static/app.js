@@ -70,6 +70,7 @@
       heatmap_height_px: Number(form.heatmap_height_px.value || 0),
       force_https: form.force_https.checked,
       log_level: form.log_level.value,
+      smart_section_size: Number(form.smart_section_size.value || 50),
     });
     $('#test').addEventListener('click', async () => {
       setMsg($('#test-msg'), 'Testing');
