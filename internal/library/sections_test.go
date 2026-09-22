@@ -160,6 +160,25 @@ func TestSectionRows_MixesSavedFiltersAndSmartSections(t *testing.T) {
 	}
 }
 
+func TestGetSavedFilterSceneSets_OmitsSmartRandomForPlaya(t *testing.T) {
+	loadConfig(t, nil)
+	svc := NewService(&routingStash{})
+
+	sets, err := svc.GetSavedFilterSceneSets(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, s := range sets {
+		if s.ID == "smart:random" {
+			t.Fatal("smart:random must not be exposed to Playa")
+		}
+	}
+	if len(sets) != 2 {
+		t.Fatalf("expected continue and recent for Playa, got %+v", sets)
+	}
+}
+
 func TestSectionRows_ListsEverySmartSectionWithDefaults(t *testing.T) {
 	loadConfig(t, nil)
 	svc := NewService(&routingStash{})

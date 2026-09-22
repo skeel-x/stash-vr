@@ -108,6 +108,10 @@ func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Sectio
 	return []Section{allScenesSection}, nil
 }
 
+// GetSavedFilterSceneSets returns the enabled sections as Playa categories,
+// leaving out smart sections that say they should not be listed there (the
+// smart Random section, which would show up as a second, differently
+// shuffled "Random" alongside Playa's own).
 func (libraryService *Service) GetSavedFilterSceneSets(ctx context.Context) ([]SavedFilterSceneSet, error) {
 	sources, err := libraryService.getSources(ctx)
 	if err != nil {
@@ -116,7 +120,19 @@ func (libraryService *Service) GetSavedFilterSceneSets(ctx context.Context) ([]S
 	if len(sources) == 0 {
 		return []SavedFilterSceneSet{}, nil
 	}
-	return libraryService.resolveSections(ctx, sources)
+	sets, err := libraryService.resolveSections(ctx, sources)
+	if err != nil {
+		return nil, err
+	}
+	smartByID := make(map[string]SmartSection, len(sources))
+	for _, s := range smartSections() {
+		smartByID[s.ID()] = s
+	}
+	sets = slices.DeleteFunc(sets, func(s SavedFilterSceneSet) bool {
+		smart, ok := smartByID[s.ID]
+		return ok && !smart.ForPlaya()
+	})
+	return sets, nil
 }
 
 // sectionRows applies the ordering rule: smart sections without an override
