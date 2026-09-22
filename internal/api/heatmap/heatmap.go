@@ -1,6 +1,7 @@
 package heatmap
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -83,31 +84,37 @@ func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 	return img, nil
 }
 
-// serveScreenshot streams the Stash screenshot to w. JPEG and PNG pass
-// through unchanged; anything else (WebP, GIF) is transcoded to JPEG because
-// the players cannot display it.
-func serveScreenshot(ctx context.Context, w http.ResponseWriter, fileUrl string) error {
+// loadScreenshot fetches the Stash screenshot fully into memory and returns
+// its content type and body. JPEG and PNG pass through unchanged; anything
+// else (WebP, GIF) is transcoded to JPEG because the players cannot display
+// it. Buffering the whole response lets the caller write the status,
+// headers and body atomically, so a fetch or transcode failure never leaves
+// a partially written, cacheable response on the wire.
+func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, body []byte, err error) {
 	resp, err := fetchScreenshot(ctx, fileUrl)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	defer resp.Body.Close()
 
 	ct := resp.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "image/jpeg") || strings.HasPrefix(ct, "image/png") {
-		w.Header().Set("Content-Type", ct)
-		if cl := resp.Header.Get("Content-Length"); cl != "" {
-			w.Header().Set("Content-Length", cl)
+		b, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+		if err != nil {
+			return "", nil, err
 		}
-		_, err = io.Copy(w, resp.Body)
-		return err
+		return ct, b, nil
 	}
+
 	img, _, err := image.Decode(resp.Body)
 	if err != nil {
-		return fmt.Errorf("decode screenshot: %w", err)
+		return "", nil, fmt.Errorf("decode screenshot: %w", err)
 	}
-	w.Header().Set("Content-Type", "image/jpeg")
-	return jpeg.Encode(w, img, nil)
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, nil); err != nil {
+		return "", nil, err
+	}
+	return "image/jpeg", buf.Bytes(), nil
 }
 
 func buildHeatmapCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.Image, error) {

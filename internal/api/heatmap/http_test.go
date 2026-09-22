@@ -62,6 +62,7 @@ func imageServer(t *testing.T) (*httptest.Server, []byte, []byte) {
 		_, _ = w.Write(heatmap)
 	})
 	mux.HandleFunc("/missing", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
+	mux.HandleFunc("/broken", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "boom", http.StatusInternalServerError) })
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv, jpg.Bytes(), pn.Bytes()
@@ -84,7 +85,7 @@ func (s *sceneStash) MakeRequest(_ context.Context, req *graphql.Request, resp *
 	_ = json.Unmarshal(raw, &in)
 	var scenes []string
 	for _, id := range in.SceneIDs {
-		shot := map[int]string{1: "/jpeg", 2: "/webp", 3: "/png", 4: "/missing", 5: "/jpeg"}[id]
+		shot := map[int]string{1: "/jpeg", 2: "/webp", 3: "/png", 4: "/missing", 5: "/jpeg", 6: "/broken"}[id]
 		interactive := id == 5
 		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"S%d","created_at":"2024-01-01T00:00:00Z","files":[],"tags":[],"interactive":%t,"paths":{"screenshot":"%s%s","interactive_heatmap":"%s/heatmap","stream":"%s/stream","preview":"","funscript":"","caption":""}}`, id, id, interactive, s.base, shot, s.base, s.base))
 	}
@@ -169,6 +170,20 @@ func TestCover_MissingScreenshotIsNotCached(t *testing.T) {
 	}
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("expected no-store for a miss, got %q", got)
+	}
+}
+
+func TestCover_UpstreamErrorIs502NoStore(t *testing.T) {
+	srv, _, _ := imageServer(t)
+	h := coverRouter(t, srv.URL)
+
+	rec := get(t, h, "/cover/6")
+
+	if rec.Code != 502 {
+		t.Fatalf("expected 502, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected no-store for an upstream error, got %q", got)
 	}
 }
 

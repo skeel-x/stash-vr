@@ -1,6 +1,7 @@
 package heatmap
 
 import (
+	"bytes"
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -9,6 +10,7 @@ import (
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
+	"strconv"
 )
 
 func CoverHandler(libraryService *library.Service) http.HandlerFunc {
@@ -43,23 +45,38 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 				}
 				return
 			}
+			var buf bytes.Buffer
+			if err := jpeg.Encode(&buf, cover, nil); err != nil {
+				log.Ctx(ctx).Err(err).Msg("cover: encode")
+				w.Header().Set("Cache-Control", "no-store")
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
 			w.Header().Set("Cache-Control", "private, max-age=86400")
 			w.Header().Set("Content-Type", "image/jpeg")
-			if err := jpeg.Encode(w, cover, nil); err != nil {
+			w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+			if _, err := w.Write(buf.Bytes()); err != nil {
 				log.Ctx(ctx).Err(err).Msg("cover: write")
 			}
 			return
 		}
 
-		w.Header().Set("Cache-Control", "private, max-age=86400")
-		if err := serveScreenshot(ctx, w, stash.ApiKeyed(*p.Screenshot)); err != nil {
-			log.Ctx(ctx).Err(err).Msg("serveScreenshot")
+		ct, body, err := loadScreenshot(ctx, stash.ApiKeyed(*p.Screenshot))
+		if err != nil {
+			log.Ctx(ctx).Err(err).Msg("loadScreenshot")
 			w.Header().Set("Cache-Control", "no-store")
 			if errors.Is(err, errImageNotFound) {
 				w.WriteHeader(http.StatusNotFound)
 			} else {
 				w.WriteHeader(http.StatusBadGateway)
 			}
+			return
+		}
+		w.Header().Set("Cache-Control", "private, max-age=86400")
+		w.Header().Set("Content-Type", ct)
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		if _, err := w.Write(body); err != nil {
+			log.Ctx(ctx).Err(err).Msg("cover: write")
 		}
 	}
 	return internal.LogRoute("cover", internal.LogVideoId(f))
