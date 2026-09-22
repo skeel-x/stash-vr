@@ -17,6 +17,7 @@ const (
 	envKeyDisableRedact      = "DISABLE_REDACT"
 	envKeyForceHTTPS         = "FORCE_HTTPS"
 	envKeyBasePath           = "BASE_PATH"
+	envKeyDeovrAutoload      = "DEOVR_AUTOLOAD"
 	envKeyHeatmapHeightPx    = "HEATMAP_HEIGHT_PX"
 	envKeyExcludeSortName    = "EXCLUDE_SORT_NAME"
 	envKeyUserConfigPath     = "CONFIG_PATH"
@@ -34,6 +35,7 @@ type ApplicationConfig struct {
 	IsRedactDisabled   bool
 	ForceHTTPS         bool
 	BasePath           string
+	DeovrAutoload      bool
 	HeatmapHeightPx    int
 	SmartSectionSize   int
 	ExcludeSortName    string
@@ -69,6 +71,9 @@ func Init() error {
 
 	pflag.String(envKeyBasePath, "", "Path prefix when served under a sub-path behind a reverse proxy, e.g. /stashvr")
 	_ = viper.BindPFlag(envKeyBasePath, pflag.Lookup(envKeyBasePath))
+
+	pflag.Bool(envKeyDeovrAutoload, true, "Send the DeoVR library when DeoVR's browser opens the front page")
+	_ = viper.BindPFlag(envKeyDeovrAutoload, pflag.Lookup(envKeyDeovrAutoload))
 
 	pflag.Int(envKeyHeatmapHeightPx, 0, "Height of heatmaps")
 	_ = viper.BindPFlag(envKeyHeatmapHeightPx, pflag.Lookup(envKeyHeatmapHeightPx))
@@ -107,6 +112,7 @@ func Init() error {
 		IsRedactDisabled:   viper.GetBool(envKeyDisableRedact),
 		ForceHTTPS:         viper.GetBool(envKeyForceHTTPS),
 		BasePath:           viper.GetString(envKeyBasePath),
+		DeovrAutoload:      viper.GetBool(envKeyDeovrAutoload),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),

@@ -47,6 +47,7 @@ type fileConfig struct {
 	SmartSectionSize   *int     `json:"smart_section_size,omitempty"`
 	ForceHTTPS         *bool    `json:"force_https,omitempty"`
 	BasePath           *string  `json:"base_path,omitempty"`
+	DeovrAutoload      *bool    `json:"deovr_autoload,omitempty"`
 	LogLevel           *string  `json:"log_level,omitempty"`
 	Filters            []Filter `json:"filters"`
 }
@@ -178,6 +179,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.BasePath != nil {
 		base.BasePath = *fc.BasePath
 	}
+	if fc.DeovrAutoload != nil {
+		base.DeovrAutoload = *fc.DeovrAutoload
+	}
 	if fc.LogLevel != nil {
 		base.LogLevel = *fc.LogLevel
 	}
@@ -264,6 +268,7 @@ func write(path string, c ApplicationConfig) error {
 		SmartSectionSize:   &c.SmartSectionSize,
 		ForceHTTPS:         &c.ForceHTTPS,
 		BasePath:           &c.BasePath,
+		DeovrAutoload:      &c.DeovrAutoload,
 		LogLevel:           &c.LogLevel,
 		Filters:            c.Filters,
 	}

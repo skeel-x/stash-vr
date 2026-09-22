@@ -41,7 +41,11 @@
       <a class="url" href="{{.Links.DeoVR}}">{{.Links.DeoVR}}</a>
       <button type="button" class="copy" data-copy="{{.Links.DeoVR}}">Copy</button>
     </div>
-    <p class="note">DeoVR also finds the library on this page by itself. If nothing appears, press the play button in the top right.</p>
+    <p class="note">Open this address in DeoVR's browser. If the library does not appear, open the address below instead.</p>
+    <div class="address">
+      <a class="url" href="{{.Links.DeoVRApi}}">{{.Links.DeoVRApi}}</a>
+      <button type="button" class="copy" data-copy="{{.Links.DeoVRApi}}">Copy</button>
+    </div>
     {{if .Links.PlainHTTP}}<p class="note warn">Covers stay blank in DeoVR over plain http. Open this page over https to see them.</p>{{end}}
   </article>
 

@@ -44,6 +44,8 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 		payload = `{"findScenes":{"scenes":[{"id":"1"},{"id":"2"}]}}`
 	case "FindAllTags":
 		payload = `{"findTags":{"tags":[]}}`
+	case "FindScenes":
+		payload = `{"findScenes":{"scenes":[{"id":"1","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"one.mp4","duration":100,"path":"/one.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/1/screenshot","stream":"http://stash:9999/scene/1/stream"},"tags":[]},{"id":"2","title":"Two","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"two.mp4","duration":100,"path":"/two.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/2/screenshot","stream":"http://stash:9999/scene/2/stream"},"tags":[]}]}}`
 	case "FindSampleSceneCover":
 		payload = `{"findScenes":{"scenes":[{"paths":{"screenshot":"http://stash:9999/scene/1/screenshot"}}]}}`
 	default:
@@ -62,6 +64,7 @@ func newEnv(t *testing.T, stash *fakeStash) (*library.Service, http.Handler) {
 		LogLevel:         "info",
 		ExcludeSortName:  "hidden",
 		SmartSectionSize: 50,
+		DeovrAutoload:    true,
 		ConfigPath:       t.TempDir(),
 		// The fake Stash always answers FindSceneIdsByFilter with 0 scenes, so
 		// the default smart sections (enabled out of the box) would otherwise
@@ -197,6 +200,39 @@ func TestPutConfig_PersistsSmartSectionSize(t *testing.T) {
 	}
 	if config.Application().SmartSectionSize != 120 {
 		t.Fatal("expected the size to be stored")
+	}
+}
+
+func TestPutConfig_PersistsDeovrAutoload(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"deovr_autoload": false,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["deovr_autoload"] != false {
+		t.Fatalf("expected 200 with deovr_autoload false, got %d %v", rec.Code, out)
+	}
+	if config.Application().DeovrAutoload {
+		t.Fatal("expected autoload off to be stored")
+	}
+	data, _ := os.ReadFile(config.FilePath(config.Application()))
+	if !strings.Contains(string(data), `"deovr_autoload": false`) {
+		t.Fatalf("expected deovr_autoload persisted to config.json, got %s", data)
+	}
+
+	delete(body, "deovr_autoload")
+	rec, _ = do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200 without the field, got %d %s", rec.Code, rec.Body.String())
+	}
+	if config.Application().DeovrAutoload {
+		t.Fatal("expected autoload kept off when the field is missing")
 	}
 }
 

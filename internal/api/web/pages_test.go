@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
+	"stash-vr/internal/config"
 )
 
 func getPage(t *testing.T, h http.Handler, path string, headers map[string]string) *httptest.ResponseRecorder {
@@ -181,5 +182,35 @@ func TestPlayers_LinksCarryForwardedPrefix(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
 		}
+	}
+}
+
+func TestPlayers_DeoVRUserAgentGetsLibraryJson(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	rec := getPage(t, h, "/", map[string]string{"User-Agent": "Mozilla/5.0 DeoVR/1.6 Quest"})
+
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("expected JSON for DeoVR, got %q", ct)
+	}
+	if !strings.Contains(rec.Body.String(), `"scenes"`) {
+		t.Fatal("expected the DeoVR library document")
+	}
+}
+
+func TestPlayers_DeoVRUserAgentGetsHtmlWhenAutoloadOff(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.DeovrAutoload = false
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	h := PagesRouter(lib)
+
+	rec := getPage(t, h, "/", map[string]string{"User-Agent": "DeoVR"})
+
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Fatalf("expected HTML with autoload off, got %q", ct)
 	}
 }

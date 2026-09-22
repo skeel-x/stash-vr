@@ -132,6 +132,9 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `FORCE_HTTPS`
   * Default: `false`
   * Force Stash-VR to use HTTPS. Useful as a last resort attempt if you're having issues with Stash-VR behind a reverse proxy.
+* `DEOVR_AUTOLOAD`
+  * Default: `true`
+  * Answer DeoVR's browser on the front page with the library document. Runtime name: `deovr_autoload`.
 
 </details>
 
@@ -202,6 +205,10 @@ Changes reflect in HereSphere when videos are re-opened.
 #### Favorites
 
 When the favorite-feature of HereSphere is first used Stash-VR will create a tag in Stash named according to `FAVORITE_TAG` (set in docker env., defaults to `FAVORITE`) and apply that tag to your scene.
+
+### DeoVR
+
+Open the Stash-VR address (for example `http://<host>:9666`) in DeoVR's browser; the library loads directly. If it does not appear, open the `/deovr` address shown on the Players page instead. Requests from DeoVR's browser to the front page receive the library document rather than the web page; turn this off with the `deovr_autoload` setting on the Setup page if you want the web page in DeoVR.
 
 ## Known issues/Missing features
 

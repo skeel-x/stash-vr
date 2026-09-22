@@ -35,7 +35,7 @@ func Router(libraryService *library.Service) *chi.Mux {
 
 	router.Mount("/api/ui", logMod("ui", web.ApiRouter(libraryService)))
 
-	web.Register(router, libraryService)
+	web.Register(router, libraryService, deovr.IndexHandler(libraryService))
 
 	router.Get("/*", http.FileServerFS(static.Fs).ServeHTTP)
 

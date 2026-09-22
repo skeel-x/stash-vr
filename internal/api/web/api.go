@@ -41,6 +41,7 @@ type ConfigView struct {
 	HeatmapHeightPx    int             `json:"heatmap_height_px"`
 	ForceHTTPS         bool            `json:"force_https"`
 	BasePath           string          `json:"base_path"`
+	DeovrAutoload      bool            `json:"deovr_autoload"`
 	LogLevel           string          `json:"log_level"`
 	SmartSectionSize   int             `json:"smart_section_size"`
 	ListenAddress      string          `json:"listen_address"`
@@ -59,6 +60,7 @@ type configInput struct {
 	HeatmapHeightPx    int     `json:"heatmap_height_px"`
 	ForceHTTPS         bool    `json:"force_https"`
 	BasePath           *string `json:"base_path"`
+	DeovrAutoload      *bool   `json:"deovr_autoload"`
 	LogLevel           string  `json:"log_level"`
 	SmartSectionSize   *int    `json:"smart_section_size"`
 }
@@ -84,6 +86,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		HeatmapHeightPx:    cfg.HeatmapHeightPx,
 		ForceHTTPS:         cfg.ForceHTTPS,
 		BasePath:           cfg.BasePath,
+		DeovrAutoload:      cfg.DeovrAutoload,
 		LogLevel:           cfg.LogLevel,
 		SmartSectionSize:   cfg.SmartSectionSize,
 		ListenAddress:      cfg.ListenAddress,
@@ -225,6 +228,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	next.ForceHTTPS = in.ForceHTTPS
 	if in.BasePath != nil {
 		next.BasePath = *in.BasePath
+	}
+	if in.DeovrAutoload != nil {
+		next.DeovrAutoload = *in.DeovrAutoload
 	}
 	next.LogLevel = in.LogLevel
 	if in.SmartSectionSize != nil {

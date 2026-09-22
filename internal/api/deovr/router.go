@@ -16,6 +16,12 @@ func Router(libraryService *library.Service) http.Handler {
 	return r
 }
 
+// IndexHandler serves the DeoVR library document; the web front page uses
+// it to answer DeoVR's browser directly.
+func IndexHandler(libraryService *library.Service) http.HandlerFunc {
+	return httpHandler{libraryService}.indexHandler
+}
+
 func getVideoDataUrl(baseUrl string, id string) string {
 	return baseUrl + "/deovr/" + id
 }

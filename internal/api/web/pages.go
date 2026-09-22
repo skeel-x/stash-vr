@@ -3,9 +3,11 @@ package web
 import (
 	"html/template"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
+	"stash-vr/internal/api/deovr"
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/build"
 	"stash-vr/internal/config"
@@ -45,12 +47,15 @@ type pageData struct {
 
 type pageHandler struct {
 	lib *library.Service
+	// deovrIndex answers DeoVR's browser on the front page with the library
+	// document instead of the Players page.
+	deovrIndex http.HandlerFunc
 }
 
 // Register adds the page routes to r. The top-level router uses this so its
 // /* static file server keeps working alongside the pages.
-func Register(r chi.Router, lib *library.Service) {
-	h := pageHandler{lib: lib}
+func Register(r chi.Router, lib *library.Service, deovrIndex http.HandlerFunc) {
+	h := pageHandler{lib: lib, deovrIndex: deovrIndex}
 	r.Get("/", h.players)
 	r.Get("/setup", h.setup)
 	r.Get("/sections", h.sections)
@@ -69,7 +74,7 @@ func redirectTo(path string) http.HandlerFunc {
 // PagesRouter serves only the HTML pages; used by tests.
 func PagesRouter(lib *library.Service) http.Handler {
 	r := chi.NewRouter()
-	Register(r, lib)
+	Register(r, lib, deovr.IndexHandler(lib))
 	return r
 }
 
@@ -85,6 +90,10 @@ func render(w http.ResponseWriter, r *http.Request, t *template.Template, data p
 }
 
 func (h pageHandler) players(w http.ResponseWriter, r *http.Request) {
+	if h.deovrIndex != nil && config.Application().DeovrAutoload && strings.Contains(strings.ToLower(r.UserAgent()), "deovr") {
+		h.deovrIndex(w, r)
+		return
+	}
 	// The page embeds the keyed sample cover URL for the headset check, so it
 	// must not be cached by a browser or an intermediary.
 	w.Header().Set("Cache-Control", "no-store")

@@ -70,6 +70,7 @@
       generate_summary_ids: form.generate_summary_ids.checked,
       heatmap_height_px: Number(form.heatmap_height_px.value || 0),
       force_https: form.force_https.checked,
+      deovr_autoload: form.deovr_autoload.checked,
       base_path: form.base_path.value.trim(),
       log_level: form.log_level.value,
       smart_section_size: Number(form.smart_section_size.value || 50),
