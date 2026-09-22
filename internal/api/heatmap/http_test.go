@@ -158,6 +158,20 @@ func TestCover_MissingScreenshotIs404(t *testing.T) {
 	}
 }
 
+func TestCover_MissingScreenshotIsNotCached(t *testing.T) {
+	srv, _, _ := imageServer(t)
+	h := coverRouter(t, srv.URL)
+
+	rec := get(t, h, "/cover/4")
+
+	if rec.Code != 404 {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected no-store for a miss, got %q", got)
+	}
+}
+
 func TestCover_InteractiveSceneStillGetsHeatmapJpeg(t *testing.T) {
 	srv, jpg, _ := imageServer(t)
 	h := coverRouter(t, srv.URL)

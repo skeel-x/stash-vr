@@ -81,12 +81,15 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string) 
 		EventServer:   util.Ptr(getEventsUrl(baseUrl, videoId)),
 	}
 
-	if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
-		dto.ThumbnailImage = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
-	}
+	paths := vd.SceneParts.Paths
+	if paths != nil {
+		if paths.Screenshot != nil && *paths.Screenshot != "" {
+			dto.ThumbnailImage = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
+		}
 
-	if vd.SceneParts.Paths.Preview != nil {
-		dto.ThumbnailVideo = util.Ptr(stash.ApiKeyed(*vd.SceneParts.Paths.Preview))
+		if paths.Preview != nil {
+			dto.ThumbnailVideo = util.Ptr(stash.ApiKeyed(*paths.Preview))
+		}
 	}
 
 	if vd.SceneParts.Date != nil {

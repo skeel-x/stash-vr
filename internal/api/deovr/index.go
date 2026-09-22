@@ -42,7 +42,7 @@ func buildIndex(sections []library.Section, vds map[string]*library.VideoData, b
 				VideoLength: int(vd.SceneParts.Files[0].Duration),
 				VideoUrl:    getVideoDataUrl(baseUrl, vd.Id()),
 			}
-			if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Screenshot != nil {
+			if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
 				s.List[j].ThumbnailUrl = util.Ptr(heatmap.GetCoverUrl(baseUrl, vd.Id()))
 			}
 		}

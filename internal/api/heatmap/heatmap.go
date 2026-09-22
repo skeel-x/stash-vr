@@ -40,22 +40,39 @@ func BuildCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.
 	return buildHeatmapCover(ctx, coverUrl, heatmapUrl)
 }
 
-func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
-	log.Ctx(ctx).Trace().Str("url", fileUrl).Msg("Fetching image")
+// fetchScreenshot fetches fileUrl from Stash, mapping a 404 to
+// errImageNotFound and any other non-200 to an error. On success the caller
+// owns resp.Body and must close it; on error the body is already closed.
+func fetchScreenshot(ctx context.Context, fileUrl string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileUrl, nil)
 	if err != nil {
 		return nil, err
 	}
-
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		log.Ctx(ctx).Debug().Msg("Image not found")
+		_ = resp.Body.Close()
 		return nil, errImageNotFound
 	}
+	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("stash returned HTTP %d", resp.StatusCode)
+	}
+	return resp, nil
+}
+
+func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
+	log.Ctx(ctx).Trace().Str("url", fileUrl).Msg("Fetching image")
+	resp, err := fetchScreenshot(ctx, fileUrl)
+	if err != nil {
+		if errors.Is(err, errImageNotFound) {
+			log.Ctx(ctx).Debug().Msg("Image not found")
+		}
+		return nil, err
+	}
+	defer resp.Body.Close()
 
 	img, format, err := image.Decode(resp.Body)
 	if err != nil {
@@ -70,21 +87,12 @@ func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 // through unchanged; anything else (WebP, GIF) is transcoded to JPEG because
 // the players cannot display it.
 func serveScreenshot(ctx context.Context, w http.ResponseWriter, fileUrl string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileUrl, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := httpClient.Do(req)
+	resp, err := fetchScreenshot(ctx, fileUrl)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound {
-		return errImageNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("screenshot: stash returned HTTP %d", resp.StatusCode)
-	}
+
 	ct := resp.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "image/jpeg") || strings.HasPrefix(ct, "image/png") {
 		w.Header().Set("Content-Type", ct)

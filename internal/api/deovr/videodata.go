@@ -59,12 +59,15 @@ func buildVideoData(vd *library.VideoData, baseUrl string) (*videoDataDto, error
 		SkipIntro:   0,
 	}
 
-	if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
-		dto.ThumbnailUrl = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
-	}
+	paths := vd.SceneParts.Paths
+	if paths != nil {
+		if paths.Screenshot != nil && *paths.Screenshot != "" {
+			dto.ThumbnailUrl = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
+		}
 
-	if vd.SceneParts.Paths.Preview != nil {
-		dto.VideoPreview = util.Ptr(stash.ApiKeyed(*vd.SceneParts.Paths.Preview))
+		if paths.Preview != nil {
+			dto.VideoPreview = util.Ptr(stash.ApiKeyed(*paths.Preview))
+		}
 	}
 
 	setStreamSources(vd, &dto)
