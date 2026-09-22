@@ -20,9 +20,14 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 
 		vd, err := libraryService.GetScene(ctx, sceneId, false)
 		if err != nil {
-			log.Ctx(ctx).Debug().Msg("Scene not found")
 			w.Header().Set("Cache-Control", "no-store")
-			w.WriteHeader(http.StatusNotFound)
+			if errors.Is(err, library.ErrSceneNotFound) {
+				log.Ctx(ctx).Debug().Msg("Scene not found")
+				w.WriteHeader(http.StatusNotFound)
+			} else {
+				log.Ctx(ctx).Err(err).Msg("GetScene")
+				w.WriteHeader(http.StatusBadGateway)
+			}
 			return
 		}
 

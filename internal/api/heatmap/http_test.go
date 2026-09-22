@@ -66,15 +66,32 @@ func imageServer(t *testing.T) (*httptest.Server, []byte, []byte) {
 	})
 	mux.HandleFunc("/missing", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	mux.HandleFunc("/broken", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "boom", http.StatusInternalServerError) })
+	mux.HandleFunc("/huge", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		chunk := make([]byte, 64<<10)
+		remaining := maxCoverBytes + 1
+		for remaining > 0 {
+			n := int64(len(chunk))
+			if remaining < n {
+				n = remaining
+			}
+			if _, err := w.Write(chunk[:n]); err != nil {
+				return
+			}
+			remaining -= n
+		}
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv, jpg.Bytes(), pn.Bytes()
 }
 
 // sceneStash answers FindScenes with one scene per requested id, whose
-// screenshot path is chosen by id.
+// screenshot path is chosen by id. Ids in failIDs make MakeRequest return an
+// error instead, simulating Stash being unreachable.
 type sceneStash struct {
-	base string
+	base    string
+	failIDs map[int]bool
 }
 
 func (s *sceneStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -86,9 +103,14 @@ func (s *sceneStash) MakeRequest(_ context.Context, req *graphql.Request, resp *
 		SceneIDs []int `json:"scene_ids"`
 	}
 	_ = json.Unmarshal(raw, &in)
+	for _, id := range in.SceneIDs {
+		if s.failIDs[id] {
+			return fmt.Errorf("stash unreachable")
+		}
+	}
 	var scenes []string
 	for _, id := range in.SceneIDs {
-		shot := map[int]string{1: "/jpeg", 2: "/webp", 3: "/png", 4: "/missing", 5: "/jpeg", 6: "/broken"}[id]
+		shot := map[int]string{1: "/jpeg", 2: "/webp", 3: "/png", 4: "/missing", 5: "/jpeg", 6: "/broken", 9: "/huge"}[id]
 		interactive := id == 5
 		screenshotURL := s.base + shot
 		if id == 7 {
@@ -192,6 +214,48 @@ func TestCover_UpstreamErrorIs502NoStore(t *testing.T) {
 	}
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("expected no-store for an upstream error, got %q", got)
+	}
+}
+
+// setMaxCoverBytesForTest lowers the package's cover size cap for the
+// duration of the calling test, so oversized-fixture tests do not need to
+// allocate and stream tens of megabytes.
+func setMaxCoverBytesForTest(t *testing.T, n int64) {
+	t.Helper()
+	prev := maxCoverBytes
+	maxCoverBytes = n
+	t.Cleanup(func() { maxCoverBytes = prev })
+}
+
+func TestCover_OversizedScreenshotIs502(t *testing.T) {
+	setMaxCoverBytesForTest(t, 1<<16)
+	srv, _, _ := imageServer(t)
+	h := coverRouter(t, srv.URL)
+
+	rec := get(t, h, "/cover/9")
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected no-store for an oversized screenshot, got %q", got)
+	}
+}
+
+func TestCover_StashDownIs502(t *testing.T) {
+	srv, _, _ := imageServer(t)
+	stash := &sceneStash{base: srv.URL, failIDs: map[int]bool{8: true}}
+	lib := library.NewService(stash)
+	r := chi.NewRouter()
+	r.Get("/cover/{videoId}", CoverHandler(lib))
+
+	rec := get(t, r, "/cover/8")
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected no-store for a Stash outage, got %q", got)
 	}
 }
 

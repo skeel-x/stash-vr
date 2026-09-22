@@ -26,6 +26,10 @@ import (
 // httpClient bounds every screenshot and heatmap fetch from Stash.
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
+// maxCoverBytes caps how much of a screenshot loadScreenshot buffers into
+// memory. A variable, not a constant, so tests can lower it.
+var maxCoverBytes int64 = 32 << 20
+
 var errImageNotFound = errors.New("image not found")
 var errScreenshotImageNotFound = errors.New("screenshot image not found")
 var errHeatmapImageNotFound = errors.New("heatmap image not found")
@@ -111,9 +115,12 @@ func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, bo
 
 	ct := resp.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "image/jpeg") || strings.HasPrefix(ct, "image/png") {
-		b, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+		b, err := io.ReadAll(io.LimitReader(resp.Body, maxCoverBytes+1))
 		if err != nil {
 			return "", nil, err
+		}
+		if int64(len(b)) > maxCoverBytes {
+			return "", nil, fmt.Errorf("screenshot larger than %d bytes", maxCoverBytes)
 		}
 		return ct, b, nil
 	}
