@@ -3948,6 +3948,15 @@ func (v *ScenePartsStudio) GetName() string { return v.Name }
 // GetImage_path returns ScenePartsStudio.Image_path, and is useful for accessing the field via an interface.
 func (v *ScenePartsStudio) GetImage_path() *string { return v.Image_path }
 
+// SceneSaveResumeTimeResponse is returned by SceneSaveResumeTime on success.
+type SceneSaveResumeTimeResponse struct {
+	// Sets the resume time point (if provided) and adds the provided duration to the scene's play duration
+	SceneSaveActivity bool `json:"sceneSaveActivity"`
+}
+
+// GetSceneSaveActivity returns SceneSaveResumeTimeResponse.SceneSaveActivity, and is useful for accessing the field via an interface.
+func (v *SceneSaveResumeTimeResponse) GetSceneSaveActivity() bool { return v.SceneSaveActivity }
+
 // SceneUpdateOrganizedResponse is returned by SceneUpdateOrganized on success.
 type SceneUpdateOrganizedResponse struct {
 	SceneUpdate *SceneUpdateOrganizedSceneUpdateScene `json:"sceneUpdate"`
@@ -4932,6 +4941,18 @@ type __SceneMarkersDestroyInput struct {
 
 // GetIds returns __SceneMarkersDestroyInput.Ids, and is useful for accessing the field via an interface.
 func (v *__SceneMarkersDestroyInput) GetIds() []string { return v.Ids }
+
+// __SceneSaveResumeTimeInput is used internally by genqlient
+type __SceneSaveResumeTimeInput struct {
+	Id     string   `json:"id"`
+	Resume *float64 `json:"resume"`
+}
+
+// GetId returns __SceneSaveResumeTimeInput.Id, and is useful for accessing the field via an interface.
+func (v *__SceneSaveResumeTimeInput) GetId() string { return v.Id }
+
+// GetResume returns __SceneSaveResumeTimeInput.Resume, and is useful for accessing the field via an interface.
+func (v *__SceneSaveResumeTimeInput) GetResume() *float64 { return v.Resume }
 
 // __SceneUpdateOrganizedInput is used internally by genqlient
 type __SceneUpdateOrganizedInput struct {
@@ -6089,6 +6110,40 @@ func SceneMarkersDestroy(
 	}
 
 	data_ = &SceneMarkersDestroyResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The mutation executed by SceneSaveResumeTime.
+const SceneSaveResumeTime_Operation = `
+mutation SceneSaveResumeTime ($id: ID!, $resume: Float) {
+	sceneSaveActivity(id: $id, resume_time: $resume)
+}
+`
+
+func SceneSaveResumeTime(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+	resume *float64,
+) (data_ *SceneSaveResumeTimeResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "SceneSaveResumeTime",
+		Query:  SceneSaveResumeTime_Operation,
+		Variables: &__SceneSaveResumeTimeInput{
+			Id:     id,
+			Resume: resume,
+		},
+	}
+
+	data_ = &SceneSaveResumeTimeResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

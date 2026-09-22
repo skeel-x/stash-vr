@@ -294,8 +294,24 @@ func (h *httpHandler) eventsHandler(w http.ResponseWriter, req *http.Request) {
 		if h.ps != nil {
 			h.ps.handleStop(ctx, h.libraryService, minPlayFraction)
 		}
+		h.saveResume(ctx, vd, float64(ev.Time))
 	default:
 	}
+}
+
+// saveResume records where playback stopped so Stash and the headset agree on
+// where to continue. It runs for every pause and close, also when no play
+// event was seen for the scene (for example after a restart).
+func (h *httpHandler) saveResume(ctx context.Context, vd *library.VideoData, position float64) {
+	if len(vd.SceneParts.Files) == 0 || vd.SceneParts.Files[0] == nil {
+		return
+	}
+	resume := resumePosition(vd.SceneParts.Files[0].Duration, position)
+	if err := h.libraryService.SaveResumeTime(ctx, vd.Id(), resume); err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to save resume position")
+		return
+	}
+	log.Ctx(ctx).Debug().Float64("position", position).Float64("resume", resume).Msg("Saved resume position")
 }
 
 type videoDataRequestDto struct {

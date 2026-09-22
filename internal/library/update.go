@@ -243,3 +243,13 @@ func (libraryService *Service) AddPlayDuration(ctx context.Context, id string, d
 	}
 	return nil
 }
+
+// SaveResumeTime stores the position Stash should resume the scene from.
+// Zero clears it.
+func (libraryService *Service) SaveResumeTime(ctx context.Context, id string, seconds float64) error {
+	_, err := gql.SceneSaveResumeTime(ctx, libraryService.Client(), id, &seconds)
+	if err != nil {
+		return fmt.Errorf("SceneSaveResumeTime: %w", err)
+	}
+	return nil
+}

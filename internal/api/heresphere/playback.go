@@ -38,6 +38,17 @@ func (ps *playbackState) handleStop(ctx context.Context, libraryService *library
 	ps.isPlaying = false
 }
 
+// resumePosition decides what to store as the scene's resume time after the
+// player paused or closed at position seconds. Positions inside the first 5
+// seconds or at or beyond 97 percent of the duration clear the stored
+// position, so finished scenes leave "Continue watching".
+func resumePosition(duration, position float64) float64 {
+	if duration <= 0 || position < 5 || position >= duration*0.97 {
+		return 0
+	}
+	return position
+}
+
 func (ps *playbackState) handleResume() {
 	if !ps.isPlaying {
 		ps.lastPlayTime = time.Now()
