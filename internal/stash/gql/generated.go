@@ -3948,6 +3948,15 @@ func (v *ScenePartsStudio) GetName() string { return v.Name }
 // GetImage_path returns ScenePartsStudio.Image_path, and is useful for accessing the field via an interface.
 func (v *ScenePartsStudio) GetImage_path() *string { return v.Image_path }
 
+// SceneSaveActivityResponse is returned by SceneSaveActivity on success.
+type SceneSaveActivityResponse struct {
+	// Sets the resume time point (if provided) and adds the provided duration to the scene's play duration
+	SceneSaveActivity bool `json:"sceneSaveActivity"`
+}
+
+// GetSceneSaveActivity returns SceneSaveActivityResponse.SceneSaveActivity, and is useful for accessing the field via an interface.
+func (v *SceneSaveActivityResponse) GetSceneSaveActivity() bool { return v.SceneSaveActivity }
+
 // SceneSaveResumeTimeResponse is returned by SceneSaveResumeTime on success.
 type SceneSaveResumeTimeResponse struct {
 	// Sets the resume time point (if provided) and adds the provided duration to the scene's play duration
@@ -4941,6 +4950,22 @@ type __SceneMarkersDestroyInput struct {
 
 // GetIds returns __SceneMarkersDestroyInput.Ids, and is useful for accessing the field via an interface.
 func (v *__SceneMarkersDestroyInput) GetIds() []string { return v.Ids }
+
+// __SceneSaveActivityInput is used internally by genqlient
+type __SceneSaveActivityInput struct {
+	Id      string   `json:"id"`
+	Seconds *float64 `json:"seconds"`
+	Resume  *float64 `json:"resume"`
+}
+
+// GetId returns __SceneSaveActivityInput.Id, and is useful for accessing the field via an interface.
+func (v *__SceneSaveActivityInput) GetId() string { return v.Id }
+
+// GetSeconds returns __SceneSaveActivityInput.Seconds, and is useful for accessing the field via an interface.
+func (v *__SceneSaveActivityInput) GetSeconds() *float64 { return v.Seconds }
+
+// GetResume returns __SceneSaveActivityInput.Resume, and is useful for accessing the field via an interface.
+func (v *__SceneSaveActivityInput) GetResume() *float64 { return v.Resume }
 
 // __SceneSaveResumeTimeInput is used internally by genqlient
 type __SceneSaveResumeTimeInput struct {
@@ -6110,6 +6135,42 @@ func SceneMarkersDestroy(
 	}
 
 	data_ = &SceneMarkersDestroyResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The mutation executed by SceneSaveActivity.
+const SceneSaveActivity_Operation = `
+mutation SceneSaveActivity ($id: ID!, $seconds: Float, $resume: Float) {
+	sceneSaveActivity(id: $id, playDuration: $seconds, resume_time: $resume)
+}
+`
+
+func SceneSaveActivity(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+	seconds *float64,
+	resume *float64,
+) (data_ *SceneSaveActivityResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "SceneSaveActivity",
+		Query:  SceneSaveActivity_Operation,
+		Variables: &__SceneSaveActivityInput{
+			Id:      id,
+			Seconds: seconds,
+			Resume:  resume,
+		},
+	}
+
+	data_ = &SceneSaveActivityResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

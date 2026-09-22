@@ -17,25 +17,26 @@ func newPlayback(vd *library.VideoData) *playbackState {
 	}
 }
 
-func (ps *playbackState) handleStop(ctx context.Context, libraryService *library.Service, minPlayFraction *float64) {
-	if ps.isPlaying {
-		currentPlayDuration := time.Since(ps.lastPlayTime)
-		ps.accumulatedPlayTime += currentPlayDuration
-		if !ps.thresholdReached && minPlayFraction != nil && ps.accumulatedPlayTime.Seconds() >= ps.videoDuration*(*minPlayFraction) {
-			ps.thresholdReached = true
-			log.Ctx(ctx).Debug().Str("total play time", ps.accumulatedPlayTime.Round(time.Second).String()).Msg("Incrementing play count")
-			err := libraryService.IncrementPlayCount(ctx, ps.videoId)
-			if err != nil {
-				log.Ctx(ctx).Warn().Err(err).Msg("Failed to increment play count")
-			}
-		}
-		log.Ctx(ctx).Debug().Str("duration", currentPlayDuration.Round(time.Second).String()).Msg("Adding play duration")
-		err := libraryService.AddPlayDuration(ctx, ps.videoId, currentPlayDuration)
+// handleStop marks playback stopped, bumping the play count once the
+// accumulated play time crosses minPlayFraction of the video's duration, and
+// returns the seconds played in this stop (0 when it was not playing). The
+// caller is responsible for reporting that duration to Stash.
+func (ps *playbackState) handleStop(ctx context.Context, libraryService *library.Service, minPlayFraction *float64) float64 {
+	if !ps.isPlaying {
+		return 0
+	}
+	currentPlayDuration := time.Since(ps.lastPlayTime)
+	ps.accumulatedPlayTime += currentPlayDuration
+	if !ps.thresholdReached && minPlayFraction != nil && ps.accumulatedPlayTime.Seconds() >= ps.videoDuration*(*minPlayFraction) {
+		ps.thresholdReached = true
+		log.Ctx(ctx).Debug().Str("total play time", ps.accumulatedPlayTime.Round(time.Second).String()).Msg("Incrementing play count")
+		err := libraryService.IncrementPlayCount(ctx, ps.videoId)
 		if err != nil {
-			log.Ctx(ctx).Warn().Err(err).Msg("Failed to add play duration")
+			log.Ctx(ctx).Warn().Err(err).Msg("Failed to increment play count")
 		}
 	}
 	ps.isPlaying = false
+	return currentPlayDuration.Seconds()
 }
 
 // resumePosition decides what to store as the scene's resume time after the

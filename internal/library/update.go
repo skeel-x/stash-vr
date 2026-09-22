@@ -253,3 +253,14 @@ func (libraryService *Service) SaveResumeTime(ctx context.Context, id string, se
 	}
 	return nil
 }
+
+// SaveActivity reports one playback stop to Stash: the seconds played since
+// the last report and the position to resume from (0 clears it). Either
+// value may be nil to leave it unchanged.
+func (libraryService *Service) SaveActivity(ctx context.Context, id string, playedSeconds *float64, resume *float64) error {
+	_, err := gql.SceneSaveActivity(ctx, libraryService.Client(), id, playedSeconds, resume)
+	if err != nil {
+		return fmt.Errorf("SceneSaveActivity: %w", err)
+	}
+	return nil
+}

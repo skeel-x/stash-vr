@@ -13,10 +13,13 @@ import (
 	"stash-vr/internal/library"
 )
 
-// fakeStash answers the scene lookup and records every resume position saved.
+// fakeStash answers the scene lookup and records every activity save: each
+// resume position saved (skipping saves that carried none), and how many
+// saves also carried played seconds.
 type fakeStash struct {
-	mu      sync.Mutex
-	resumes []float64
+	mu          sync.Mutex
+	resumes     []float64
+	withSeconds int
 }
 
 func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -24,11 +27,12 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 	switch req.OpName {
 	case "FindScenes":
 		payload = `{"findScenes":{"scenes":[{"id":"7","title":"Seven","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"seven.mp4","duration":1000,"path":"/seven.mp4","height":1080,"video_codec":"h264"}],"tags":[]}]}}`
-	case "SceneSaveResumeTime":
-		// req.Variables is *gql.__SceneSaveResumeTimeInput, which is unexported
+	case "SceneSaveActivity":
+		// req.Variables is *gql.__SceneSaveActivityInput, which is unexported
 		// and unreachable from this package, so decode it structurally instead.
 		var in struct {
-			Resume *float64 `json:"resume"`
+			Seconds *float64 `json:"seconds"`
+			Resume  *float64 `json:"resume"`
 		}
 		b, err := json.Marshal(req.Variables)
 		if err != nil {
@@ -38,7 +42,12 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 			return err
 		}
 		f.mu.Lock()
-		f.resumes = append(f.resumes, *in.Resume)
+		if in.Resume != nil {
+			f.resumes = append(f.resumes, *in.Resume)
+		}
+		if in.Seconds != nil {
+			f.withSeconds++
+		}
 		f.mu.Unlock()
 		payload = `{"sceneSaveActivity":true}`
 	default:
@@ -98,5 +107,22 @@ func TestEvents_PlayDoesNotSaveResumePosition(t *testing.T) {
 
 	if len(stash.resumes) != 0 {
 		t.Fatalf("play must not save a resume position, got %v", stash.resumes)
+	}
+}
+
+// Because saveActivity runs synchronously in the handler (detached context,
+// not a goroutine), the fake sees the call before postEvent returns.
+func TestEvents_PlayThenPauseReportsDurationAndResumeTogether(t *testing.T) {
+	stash := &fakeStash{}
+	h := &httpHandler{libraryService: library.NewService(stash)}
+
+	postEvent(t, h, evPlay, 100)
+	postEvent(t, h, evPause, 600)
+
+	if len(stash.resumes) != 1 || stash.resumes[0] != 600 {
+		t.Fatalf("expected one resume save of 600, got %v", stash.resumes)
+	}
+	if stash.withSeconds != 1 {
+		t.Fatalf("expected the same call to carry the played seconds, got %d", stash.withSeconds)
 	}
 }

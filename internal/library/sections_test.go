@@ -155,8 +155,11 @@ func TestSectionRows_MixesSavedFiltersAndSmartSections(t *testing.T) {
 	if rows[5].Name != "Anal (2D)" || rows[5].SourceName != "2D Anal" || rows[5].Smart {
 		t.Fatalf("renamed saved filter row wrong: %+v", rows[5])
 	}
-	if !rows[7].Disabled || rows[1].Disabled == false && rows[1].ID != "smart:unwatched" {
-		t.Fatalf("disabled flags wrong: %+v", rows)
+	if !rows[1].Disabled {
+		t.Fatal("unwatched should be off by default")
+	}
+	if !rows[7].Disabled {
+		t.Fatal("recent was disabled by its override")
 	}
 }
 

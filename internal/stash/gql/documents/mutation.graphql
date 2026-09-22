@@ -61,3 +61,7 @@ mutation SceneAddPlayDurationSeconds($id: ID!, $seconds: Float){
 mutation SceneSaveResumeTime($id: ID!, $resume: Float){
     sceneSaveActivity(id: $id, resume_time: $resume)
 }
+
+mutation SceneSaveActivity($id: ID!, $seconds: Float, $resume: Float){
+    sceneSaveActivity(id: $id, playDuration: $seconds, resume_time: $resume)
+}
