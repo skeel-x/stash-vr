@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Khan/genqlient/graphql"
 )
 
 func getPage(t *testing.T, h http.Handler, path string, headers map[string]string) *httptest.ResponseRecorder {
@@ -110,6 +112,38 @@ func TestSections_RendersPage(t *testing.T) {
 
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Reset to Stash order") {
 		t.Fatalf("expected sections page, got %d", rec.Code)
+	}
+}
+
+func TestPlayers_ShowsRejectedKeyWhenUnauthorized(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{versionErr: &graphql.HTTPError{StatusCode: 401}})
+	h := PagesRouter(lib)
+
+	rec := getPage(t, h, "/", nil)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Stash rejected the API key.") {
+		t.Fatal("expected the rejected-key health line")
+	}
+	if !strings.Contains(body, "Players can't see a library yet") {
+		t.Fatal("expected the blocked block when the key is rejected")
+	}
+}
+
+func TestPlayers_PlayaBandIsNotALink(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/", nil).Body.String()
+
+	i := strings.Index(body, "Add this server in Playa")
+	if i < 0 {
+		t.Fatal("expected the Playa band")
+	}
+	// The band element that contains the action text must be a div, not an anchor.
+	start := strings.LastIndex(body[:i], `class="launch`)
+	if start < 0 || !strings.HasPrefix(body[strings.LastIndex(body[:start], "<"):], "<div") {
+		t.Fatal("expected the Playa band to be a div, not a link")
 	}
 }
 

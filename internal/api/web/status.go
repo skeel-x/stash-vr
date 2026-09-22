@@ -21,7 +21,7 @@ const (
 	ConnectionUnreachable  = "unreachable"
 )
 
-// Status is what the dashboard and GET /api/ui/status show.
+// Status is what the Players page and GET /api/ui/status show.
 type Status struct {
 	Version          string `json:"version"`
 	StashVersion     string `json:"stash_version,omitempty"`
@@ -36,7 +36,7 @@ type Status struct {
 	Links            int    `json:"links"`
 	Scenes           int    `json:"scenes"`
 	// SampleCoverUrl carries the Stash API key (via stash.ApiKeyed) so the
-	// dashboard's headset-reachability check can load it directly. It must
+	// Players page's headset-reachability check can load it directly. It must
 	// never be serialised to the browser.
 	SampleCoverUrl string `json:"-"`
 }
