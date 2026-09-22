@@ -12,7 +12,7 @@
 - A synthetic `Random` category is exposed under saved filter/topmost list; selecting it randomizes the `/videos` feed, and it can be combined with other categories like tags or saved filters.
 - Current Limitations:
   - only tested on Android phone version (works fine for 6K resolution or low bitrate. lags on 8K or too high bitrate).
-  - only work on direct stream (selected as default). transcoding doesnt work.
+  - direct stream is the default; transcoded (HLS) qualities also work, including with an API key.
   - No trailer or "preview", only thumbnails.
   - might have to tinker on the graphql url or docker container network if you get timeout error.
   - No write-back updates to the stash like play count, favorites, etc. mostly just the read only feature.

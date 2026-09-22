@@ -238,8 +238,9 @@ func buildPlayableLinkCandidates(vd *library.VideoData, projection string, stere
 	// support, so PLAYA reads ftyp+moov, finds duration 0 and no index, and hangs
 	// up after ~1299 bytes without ever playing. The HLS VOD playlist carries real
 	// durations and seekable segments.
-	// Caveat: playlist segment URLs are relative and unkeyed, so a stash behind
-	// STASH_API_KEY will 401 on them.
+	// The playlist is requested with the apikey query parameter, and Stash
+	// propagates it to every segment URL, so transcoding works with a key too
+	// (verified against Stash 0.31).
 	for _, source := range stash.GetHLSStream(sp).Sources {
 		if source.Url == "" {
 			continue
