@@ -299,6 +299,7 @@ func (h *apiHandler) putFilters(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, settingsErrorCode(err), err.Error())
 		return
 	}
+	h.lib.ResetSections()
 	writeJson(ctx, w, map[string]any{"filters": saved.Filters})
 }
 

@@ -14,6 +14,17 @@ import (
 var ErrSceneNotFound = errors.New("scene not found")
 
 func (libraryService *Service) GetScenes(ctx context.Context) (map[string]*VideoData, error) {
+	// Nothing has built the index yet (for example Playa's first request
+	// after a restart): build it so the cache knows which scenes exist.
+	libraryService.muVdCache.RLock()
+	empty := len(libraryService.vdCache) == 0
+	libraryService.muVdCache.RUnlock()
+	if empty {
+		if _, err := libraryService.GetSections(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	res, err, _ := libraryService.single.Do("scenes", func() (interface{}, error) {
 		start := time.Now()
 		libraryService.muVdCache.RLock()

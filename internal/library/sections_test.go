@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
@@ -46,10 +47,27 @@ func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp
 		n := len(r.queries)
 		r.mu.Unlock()
 		payload = fmt.Sprintf(`{"findScenes":{"scenes":[{"id":"%d"}]}}`, n)
+	case "FindScenes":
+		raw, _ := json.Marshal(req.Variables)
+		var in struct {
+			SceneIDs []int `json:"scene_ids"`
+		}
+		_ = json.Unmarshal(raw, &in)
+		scenes := make([]string, 0, len(in.SceneIDs))
+		for _, id := range in.SceneIDs {
+			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"S%d","created_at":"2024-01-01T00:00:00Z","files":[],"tags":[]}`, id, id))
+		}
+		payload = `{"findScenes":{"scenes":[` + strings.Join(scenes, ",") + `]}}`
 	default:
 		payload = `{}`
 	}
 	return json.Unmarshal([]byte(payload), resp.Data)
+}
+
+func (r *routingStash) sceneIdQueries() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.queries)
 }
 
 func loadConfig(t *testing.T, filters []config.Filter) {
@@ -199,5 +217,66 @@ func TestSectionRows_ListsEverySmartSectionWithDefaults(t *testing.T) {
 	}
 	if rows[2].ID != "smart:unwatched" || !rows[2].Disabled {
 		t.Fatalf("unwatched should be off by default, got %+v", rows[2])
+	}
+}
+
+func TestGetSections_ServesCachedSetsWithinTTL(t *testing.T) {
+	loadConfig(t, nil)
+	stash := &routingStash{}
+	svc := NewService(stash)
+
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	first := stash.sceneIdQueries()
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := stash.sceneIdQueries(); got != first {
+		t.Fatalf("second call within the TTL must not requery, got %d queries after %d", got, first)
+	}
+
+	svc.ResetSections()
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := stash.sceneIdQueries(); got != 2*first {
+		t.Fatalf("after ResetSections the sets must be rebuilt, got %d queries", got)
+	}
+}
+
+func TestGetSections_ConcurrentCallersShareOneBuild(t *testing.T) {
+	loadConfig(t, nil)
+	stash := &routingStash{}
+	svc := NewService(stash)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := svc.GetSections(context.Background()); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := stash.sceneIdQueries(); got != 3 {
+		t.Fatalf("expected one build (3 smart queries), got %d", got)
+	}
+}
+
+func TestGetScenes_SeedsIndexWhenCacheIsEmpty(t *testing.T) {
+	loadConfig(t, nil)
+	svc := NewService(&routingStash{})
+
+	scenes, err := svc.GetScenes(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(scenes) == 0 {
+		t.Fatal("expected GetScenes to build the index and return scenes without a prior GetSections call")
 	}
 }

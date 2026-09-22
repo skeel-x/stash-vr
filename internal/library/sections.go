@@ -9,9 +9,14 @@ import (
 	"stash-vr/internal/stash/filter"
 	"stash-vr/internal/stash/gql"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
+
+// sectionCacheTTL bounds how often the saved-filter and smart-section
+// queries run; players request the index far more often than sections change.
+const sectionCacheTTL = 60 * time.Second
 
 type Section struct {
 	Name string
@@ -34,63 +39,107 @@ type SectionRow struct {
 	Smart      bool
 }
 
-func (libraryService *Service) GetSections(ctx context.Context) ([]Section, error) {
-	res, err, _ := libraryService.single.Do("sections", func() (interface{}, error) {
+type setsResult struct {
+	sets    []SavedFilterSceneSet
+	rebuilt bool
+}
+
+// cachedSets returns the resolved section sets, rebuilding them at most once
+// per sectionCacheTTL. Concurrent callers share one rebuild. rebuilt reports
+// whether this call produced a fresh result.
+func (libraryService *Service) cachedSets(ctx context.Context) (sets []SavedFilterSceneSet, rebuilt bool, err error) {
+	if s, ok := libraryService.freshSets(); ok {
+		return s, false, nil
+	}
+	res, err, _ := libraryService.single.Do("sets", func() (interface{}, error) {
+		if s, ok := libraryService.freshSets(); ok {
+			return setsResult{sets: s}, nil
+		}
 		sources, err := libraryService.getSources(ctx)
 		if err != nil {
 			return nil, err
 		}
-
-		var sections []Section
-		if len(sources) == 0 {
-			log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
-			sections, err = libraryService.getDefaultSections(ctx)
-		} else {
-			var sets []SavedFilterSceneSet
-			sets, err = libraryService.resolveSections(ctx, sources)
-			if err == nil {
-				sections = make([]Section, len(sets))
-				for i, set := range sets {
-					sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
-				}
+		s := []SavedFilterSceneSet{}
+		if len(sources) > 0 {
+			if s, err = libraryService.resolveSections(ctx, sources); err != nil {
+				return nil, err
 			}
 		}
-		if err != nil {
-			return nil, err
-		}
-
-		libraryService.muVdCache.Lock()
-		for k := range libraryService.vdCache {
-			delete(libraryService.vdCache, k)
-		}
-
-		libraryService.Stats.Links = 0
-		for _, v := range sections {
-			libraryService.Stats.Links += len(v.Ids)
-			for _, id := range v.Ids {
-				libraryService.vdCache[id] = nil
-			}
-		}
-		libraryService.Stats.Scenes = len(libraryService.vdCache)
-		libraryService.muVdCache.Unlock()
-
-		log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", libraryService.Stats.Links).
-			Int("scenes", libraryService.Stats.Scenes).
-			Msg("Index built")
-
-		_ = libraryService.LoadTags(ctx)
-
-		libraryService.muTagCache.RLock()
-		tagCount := len(libraryService.tagCache)
-		libraryService.muTagCache.RUnlock()
-		log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
-
-		return sections, nil
+		libraryService.muSets.Lock()
+		libraryService.sets = s
+		libraryService.setsAt = time.Now()
+		libraryService.muSets.Unlock()
+		return setsResult{sets: s, rebuilt: true}, nil
 	})
+	if err != nil {
+		return nil, false, err
+	}
+	r := res.(setsResult)
+	return r.sets, r.rebuilt, nil
+}
+
+func (libraryService *Service) freshSets() ([]SavedFilterSceneSet, bool) {
+	libraryService.muSets.Lock()
+	defer libraryService.muSets.Unlock()
+	if libraryService.sets == nil || time.Since(libraryService.setsAt) >= sectionCacheTTL {
+		return nil, false
+	}
+	return libraryService.sets, true
+}
+
+func (libraryService *Service) GetSections(ctx context.Context) ([]Section, error) {
+	sets, rebuilt, err := libraryService.cachedSets(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return res.([]Section), nil
+
+	var sections []Section
+	if len(sets) == 0 {
+		log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
+		if sections, err = libraryService.getDefaultSections(ctx); err != nil {
+			return nil, err
+		}
+		rebuilt = true
+	} else {
+		sections = make([]Section, len(sets))
+		for i, set := range sets {
+			sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
+		}
+	}
+	if !rebuilt {
+		return sections, nil
+	}
+
+	// A fresh build: reseed the scene cache with the ids players may ask
+	// for, recompute the stats and refresh the tag hierarchy.
+	libraryService.muVdCache.Lock()
+	for k := range libraryService.vdCache {
+		delete(libraryService.vdCache, k)
+	}
+	libraryService.Stats.Links = 0
+	for _, v := range sections {
+		libraryService.Stats.Links += len(v.Ids)
+		for _, id := range v.Ids {
+			libraryService.vdCache[id] = nil
+		}
+	}
+	libraryService.Stats.Scenes = len(libraryService.vdCache)
+	links := libraryService.Stats.Links
+	scenesCount := libraryService.Stats.Scenes
+	libraryService.muVdCache.Unlock()
+
+	log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", links).
+		Int("scenes", scenesCount).
+		Msg("Index built")
+
+	_ = libraryService.LoadTags(ctx)
+
+	libraryService.muTagCache.RLock()
+	tagCount := len(libraryService.tagCache)
+	libraryService.muTagCache.RUnlock()
+	log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
+
+	return sections, nil
 }
 
 func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Section, error) {
@@ -113,18 +162,12 @@ func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Sectio
 // smart Random section, which would show up as a second, differently
 // shuffled "Random" alongside Playa's own).
 func (libraryService *Service) GetSavedFilterSceneSets(ctx context.Context) ([]SavedFilterSceneSet, error) {
-	sources, err := libraryService.getSources(ctx)
+	sets, _, err := libraryService.cachedSets(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(sources) == 0 {
-		return []SavedFilterSceneSet{}, nil
-	}
-	sets, err := libraryService.resolveSections(ctx, sources)
-	if err != nil {
-		return nil, err
-	}
-	smartByID := make(map[string]SmartSection, len(sources))
+	sets = slices.Clone(sets)
+	smartByID := make(map[string]SmartSection, len(sets))
 	for _, s := range smartSections() {
 		smartByID[s.ID()] = s
 	}

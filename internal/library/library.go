@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
 	"golang.org/x/sync/singleflight"
@@ -24,6 +25,10 @@ type Service struct {
 
 	tagCache   map[string]*Tag
 	muTagCache sync.RWMutex
+
+	muSets sync.Mutex
+	sets   []SavedFilterSceneSet
+	setsAt time.Time
 }
 
 // clientBox wraps the client so different concrete client types can be
@@ -55,6 +60,16 @@ func (libraryService *Service) ResetCaches() {
 	libraryService.muTagCache.Lock()
 	libraryService.tagCache = nil
 	libraryService.muTagCache.Unlock()
+
+	libraryService.ResetSections()
+}
+
+// ResetSections drops the cached section sets so the next index request
+// requeries Stash. Scene data stays cached.
+func (libraryService *Service) ResetSections() {
+	libraryService.muSets.Lock()
+	libraryService.sets = nil
+	libraryService.muSets.Unlock()
 }
 
 func (libraryService *Service) snapshot() map[string]*VideoData {
