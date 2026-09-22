@@ -3,7 +3,6 @@ package heresphere
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
-	"stash-vr/internal/util"
 	"strings"
 	"time"
 )
@@ -156,102 +154,50 @@ func (h *httpHandler) processUpdates(videoId string, vdReq videoDataRequestDto) 
 }
 
 func (h *httpHandler) processIncomingTags(ctx context.Context, videoId string, vdReq videoDataRequestDto) {
-	newTags := make([]string, 0)
-	newMarkers := make([]library.MarkerDto, 0)
+	in := classifyIncomingTags(ctx, *vdReq.Tags)
 
-	hasPlayCount := false
-	hasOrganized := false
-	hasOCount := false
-	hasRating := false
-
-	for _, t := range *vdReq.Tags {
-		key, arg, _ := strings.Cut(t.Name, ":")
-
-		if key == "" {
-			continue
-		}
-
-		switch key {
-		case internal.LegendPerformer, internal.LegendSceneStudio, internal.LegendSceneGroup,
-			internal.LegendMetaResolution, internal.LegendSummary, internal.LegendSummaryId:
-			continue
-		case internal.LegendMetaOCount:
-			hasOCount = true
-			continue
-		case internal.LegendMetaOrganized:
-			hasOrganized = true
-			continue
-		case internal.LegendMetaPlayCount:
-			hasPlayCount = true
-			continue
-		case internal.LegendMetaRating:
-			hasRating = true
-			continue
-		}
-
-		if strings.HasPrefix(key, internal.LegendTag) {
-			if key == internal.LegendTag && arg != "" && arg[0] != '#' {
-				newTags = append(newTags, arg)
-			}
-			continue
-		}
-
-		if strings.EqualFold(key, internal.CommandIncrementO) {
+	for _, c := range in.commands {
+		switch c {
+		case strings.ToLower(internal.CommandIncrementO):
 			if err := h.libraryService.IncrementO(ctx, videoId); err != nil {
 				log.Ctx(ctx).Warn().Err(err).Msg("Failed to increment O")
 			}
-			continue
-		}
-		if strings.EqualFold(key, internal.CommandSetOrganizedTrue) {
+		case strings.ToLower(internal.CommandSetOrganizedTrue):
 			if err := h.libraryService.SetOrganized(ctx, videoId, true); err != nil {
 				log.Ctx(ctx).Warn().Err(err).Msg("Failed to set organized=true")
 			}
-			continue
 		}
-
-		m := library.MarkerDto{
-			PrimaryTagName: key,
-			StartSecond:    t.Start / 1000,
-			MarkerId:       fmt.Sprintf("%.0f", *t.Rating),
-		}
-		if arg != "" {
-			m.Title = arg
-		}
-		if t.End != nil {
-			m.EndSecond = util.Ptr(*t.End / 1000)
-		}
-		newMarkers = append(newMarkers, m)
 	}
 
-	if !hasPlayCount {
+	if !in.hasPlayCount {
 		if err := h.libraryService.DecrementPlayCount(ctx, videoId); err != nil {
 			log.Ctx(ctx).Warn().Err(err).Msg("Failed to decrement play count")
 		}
 	}
 
-	if !hasOrganized {
+	if !in.hasOrganized {
 		if err := h.libraryService.SetOrganized(ctx, videoId, false); err != nil {
 			log.Ctx(ctx).Warn().Err(err).Msg("Failed to set organized=false")
 		}
 	}
 
-	if !hasOCount {
+	if !in.hasOCount {
 		if err := h.libraryService.DecrementO(ctx, videoId); err != nil {
 			log.Ctx(ctx).Warn().Err(err).Msg("Failed to decrement O")
 		}
 	}
 
-	if !hasRating {
+	if !in.hasRating {
 		if err := h.libraryService.UpdateRating(ctx, videoId, nil); err != nil {
 			log.Ctx(ctx).Warn().Err(err).Msg("Failed to set zero rating")
 		}
 	}
 
-	if err := h.libraryService.UpdateTags(ctx, videoId, newTags); err != nil {
+	if err := h.libraryService.UpdateTags(ctx, videoId, in.tags); err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to update tags")
 	}
 
-	if err := h.libraryService.UpdateMarkers(ctx, videoId, newMarkers); err != nil {
+	if err := h.libraryService.UpdateMarkers(ctx, videoId, in.markers); err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to update markers")
 	}
 }
