@@ -83,8 +83,9 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve sections")
 	} else {
 		s.Sections = len(sections)
-		s.Links = lib.Stats.Links
-		s.Scenes = lib.Stats.Scenes
+		stats := lib.StatsSnapshot()
+		s.Links = stats.Links
+		s.Scenes = stats.Scenes
 	}
 
 	cover, err := gql.FindSampleSceneCover(probeCtx, lib.Client())

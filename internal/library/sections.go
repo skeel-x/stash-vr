@@ -24,8 +24,9 @@ type Section struct {
 }
 
 type SavedFilterSceneSet struct {
-	ID       string
-	Name     string
+	ID   string
+	Name string
+	// SceneIDs is shared with the section cache and must be treated as read-only.
 	SceneIDs []string
 }
 
@@ -60,6 +61,10 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 		if s, sec, ok := libraryService.freshIndex(); ok {
 			return indexResult{sets: s, sections: sec}, nil
 		}
+		libraryService.muSets.Lock()
+		gen := libraryService.setsGen
+		libraryService.muSets.Unlock()
+
 		sources, err := libraryService.getSources(ctx)
 		if err != nil {
 			return nil, err
@@ -113,9 +118,11 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 		log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
 
 		libraryService.muSets.Lock()
-		libraryService.sets = sets
-		libraryService.sections = sections
-		libraryService.setsAt = time.Now()
+		if libraryService.setsGen == gen {
+			libraryService.sets = sets
+			libraryService.sections = sections
+			libraryService.setsAt = time.Now()
+		}
 		libraryService.muSets.Unlock()
 
 		return indexResult{sets: sets, sections: sections}, nil

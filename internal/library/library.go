@@ -30,6 +30,10 @@ type Service struct {
 	sets     []SavedFilterSceneSet
 	sections []Section
 	setsAt   time.Time
+	// setsGen counts ResetSections calls. A build started before a reset
+	// checks it again before storing its result, so a reset that lands
+	// mid-build is not overwritten by that build's now-stale result.
+	setsGen uint64
 }
 
 // clientBox wraps the client so different concrete client types can be
@@ -66,11 +70,13 @@ func (libraryService *Service) ResetCaches() {
 }
 
 // ResetSections drops the cached section sets and sections so the next
-// index request requeries Stash. Scene data stays cached.
+// index request requeries Stash. Scene data stays cached. Incrementing
+// setsGen also invalidates a build already in flight: see buildIndex.
 func (libraryService *Service) ResetSections() {
 	libraryService.muSets.Lock()
 	libraryService.sets = nil
 	libraryService.sections = nil
+	libraryService.setsGen++
 	libraryService.muSets.Unlock()
 }
 
@@ -98,6 +104,14 @@ func (libraryService *Service) Warmup(ctx context.Context) error {
 type Stats struct {
 	Links  int
 	Scenes int
+}
+
+// StatsSnapshot returns the current Stats under the same lock buildIndex
+// uses to update them, so a reader never races the index build.
+func (libraryService *Service) StatsSnapshot() Stats {
+	libraryService.muVdCache.RLock()
+	defer libraryService.muVdCache.RUnlock()
+	return libraryService.Stats
 }
 
 type StudioRef struct {

@@ -311,9 +311,10 @@ func (h *apiHandler) reindex(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusBadGateway, err.Error())
 		return
 	}
+	stats := h.lib.StatsSnapshot()
 	writeJson(ctx, w, map[string]int{
 		"sections": len(sections),
-		"links":    h.lib.Stats.Links,
-		"scenes":   h.lib.Stats.Scenes,
+		"links":    stats.Links,
+		"scenes":   stats.Scenes,
 	})
 }

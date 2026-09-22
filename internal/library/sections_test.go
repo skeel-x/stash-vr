@@ -26,6 +26,15 @@ type routingStash struct {
 	queries  []*sceneIdQuery
 	allIds   int
 	tagLoads int
+
+	// gate and started let a test pause a build in flight: when gate is
+	// non-nil, a FindSceneIdsByFilter query closes started (once, on the
+	// first such query) and then blocks until gate is closed. Both are nil
+	// in every test but the one that uses them, so they must never be read
+	// unguarded or they would block the other tests.
+	gate        chan struct{}
+	started     chan struct{}
+	startedOnce sync.Once
 }
 
 func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -44,6 +53,10 @@ func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp
 		r.mu.Unlock()
 		payload = `{"findScenes":{"scenes":[{"id":"1"},{"id":"2"}]}}`
 	case "FindSceneIdsByFilter":
+		if r.gate != nil {
+			r.startedOnce.Do(func() { close(r.started) })
+			<-r.gate
+		}
 		raw, err := json.Marshal(req.Variables)
 		if err != nil {
 			return err
@@ -333,5 +346,56 @@ func TestGetScenes_SeedsIndexWhenCacheIsEmpty(t *testing.T) {
 
 	if len(scenes) == 0 {
 		t.Fatal("expected GetScenes to build the index and return scenes without a prior GetSections call")
+	}
+}
+
+func TestResetSectionsDuringBuildForcesRebuild(t *testing.T) {
+	loadConfig(t, nil)
+	stash := &routingStash{gate: make(chan struct{}), started: make(chan struct{})}
+	svc := NewService(stash)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if _, err := svc.GetSections(context.Background()); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	// Wait until the build has reached Stash, then reset while it is still
+	// in flight, then let it finish.
+	<-stash.started
+	svc.ResetSections()
+	close(stash.gate)
+	<-done
+
+	first := stash.sceneIdQueries()
+	if first == 0 {
+		t.Fatal("expected the first build to have queried Stash")
+	}
+
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := stash.sceneIdQueries(); got != 2*first {
+		t.Fatalf("expected a reset mid-build to force a second build, got %d scene-id queries (was %d)", got, first)
+	}
+}
+
+func TestGetSavedFilterSceneSets_SharesIndexWithGetSections(t *testing.T) {
+	loadConfig(t, nil)
+	stash := &routingStash{}
+	svc := NewService(stash)
+
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	before := stash.sceneIdQueries()
+
+	if _, err := svc.GetSavedFilterSceneSets(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := stash.sceneIdQueries(); got != before {
+		t.Fatalf("expected GetSavedFilterSceneSets to reuse the index GetSections already built, got %d queries after %d", got, before)
 	}
 }
