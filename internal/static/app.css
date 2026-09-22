@@ -14,15 +14,19 @@ body{margin:0;color:var(--text);background:transparent;position:relative;min-hei
 body::before{
   content:"";position:fixed;inset:-15%;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(40% 35% at 18% 12%, rgba(196,236,86,.38), transparent 62%),
-    radial-gradient(34% 30% at 78% 18%, rgba(95,211,154,.34), transparent 62%),
-    radial-gradient(46% 40% at 72% 82%, rgba(91,156,255,.24), transparent 62%),
-    radial-gradient(30% 28% at 22% 86%, rgba(255,159,67,.20), transparent 62%),
-    radial-gradient(36% 32% at 50% 52%, rgba(63,199,194,.20), transparent 62%);
-  filter:blur(70px) saturate(1.05);
+    radial-gradient(55% 48% at 18% 12%, rgba(196,236,86,.38), transparent 75%),
+    radial-gradient(48% 42% at 78% 18%, rgba(95,211,154,.34), transparent 75%),
+    radial-gradient(60% 52% at 72% 82%, rgba(91,156,255,.24), transparent 75%),
+    radial-gradient(44% 40% at 22% 86%, rgba(255,159,67,.20), transparent 75%),
+    radial-gradient(50% 44% at 50% 52%, rgba(63,199,194,.20), transparent 75%);
   opacity:.85;
 }
-@media (max-width:560px){body::before{filter:blur(40px)}}
+/* Fine noise at very low opacity hides gradient banding on 8-bit displays. */
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.06;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size:160px 160px;
+}
 a{color:var(--text)}
 main{max-width:720px;margin:0 auto;padding:24px 16px 56px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;word-break:break-all}
