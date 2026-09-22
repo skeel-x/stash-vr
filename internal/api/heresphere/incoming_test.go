@@ -83,3 +83,22 @@ func TestClassify_HiddenAndKnownLegendsAreNotMarkers(t *testing.T) {
 		t.Fatalf("classification wrong: %+v", in)
 	}
 }
+
+func TestClassify_MarkerNamedLikeALegendKeepsItsId(t *testing.T) {
+	// Markers whose primary tag is a legend or legacy word ("O", "Studio")
+	// still carry their id in Rating and must not be dropped, since
+	// UpdateMarkers destroys every marker missing from the incoming list.
+	end := 9000.0
+	in := classifyIncomingTags(context.Background(), []tagDto{
+		{Name: "O", Start: 4000, End: &end, Rating: util.Ptr(float32(5))},
+		{Name: "Studio:intro", Start: 0, Rating: util.Ptr(float32(6))},
+		{Name: "Played:3"},
+	})
+
+	if got := markerNames(in); len(got) != 2 || got[0] != "O=5" || got[1] != "Studio=6" {
+		t.Fatalf("expected markers O=5 and Studio=6, got %v", got)
+	}
+	if !in.hasPlayCount {
+		t.Fatal("untagged legend must still be classified as metadata")
+	}
+}
