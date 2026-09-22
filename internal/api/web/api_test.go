@@ -51,13 +51,23 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 func newEnv(t *testing.T, stash *fakeStash) (*library.Service, http.Handler) {
 	t.Helper()
 	seed := config.ApplicationConfig{
-		ListenAddress:   ":9666",
-		StashGraphQLUrl: "http://stash:9999/graphql",
-		StashApiKey:     "secret",
-		FavoriteTag:     "FAVORITE",
-		LogLevel:        "info",
-		ExcludeSortName: "hidden",
-		ConfigPath:      t.TempDir(),
+		ListenAddress:    ":9666",
+		StashGraphQLUrl:  "http://stash:9999/graphql",
+		StashApiKey:      "secret",
+		FavoriteTag:      "FAVORITE",
+		LogLevel:         "info",
+		ExcludeSortName:  "hidden",
+		SmartSectionSize: 50,
+		ConfigPath:       t.TempDir(),
+		// The fake Stash always answers FindSceneIdsByFilter with 0 scenes, so
+		// the default smart sections (enabled out of the box) would otherwise
+		// crowd out the "All" fallback these tests assert on; disable them to
+		// keep the status/reindex counts about the fallback, not smart sections.
+		Filters: []config.Filter{
+			{ID: "smart:continue", Disabled: true},
+			{ID: "smart:recent", Disabled: true},
+			{ID: "smart:random", Disabled: true},
+		},
 	}
 	if err := config.Load(seed); err != nil {
 		t.Fatal(err)
@@ -150,7 +160,7 @@ func TestPutConfig_BlankKeyKeepsCurrentAndPersists(t *testing.T) {
 	body := map[string]any{
 		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
 		"favorite_tag": "LOVED", "exclude_sort_name": "hidden", "generate_summary_ids": false,
-		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 	}
 
 	rec, _ := do(t, h, http.MethodPut, "/config", body)
@@ -174,7 +184,7 @@ func TestPutConfig_NewUrlSwapsLibraryClient(t *testing.T) {
 	body := map[string]any{
 		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "newkey",
 		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
-		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 	}
 
 	rec, _ := do(t, h, http.MethodPut, "/config", body)
@@ -195,7 +205,7 @@ func TestPutConfig_NewHostWithoutKeyIs400(t *testing.T) {
 	body := map[string]any{
 		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
 		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
-		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 	}
 
 	rec, out := do(t, h, http.MethodPut, "/config", body)
@@ -247,7 +257,7 @@ func TestPutConfig_InvalidIs400AndUnchanged(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
 		"stash_graphql_url": "nope", "stash_api_key": "", "favorite_tag": "FAVORITE",
-		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info",
+		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info", "smart_section_size": 50,
 	}
 
 	rec, out := do(t, h, http.MethodPut, "/config", body)
@@ -352,7 +362,7 @@ func TestTestConfig_DoesNotEchoNonJsonResponseBody(t *testing.T) {
 func TestPutConfig_InvalidUrlReportsValidationNotHostRule(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{"stash_graphql_url": "nope", "stash_api_key": "", "favorite_tag": "FAVORITE",
-		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info"}
+		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info", "smart_section_size": 50}
 
 	rec, out := do(t, h, http.MethodPut, "/config", body)
 
@@ -391,7 +401,7 @@ func TestPutConfig_LogLevelChangeSetsGlobalLevel(t *testing.T) {
 	body := map[string]any{
 		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
 		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
-		"heatmap_height_px": 0, "force_https": false, "log_level": "debug",
+		"heatmap_height_px": 0, "force_https": false, "log_level": "debug", "smart_section_size": 50,
 	}
 
 	rec, _ := do(t, h, http.MethodPut, "/config", body)

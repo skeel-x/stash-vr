@@ -43,6 +43,7 @@ type fileConfig struct {
 	ExcludeSortName    *string  `json:"exclude_sort_name,omitempty"`
 	GenerateSummaryIds *bool    `json:"generate_summary_ids,omitempty"`
 	HeatmapHeightPx    *int     `json:"heatmap_height_px,omitempty"`
+	SmartSectionSize   *int     `json:"smart_section_size,omitempty"`
 	ForceHTTPS         *bool    `json:"force_https,omitempty"`
 	LogLevel           *string  `json:"log_level,omitempty"`
 	Filters            []Filter `json:"filters"`
@@ -160,6 +161,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.HeatmapHeightPx != nil {
 		base.HeatmapHeightPx = *fc.HeatmapHeightPx
 	}
+	if fc.SmartSectionSize != nil {
+		base.SmartSectionSize = *fc.SmartSectionSize
+	}
 	if fc.ForceHTTPS != nil {
 		base.ForceHTTPS = *fc.ForceHTTPS
 	}
@@ -209,6 +213,9 @@ func Validate(c ApplicationConfig) error {
 	if c.HeatmapHeightPx < 0 || c.HeatmapHeightPx > 200 {
 		return fmt.Errorf("%w: heatmap_height_px must be between 0 and 200, got %d", ErrInvalid, c.HeatmapHeightPx)
 	}
+	if c.SmartSectionSize < 10 || c.SmartSectionSize > 500 {
+		return fmt.Errorf("%w: smart_section_size must be between 10 and 500, got %d", ErrInvalid, c.SmartSectionSize)
+	}
 	// An empty favorite tag is allowed: it disables favorite sync
 	// (see library.Service.UpdateFavorite).
 	if c.ExcludeSortName == "" {
@@ -225,6 +232,7 @@ func write(path string, c ApplicationConfig) error {
 		ExcludeSortName:    &c.ExcludeSortName,
 		GenerateSummaryIds: &c.GenerateSummaryIds,
 		HeatmapHeightPx:    &c.HeatmapHeightPx,
+		SmartSectionSize:   &c.SmartSectionSize,
 		ForceHTTPS:         &c.ForceHTTPS,
 		LogLevel:           &c.LogLevel,
 		Filters:            c.Filters,

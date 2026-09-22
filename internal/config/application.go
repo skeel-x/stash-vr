@@ -20,6 +20,7 @@ const (
 	envKeyExcludeSortName    = "EXCLUDE_SORT_NAME"
 	envKeyUserConfigPath     = "CONFIG_PATH"
 	envKeyGenerateSummaryIds = "GENERATE_SUMMARY_IDS"
+	envKeySmartSectionSize   = "SMART_SECTION_SIZE"
 )
 
 type ApplicationConfig struct {
@@ -32,6 +33,7 @@ type ApplicationConfig struct {
 	IsRedactDisabled   bool
 	ForceHTTPS         bool
 	HeatmapHeightPx    int
+	SmartSectionSize   int
 	ExcludeSortName    string
 	ConfigPath         string
 	GenerateSummaryIds bool
@@ -66,6 +68,9 @@ func Init() error {
 	pflag.Int(envKeyHeatmapHeightPx, 0, "Height of heatmaps")
 	_ = viper.BindPFlag(envKeyHeatmapHeightPx, pflag.Lookup(envKeyHeatmapHeightPx))
 
+	pflag.Int(envKeySmartSectionSize, 50, "Number of scenes in each smart section")
+	_ = viper.BindPFlag(envKeySmartSectionSize, pflag.Lookup(envKeySmartSectionSize))
+
 	pflag.String(envKeyExcludeSortName, "hidden", "Exclude tags with this sort name")
 	_ = viper.BindPFlag(envKeyExcludeSortName, pflag.Lookup(envKeyExcludeSortName))
 
@@ -97,6 +102,7 @@ func Init() error {
 		IsRedactDisabled:   viper.GetBool(envKeyDisableRedact),
 		ForceHTTPS:         viper.GetBool(envKeyForceHTTPS),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
+		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),
 		ConfigPath:         viper.GetString(envKeyUserConfigPath),
 		GenerateSummaryIds: viper.GetBool(envKeyGenerateSummaryIds),

@@ -24,19 +24,36 @@ type SavedFilterSceneSet struct {
 	SceneIDs []string
 }
 
+// SectionRow is one entry on the Sections page and one candidate section
+// for the index, in display order.
+type SectionRow struct {
+	ID         string
+	SourceName string // name in Stash, or the smart section's built-in name
+	Name       string // name after the user's override
+	Disabled   bool
+	Smart      bool
+}
+
 func (libraryService *Service) GetSections(ctx context.Context) ([]Section, error) {
 	res, err, _ := libraryService.single.Do("sections", func() (interface{}, error) {
-		filters, err := libraryService.getFilters(ctx)
+		sources, err := libraryService.getSources(ctx)
 		if err != nil {
 			return nil, err
 		}
 
 		var sections []Section
-		if len(filters) == 0 {
-			log.Ctx(ctx).Info().Msg("No saved scene filters found, creating default section with ALL scenes")
+		if len(sources) == 0 {
+			log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
 			sections, err = libraryService.getDefaultSections(ctx)
 		} else {
-			sections, err = libraryService.getSectionsByFilters(ctx, filters)
+			var sets []SavedFilterSceneSet
+			sets, err = libraryService.resolveSections(ctx, sources)
+			if err == nil {
+				sections = make([]Section, len(sets))
+				for i, set := range sets {
+					sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
+				}
+			}
 		}
 		if err != nil {
 			return nil, err
@@ -91,97 +108,176 @@ func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Sectio
 	return []Section{allScenesSection}, nil
 }
 
-func (libraryService *Service) getSectionsByFilters(ctx context.Context, filters []gql.SavedFilterParts) ([]Section, error) {
-	sets, err := libraryService.resolveSavedFilterSceneSets(ctx, filters)
-	if err != nil {
-		return nil, err
-	}
-
-	sections := make([]Section, len(sets))
-	for i, set := range sets {
-		sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
-	}
-	return sections, nil
-}
-
 func (libraryService *Service) GetSavedFilterSceneSets(ctx context.Context) ([]SavedFilterSceneSet, error) {
-	filters, err := libraryService.getFilters(ctx)
+	sources, err := libraryService.getSources(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(filters) == 0 {
+	if len(sources) == 0 {
 		return []SavedFilterSceneSet{}, nil
 	}
-	return libraryService.resolveSavedFilterSceneSets(ctx, filters)
+	return libraryService.resolveSections(ctx, sources)
 }
 
-func (libraryService *Service) resolveSavedFilterSceneSets(ctx context.Context, filters []gql.SavedFilterParts) ([]SavedFilterSceneSet, error) {
-	sections := make([]SavedFilterSceneSet, len(filters))
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(filters))
-
-	for i, f := range filters {
-		go func(i int, f gql.SavedFilterParts) {
-			defer wg.Done()
-			flog := log.Ctx(ctx).With().Str("filterId", f.Id).Str("name", f.Name).Logger()
-
-			sceneFilter, err := filter.SavedFilterToSceneFilter(ctx, f)
-			if err != nil {
-				flog.Warn().Err(err).Interface("savedFilter", f).Msg("Failed to convert filter, skipping")
-				return
-			}
-
-			resp, err := gql.FindSceneIdsByFilter(ctx, libraryService.Client(), &sceneFilter.SceneFilter, &sceneFilter.FilterOpts)
-			if err != nil {
-				flog.Err(err).Interface("savedFilter", f).Interface("sceneFilter", sceneFilter).Msg("Failed to find scenes by filter, skipping")
-				return
-			}
-
-			if len(resp.FindScenes.Scenes) == 0 {
-				flog.Debug().Msg("Filter skipped: 0 scenes")
-				return
-			}
-
-			sections[i] = SavedFilterSceneSet{
-				ID:       f.Id,
-				Name:     f.Name,
-				SceneIDs: make([]string, len(resp.FindScenes.Scenes)),
-			}
-			for j, v := range resp.FindScenes.Scenes {
-				sections[i].SceneIDs[j] = v.Id
-			}
-
-			flog.Debug().Int("scenes", len(sections[i].SceneIDs)).Msg("Section built")
-		}(i, f)
+// sectionRows applies the ordering rule: smart sections without an override
+// first (default state), then overrides in saved order, then remaining saved
+// filters in the given order.
+func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, overrides []config.Filter) []SectionRow {
+	overridden := make(map[string]config.Filter, len(overrides))
+	for _, o := range overrides {
+		overridden[o.ID] = o
 	}
-	wg.Wait()
-	sections = slices.DeleteFunc(sections, func(s SavedFilterSceneSet) bool {
-		return len(s.SceneIDs) == 0
-	})
-	return sections, nil
+	smartByID := make(map[string]SmartSection, len(smart))
+	for _, s := range smart {
+		smartByID[s.ID()] = s
+	}
+	savedByID := make(map[string]gql.SavedFilterParts, len(saved))
+	for _, sf := range saved {
+		savedByID[sf.Id] = sf
+	}
+
+	rows := make([]SectionRow, 0, len(smart)+len(saved))
+	for _, s := range smart {
+		if _, ok := overridden[s.ID()]; ok {
+			continue
+		}
+		rows = append(rows, SectionRow{ID: s.ID(), SourceName: s.Name, Name: s.Name, Disabled: !s.Default, Smart: true})
+	}
+	seen := make(map[string]struct{}, len(overrides))
+	for _, o := range overrides {
+		seen[o.ID] = struct{}{}
+		if s, ok := smartByID[o.ID]; ok {
+			name := o.Name
+			if name == "" {
+				name = s.Name
+			}
+			rows = append(rows, SectionRow{ID: o.ID, SourceName: s.Name, Name: name, Disabled: o.Disabled, Smart: true})
+			continue
+		}
+		if sf, ok := savedByID[o.ID]; ok {
+			name := o.Name
+			if name == "" {
+				name = sf.Name
+			}
+			rows = append(rows, SectionRow{ID: o.ID, SourceName: sf.Name, Name: name, Disabled: o.Disabled})
+		}
+	}
+	for _, sf := range saved {
+		if _, ok := seen[sf.Id]; ok {
+			continue
+		}
+		rows = append(rows, SectionRow{ID: sf.Id, SourceName: sf.Name, Name: sf.Name})
+	}
+	return rows
 }
 
-func (libraryService *Service) getFilters(ctx context.Context) ([]gql.SavedFilterParts, error) {
-	savedFilters, err := gql.FindSavedSceneFilters(ctx, libraryService.Client())
+// sectionSource is one enabled row resolved to what produces its scene ids.
+type sectionSource struct {
+	row   SectionRow
+	saved *gql.SavedFilterParts
+	smart *SmartSection
+}
+
+// savedFilters returns Stash's saved scene filters in the order they should
+// appear when the user has no overrides: front page filters first, as before.
+func (libraryService *Service) savedFilters(ctx context.Context) ([]gql.SavedFilterParts, error) {
+	resp, err := gql.FindSavedSceneFilters(ctx, libraryService.Client())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find saved filters: %w", err)
 	}
-
-	if len(savedFilters.FindSavedFilters) == 0 {
+	if len(resp.FindSavedFilters) == 0 {
 		return nil, nil
 	}
-
-	var out []gql.SavedFilterParts
-
-	userConfigFilters := config.Application().Filters
-
-	if len(userConfigFilters) == 0 {
-		out, err = libraryService.buildFiltersByFrontpage(ctx, savedFilters)
-	} else {
-		out = buildFiltersByUserConfig(ctx, savedFilters, userConfigFilters)
+	if len(config.Application().Filters) == 0 {
+		return libraryService.buildFiltersByFrontpage(ctx, resp)
+	}
+	out := make([]gql.SavedFilterParts, len(resp.FindSavedFilters))
+	for i, sf := range resp.FindSavedFilters {
+		out[i] = sf.SavedFilterParts
 	}
 	return out, nil
+}
+
+// SectionRows lists every smart section and saved filter in display order,
+// including disabled ones, for the Sections page.
+func (libraryService *Service) SectionRows(ctx context.Context) ([]SectionRow, error) {
+	saved, err := libraryService.savedFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return sectionRows(saved, smartSections(), config.Application().Filters), nil
+}
+
+func (libraryService *Service) getSources(ctx context.Context) ([]sectionSource, error) {
+	saved, err := libraryService.savedFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	smart := smartSections()
+	smartByID := make(map[string]*SmartSection, len(smart))
+	for i := range smart {
+		smartByID[smart[i].ID()] = &smart[i]
+	}
+	savedByID := make(map[string]*gql.SavedFilterParts, len(saved))
+	for i := range saved {
+		savedByID[saved[i].Id] = &saved[i]
+	}
+	var sources []sectionSource
+	for _, row := range sectionRows(saved, smart, config.Application().Filters) {
+		if row.Disabled {
+			continue
+		}
+		if s, ok := smartByID[row.ID]; ok {
+			sources = append(sources, sectionSource{row: row, smart: s})
+		} else if sf, ok := savedByID[row.ID]; ok {
+			sources = append(sources, sectionSource{row: row, saved: sf})
+		}
+	}
+	return sources, nil
+}
+
+func (libraryService *Service) resolveSections(ctx context.Context, sources []sectionSource) ([]SavedFilterSceneSet, error) {
+	size := config.Application().SmartSectionSize
+	sections := make([]SavedFilterSceneSet, len(sources))
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(sources))
+	for i, src := range sources {
+		go func(i int, src sectionSource) {
+			defer wg.Done()
+			flog := log.Ctx(ctx).With().Str("sectionId", src.row.ID).Str("name", src.row.Name).Logger()
+
+			var sceneFilter *gql.SceneFilterType
+			var opts *gql.FindFilterType
+			if src.smart != nil {
+				sceneFilter, opts = src.smart.query(size)
+			} else {
+				converted, err := filter.SavedFilterToSceneFilter(ctx, *src.saved)
+				if err != nil {
+					flog.Warn().Err(err).Msg("Failed to convert filter, skipping")
+					return
+				}
+				sceneFilter, opts = &converted.SceneFilter, &converted.FilterOpts
+			}
+
+			resp, err := gql.FindSceneIdsByFilter(ctx, libraryService.Client(), sceneFilter, opts)
+			if err != nil {
+				flog.Err(err).Msg("Failed to find scenes by filter, skipping")
+				return
+			}
+			if len(resp.FindScenes.Scenes) == 0 {
+				flog.Debug().Msg("Section skipped: 0 scenes")
+				return
+			}
+			sections[i] = SavedFilterSceneSet{ID: src.row.ID, Name: src.row.Name, SceneIDs: make([]string, len(resp.FindScenes.Scenes))}
+			for j, v := range resp.FindScenes.Scenes {
+				sections[i].SceneIDs[j] = v.Id
+			}
+			flog.Debug().Int("scenes", len(sections[i].SceneIDs)).Msg("Section built")
+		}(i, src)
+	}
+	wg.Wait()
+	return slices.DeleteFunc(sections, func(s SavedFilterSceneSet) bool { return len(s.SceneIDs) == 0 }), nil
 }
 
 func (libraryService *Service) buildFiltersByFrontpage(ctx context.Context, savedFilters *gql.FindSavedSceneFiltersResponse) ([]gql.SavedFilterParts, error) {
@@ -216,43 +312,4 @@ func (libraryService *Service) buildFiltersByFrontpage(ctx context.Context, save
 	log.Ctx(ctx).Debug().Int("count", len(out)).Msg("Filters built by frontpage")
 
 	return out, nil
-}
-
-func buildFiltersByUserConfig(ctx context.Context, savedFilters *gql.FindSavedSceneFiltersResponse, cfgFilters []config.Filter) []gql.SavedFilterParts {
-	stashFilters := savedFilters.FindSavedFilters
-	stashFilterParts := make(map[string]gql.SavedFilterParts, len(stashFilters))
-	for _, sf := range stashFilters {
-		stashFilterParts[sf.Id] = sf.SavedFilterParts
-	}
-
-	out := make([]gql.SavedFilterParts, 0, len(stashFilters))
-	seen := make(map[string]struct{}, len(stashFilters))
-
-	// 1) Enabled cfgFilters in the given order.
-	for _, cf := range cfgFilters {
-		seen[cf.ID] = struct{}{}
-		if cf.Disabled {
-			continue
-		}
-		sf, ok := stashFilterParts[cf.ID]
-		if !ok {
-			continue
-		}
-
-		if cf.Name != "" {
-			sf.Name = cf.Name
-		}
-		out = append(out, sf)
-	}
-
-	for _, s := range stashFilters {
-		if _, done := seen[s.Id]; done {
-			continue
-		}
-		out = append(out, s.SavedFilterParts)
-	}
-
-	log.Ctx(ctx).Debug().Int("count", len(out)).Msg("Filters built by user config")
-
-	return out
 }

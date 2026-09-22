@@ -11,13 +11,14 @@ import (
 func seedFor(t *testing.T) ApplicationConfig {
 	t.Helper()
 	return ApplicationConfig{
-		ListenAddress:   ":9666",
-		StashGraphQLUrl: "http://stash:9999/graphql",
-		StashApiKey:     "secret",
-		FavoriteTag:     "FAVORITE",
-		LogLevel:        "info",
-		ExcludeSortName: "hidden",
-		ConfigPath:      t.TempDir(),
+		ListenAddress:    ":9666",
+		StashGraphQLUrl:  "http://stash:9999/graphql",
+		StashApiKey:      "secret",
+		FavoriteTag:      "FAVORITE",
+		LogLevel:         "info",
+		ExcludeSortName:  "hidden",
+		SmartSectionSize: 50,
+		ConfigPath:       t.TempDir(),
 	}
 }
 
@@ -200,5 +201,30 @@ func TestSet_AllowsEmptyFavoriteTag(t *testing.T) {
 	}
 	if got := Application().FavoriteTag; got != "" {
 		t.Fatalf("expected the empty favorite tag to be stored, got %q", got)
+	}
+}
+
+func TestSet_SmartSectionSizeBounds(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []int{9, 501} {
+		cfg := Application()
+		cfg.SmartSectionSize = bad
+		if _, err := Set(cfg); err == nil {
+			t.Errorf("expected smart_section_size %d to be rejected", bad)
+		}
+	}
+	cfg := Application()
+	cfg.SmartSectionSize = 120
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().SmartSectionSize; got != 120 {
+		t.Fatalf("expected persisted 120, got %d", got)
 	}
 }
