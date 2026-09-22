@@ -16,7 +16,9 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"stash-vr/internal/config"
+	"stash-vr/internal/stash"
 	"strings"
 	"time"
 )
@@ -51,7 +53,7 @@ func fetchScreenshot(ctx context.Context, fileUrl string) (*http.Response, error
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetch %s: %w", stash.Redacted(fileUrl), UnwrapURLError(err))
 	}
 	if resp.StatusCode == http.StatusNotFound {
 		_ = resp.Body.Close()
@@ -64,8 +66,18 @@ func fetchScreenshot(ctx context.Context, fileUrl string) (*http.Response, error
 	return resp, nil
 }
 
+// UnwrapURLError strips the URL from a *url.Error so callers can log it
+// safely.
+func UnwrapURLError(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return ue.Err
+	}
+	return err
+}
+
 func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
-	log.Ctx(ctx).Trace().Str("url", fileUrl).Msg("Fetching image")
+	log.Ctx(ctx).Trace().Str("url", stash.Redacted(fileUrl)).Msg("Fetching image")
 	resp, err := fetchScreenshot(ctx, fileUrl)
 	if err != nil {
 		if errors.Is(err, errImageNotFound) {

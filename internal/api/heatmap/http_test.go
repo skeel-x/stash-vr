@@ -17,6 +17,9 @@ import (
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 )
 
@@ -87,7 +90,12 @@ func (s *sceneStash) MakeRequest(_ context.Context, req *graphql.Request, resp *
 	for _, id := range in.SceneIDs {
 		shot := map[int]string{1: "/jpeg", 2: "/webp", 3: "/png", 4: "/missing", 5: "/jpeg", 6: "/broken"}[id]
 		interactive := id == 5
-		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"S%d","created_at":"2024-01-01T00:00:00Z","files":[],"tags":[],"interactive":%t,"paths":{"screenshot":"%s%s","interactive_heatmap":"%s/heatmap","stream":"%s/stream","preview":"","funscript":"","caption":""}}`, id, id, interactive, s.base, shot, s.base, s.base))
+		screenshotURL := s.base + shot
+		if id == 7 {
+			// A closed port: the transport error carries the keyed URL.
+			screenshotURL = "http://127.0.0.1:1/x"
+		}
+		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"S%d","created_at":"2024-01-01T00:00:00Z","files":[],"tags":[],"interactive":%t,"paths":{"screenshot":"%s","interactive_heatmap":"%s/heatmap","stream":"%s/stream","preview":"","funscript":"","caption":""}}`, id, id, interactive, screenshotURL, s.base, s.base))
 	}
 	payload := `{"findScenes":{"scenes":[` + strings.Join(scenes, ",") + `]}}`
 	return json.Unmarshal([]byte(payload), resp.Data)
@@ -184,6 +192,44 @@ func TestCover_UpstreamErrorIs502NoStore(t *testing.T) {
 	}
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("expected no-store for an upstream error, got %q", got)
+	}
+}
+
+func TestCover_TransportErrorDoesNotLogTheKey(t *testing.T) {
+	if err := config.Load(config.ApplicationConfig{
+		ListenAddress:    ":9666",
+		StashGraphQLUrl:  "http://stash:9999/graphql",
+		StashApiKey:      "secret",
+		FavoriteTag:      "FAVORITE",
+		LogLevel:         "info",
+		ExcludeSortName:  "hidden",
+		SmartSectionSize: 50,
+		ConfigPath:       t.TempDir(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	srv, _, _ := imageServer(t)
+	h := coverRouter(t, srv.URL)
+
+	var buf bytes.Buffer
+	bufLogger := zerolog.New(&buf)
+	prevLogger := log.Logger
+	prevCtxLogger := zerolog.DefaultContextLogger
+	log.Logger = bufLogger
+	zerolog.DefaultContextLogger = &bufLogger
+	t.Cleanup(func() {
+		log.Logger = prevLogger
+		zerolog.DefaultContextLogger = prevCtxLogger
+	})
+
+	rec := get(t, h, "/cover/7")
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", rec.Code)
+	}
+	if strings.Contains(buf.String(), "secret") {
+		t.Fatalf("log leaked the api key: %s", buf.String())
 	}
 }
 

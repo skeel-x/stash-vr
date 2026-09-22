@@ -3,6 +3,7 @@ package playa
 import (
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -10,11 +11,15 @@ import (
 	"stash-vr/internal/api/heatmap"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
+	"time"
 
 	_ "golang.org/x/image/webp"
 )
 
 var errPosterNotFound = errors.New("poster not found")
+
+// posterClient bounds the plain (non-heatmap) poster fetch from Stash.
+var posterClient = &http.Client{Timeout: 15 * time.Second}
 
 func buildPosterImage(ctx context.Context, vd *library.VideoData) (image.Image, error) {
 	if vd == nil || vd.SceneParts == nil || vd.SceneParts.Paths == nil {
@@ -46,9 +51,9 @@ func fetchPosterImage(ctx context.Context, fileURL string) (image.Image, error) 
 		return nil, err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := posterClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetch %s: %w", stash.Redacted(fileURL), heatmap.UnwrapURLError(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
