@@ -200,6 +200,24 @@ func TestPutConfig_PersistsSmartSectionSize(t *testing.T) {
 	}
 }
 
+func TestPutConfig_MissingSmartSectionSizeKeepsCurrent(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
+	}
+
+	rec, _ := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200 without the field, got %d %s", rec.Code, rec.Body.String())
+	}
+	if config.Application().SmartSectionSize != 50 {
+		t.Fatalf("expected size kept at 50, got %d", config.Application().SmartSectionSize)
+	}
+}
+
 func TestPutConfig_NewUrlSwapsLibraryClient(t *testing.T) {
 	lib, h := newEnv(t, &fakeStash{})
 	before := lib.Client()

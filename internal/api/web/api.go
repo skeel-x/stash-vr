@@ -58,7 +58,7 @@ type configInput struct {
 	HeatmapHeightPx    int    `json:"heatmap_height_px"`
 	ForceHTTPS         bool   `json:"force_https"`
 	LogLevel           string `json:"log_level"`
-	SmartSectionSize   int    `json:"smart_section_size"`
+	SmartSectionSize   *int   `json:"smart_section_size"`
 }
 
 type testInput struct {
@@ -221,7 +221,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	next.HeatmapHeightPx = in.HeatmapHeightPx
 	next.ForceHTTPS = in.ForceHTTPS
 	next.LogLevel = in.LogLevel
-	next.SmartSectionSize = in.SmartSectionSize
+	if in.SmartSectionSize != nil {
+		next.SmartSectionSize = *in.SmartSectionSize
+	}
 
 	// Validate before the host rule so an unusable URL is reported as such
 	// rather than as a missing API key.
