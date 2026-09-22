@@ -59,12 +59,8 @@ func buildVideoData(vd *library.VideoData, baseUrl string) (*videoDataDto, error
 		SkipIntro:   0,
 	}
 
-	if vd.SceneParts.Paths.Screenshot != nil {
-		if vd.SceneParts.Interactive && vd.SceneParts.Paths.Interactive_heatmap != nil {
-			dto.ThumbnailUrl = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
-		} else {
-			dto.ThumbnailUrl = util.Ptr(stash.ApiKeyed(*vd.SceneParts.Paths.Screenshot))
-		}
+	if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
+		dto.ThumbnailUrl = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
 	}
 
 	if vd.SceneParts.Paths.Preview != nil {

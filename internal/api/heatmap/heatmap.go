@@ -3,18 +3,25 @@ package heatmap
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 	"golang.org/x/sync/errgroup"
 	"image"
 	_ "image/gif"
-	_ "image/jpeg"
+	"image/jpeg"
 	_ "image/png"
+	"io"
 	"math"
 	"net/http"
 	"stash-vr/internal/config"
+	"strings"
+	"time"
 )
+
+// httpClient bounds every screenshot and heatmap fetch from Stash.
+var httpClient = &http.Client{Timeout: 15 * time.Second}
 
 var errImageNotFound = errors.New("image not found")
 var errScreenshotImageNotFound = errors.New("screenshot image not found")
@@ -40,7 +47,7 @@ func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 		return nil, err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +64,42 @@ func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 
 	log.Ctx(ctx).Trace().Str("format", format).Msg("Fetched image")
 	return img, nil
+}
+
+// serveScreenshot streams the Stash screenshot to w. JPEG and PNG pass
+// through unchanged; anything else (WebP, GIF) is transcoded to JPEG because
+// the players cannot display it.
+func serveScreenshot(ctx context.Context, w http.ResponseWriter, fileUrl string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileUrl, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return errImageNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("screenshot: stash returned HTTP %d", resp.StatusCode)
+	}
+	ct := resp.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "image/jpeg") || strings.HasPrefix(ct, "image/png") {
+		w.Header().Set("Content-Type", ct)
+		if cl := resp.Header.Get("Content-Length"); cl != "" {
+			w.Header().Set("Content-Length", cl)
+		}
+		_, err = io.Copy(w, resp.Body)
+		return err
+	}
+	img, _, err := image.Decode(resp.Body)
+	if err != nil {
+		return fmt.Errorf("decode screenshot: %w", err)
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	return jpeg.Encode(w, img, nil)
 }
 
 func buildHeatmapCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.Image, error) {

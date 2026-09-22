@@ -24,20 +24,37 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 		}
 
 		p := vd.SceneParts.Paths
-		cover, err := buildHeatmapCover(ctx, stash.ApiKeyed(*p.Screenshot), stash.ApiKeyed(*p.Interactive_heatmap))
-		if err != nil {
-			log.Ctx(ctx).Err(err).Msg("buildHeatmapCover")
-			if errors.Is(err, errImageNotFound) {
-				w.WriteHeader(http.StatusNotFound)
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
+		if p == nil || p.Screenshot == nil || *p.Screenshot == "" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Cache-Control", "private, max-age=86400")
+
+		if vd.SceneParts.Interactive && p.Interactive_heatmap != nil && *p.Interactive_heatmap != "" {
+			cover, err := buildHeatmapCover(ctx, stash.ApiKeyed(*p.Screenshot), stash.ApiKeyed(*p.Interactive_heatmap))
+			if err != nil {
+				log.Ctx(ctx).Err(err).Msg("buildHeatmapCover")
+				if errors.Is(err, errImageNotFound) {
+					w.WriteHeader(http.StatusNotFound)
+				} else {
+					w.WriteHeader(http.StatusBadGateway)
+				}
+				return
+			}
+			w.Header().Set("Content-Type", "image/jpeg")
+			if err := jpeg.Encode(w, cover, nil); err != nil {
+				log.Ctx(ctx).Err(err).Msg("cover: write")
 			}
 			return
 		}
-		err = jpeg.Encode(w, cover, nil)
-		if err != nil {
-			log.Ctx(ctx).Err(err).Msg("cover: write")
-			return
+
+		if err := serveScreenshot(ctx, w, stash.ApiKeyed(*p.Screenshot)); err != nil {
+			log.Ctx(ctx).Err(err).Msg("serveScreenshot")
+			if errors.Is(err, errImageNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+			} else {
+				w.WriteHeader(http.StatusBadGateway)
+			}
 		}
 	}
 	return internal.LogRoute("cover", internal.LogVideoId(f))

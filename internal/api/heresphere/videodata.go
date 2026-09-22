@@ -81,12 +81,8 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string) 
 		EventServer:   util.Ptr(getEventsUrl(baseUrl, videoId)),
 	}
 
-	if vd.SceneParts.Paths.Screenshot != nil {
-		if vd.SceneParts.Interactive && vd.SceneParts.Paths.Interactive_heatmap != nil {
-			dto.ThumbnailImage = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
-		} else {
-			dto.ThumbnailImage = util.Ptr(stash.ApiKeyed(*vd.SceneParts.Paths.Screenshot))
-		}
+	if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
+		dto.ThumbnailImage = util.Ptr(heatmap.GetCoverUrl(baseUrl, videoId))
 	}
 
 	if vd.SceneParts.Paths.Preview != nil {
@@ -124,12 +120,19 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string) 
 	dto.Tags = getTags(vd)
 
 	log.Ctx(ctx).Debug().
-		Str("thumbImage", *dto.ThumbnailImage).
-		Str("thumbVideo", *dto.ThumbnailVideo).
+		Str("thumbImage", derefOr(dto.ThumbnailImage)).
+		Str("thumbVideo", derefOr(dto.ThumbnailVideo)).
 		Str("codec", vd.SceneParts.Files[0].Video_codec).
 		Interface("media", dto.Media).Send()
 
 	return &dto, nil
+}
+
+func derefOr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func setSubtitles(vd *library.VideoData, dto *videoDataDto) {
