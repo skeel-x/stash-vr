@@ -22,8 +22,10 @@ type sceneIdQuery struct {
 
 // routingStash has no saved filters and records every scene-id query.
 type routingStash struct {
-	mu      sync.Mutex
-	queries []*sceneIdQuery
+	mu       sync.Mutex
+	queries  []*sceneIdQuery
+	allIds   int
+	tagLoads int
 }
 
 func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -32,7 +34,15 @@ func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp
 	case "FindSavedSceneFilters":
 		payload = `{"findSavedFilters":[]}`
 	case "FindAllTags":
+		r.mu.Lock()
+		r.tagLoads++
+		r.mu.Unlock()
 		payload = `{"findTags":{"tags":[]}}`
+	case "FindAllSceneIds":
+		r.mu.Lock()
+		r.allIds++
+		r.mu.Unlock()
+		payload = `{"findScenes":{"scenes":[{"id":"1"},{"id":"2"}]}}`
 	case "FindSceneIdsByFilter":
 		raw, err := json.Marshal(req.Variables)
 		if err != nil {
@@ -68,6 +78,18 @@ func (r *routingStash) sceneIdQueries() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.queries)
+}
+
+func (r *routingStash) allIdQueries() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.allIds
+}
+
+func (r *routingStash) tagQueries() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.tagLoads
 }
 
 func loadConfig(t *testing.T, filters []config.Filter) {
@@ -264,6 +286,39 @@ func TestGetSections_ConcurrentCallersShareOneBuild(t *testing.T) {
 
 	if got := stash.sceneIdQueries(); got != 3 {
 		t.Fatalf("expected one build (3 smart queries), got %d", got)
+	}
+	if got := stash.tagQueries(); got != 1 {
+		t.Fatalf("expected the tag reload to run once for the shared build, got %d", got)
+	}
+}
+
+func TestGetSections_AllFallbackIsCachedWithinTTL(t *testing.T) {
+	loadConfig(t, []config.Filter{
+		{ID: "smart:continue", Disabled: true},
+		{ID: "smart:recent", Disabled: true},
+		{ID: "smart:random", Disabled: true},
+	})
+	stash := &routingStash{}
+	svc := NewService(stash)
+
+	sections, err := svc.GetSections(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(sections); fmt.Sprint(got) != fmt.Sprint([]string{"All"}) {
+		t.Fatalf("sections = %v, want [All]", got)
+	}
+
+	sections, err = svc.GetSections(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(sections); fmt.Sprint(got) != fmt.Sprint([]string{"All"}) {
+		t.Fatalf("sections = %v, want [All]", got)
+	}
+
+	if got := stash.allIdQueries(); got != 1 {
+		t.Fatalf("expected the All fallback to be cached within the TTL, got %d FindAllSceneIds queries", got)
 	}
 }
 

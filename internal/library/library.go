@@ -26,9 +26,10 @@ type Service struct {
 	tagCache   map[string]*Tag
 	muTagCache sync.RWMutex
 
-	muSets sync.Mutex
-	sets   []SavedFilterSceneSet
-	setsAt time.Time
+	muSets   sync.Mutex
+	sets     []SavedFilterSceneSet
+	sections []Section
+	setsAt   time.Time
 }
 
 // clientBox wraps the client so different concrete client types can be
@@ -64,11 +65,12 @@ func (libraryService *Service) ResetCaches() {
 	libraryService.ResetSections()
 }
 
-// ResetSections drops the cached section sets so the next index request
-// requeries Stash. Scene data stays cached.
+// ResetSections drops the cached section sets and sections so the next
+// index request requeries Stash. Scene data stays cached.
 func (libraryService *Service) ResetSections() {
 	libraryService.muSets.Lock()
 	libraryService.sets = nil
+	libraryService.sections = nil
 	libraryService.muSets.Unlock()
 }
 

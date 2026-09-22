@@ -39,107 +39,115 @@ type SectionRow struct {
 	Smart      bool
 }
 
-type setsResult struct {
-	sets    []SavedFilterSceneSet
-	rebuilt bool
+// indexResult is the outcome of one buildIndex rebuild: the resolved section
+// sets and the sections derived from them (including the "All" fallback
+// when nothing is enabled).
+type indexResult struct {
+	sets     []SavedFilterSceneSet
+	sections []Section
 }
 
-// cachedSets returns the resolved section sets, rebuilding them at most once
-// per sectionCacheTTL. Concurrent callers share one rebuild. rebuilt reports
-// whether this call produced a fresh result.
-func (libraryService *Service) cachedSets(ctx context.Context) (sets []SavedFilterSceneSet, rebuilt bool, err error) {
-	if s, ok := libraryService.freshSets(); ok {
-		return s, false, nil
+// buildIndex returns the cached section sets and sections, rebuilding the
+// whole index - sets, sections, the reseeded scene cache, Stats and the tag
+// hierarchy - at most once per sectionCacheTTL. Concurrent callers share one
+// rebuild and its side effects run exactly once per rebuild, never once per
+// caller.
+func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilterSceneSet, sections []Section, err error) {
+	if s, sec, ok := libraryService.freshIndex(); ok {
+		return s, sec, nil
 	}
 	res, err, _ := libraryService.single.Do("sets", func() (interface{}, error) {
-		if s, ok := libraryService.freshSets(); ok {
-			return setsResult{sets: s}, nil
+		if s, sec, ok := libraryService.freshIndex(); ok {
+			return indexResult{sets: s, sections: sec}, nil
 		}
 		sources, err := libraryService.getSources(ctx)
 		if err != nil {
 			return nil, err
 		}
-		s := []SavedFilterSceneSet{}
-		if len(sources) > 0 {
-			if s, err = libraryService.resolveSections(ctx, sources); err != nil {
+
+		var sets []SavedFilterSceneSet
+		var sections []Section
+		if len(sources) == 0 {
+			log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
+			if sections, err = libraryService.getDefaultSections(ctx); err != nil {
 				return nil, err
 			}
+			sets = []SavedFilterSceneSet{}
+		} else {
+			if sets, err = libraryService.resolveSections(ctx, sources); err != nil {
+				return nil, err
+			}
+			sections = make([]Section, len(sets))
+			for i, set := range sets {
+				sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
+			}
 		}
+
+		// Reseed the scene cache with the ids players may ask for, recompute
+		// the stats and refresh the tag hierarchy - once for this rebuild.
+		libraryService.muVdCache.Lock()
+		for k := range libraryService.vdCache {
+			delete(libraryService.vdCache, k)
+		}
+		libraryService.Stats.Links = 0
+		for _, v := range sections {
+			libraryService.Stats.Links += len(v.Ids)
+			for _, id := range v.Ids {
+				libraryService.vdCache[id] = nil
+			}
+		}
+		libraryService.Stats.Scenes = len(libraryService.vdCache)
+		links := libraryService.Stats.Links
+		scenesCount := libraryService.Stats.Scenes
+		libraryService.muVdCache.Unlock()
+
+		log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", links).
+			Int("scenes", scenesCount).
+			Msg("Index built")
+
+		_ = libraryService.LoadTags(ctx)
+
+		libraryService.muTagCache.RLock()
+		tagCount := len(libraryService.tagCache)
+		libraryService.muTagCache.RUnlock()
+		log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
+
 		libraryService.muSets.Lock()
-		libraryService.sets = s
+		libraryService.sets = sets
+		libraryService.sections = sections
 		libraryService.setsAt = time.Now()
 		libraryService.muSets.Unlock()
-		return setsResult{sets: s, rebuilt: true}, nil
+
+		return indexResult{sets: sets, sections: sections}, nil
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, nil, err
 	}
-	r := res.(setsResult)
-	return r.sets, r.rebuilt, nil
+	r := res.(indexResult)
+	return r.sets, r.sections, nil
 }
 
-func (libraryService *Service) freshSets() ([]SavedFilterSceneSet, bool) {
+// freshIndex returns the cached sets and sections if they exist and are
+// still within sectionCacheTTL.
+func (libraryService *Service) freshIndex() ([]SavedFilterSceneSet, []Section, bool) {
 	libraryService.muSets.Lock()
 	defer libraryService.muSets.Unlock()
 	if libraryService.sets == nil || time.Since(libraryService.setsAt) >= sectionCacheTTL {
-		return nil, false
+		return nil, nil, false
 	}
-	return libraryService.sets, true
+	return libraryService.sets, libraryService.sections, true
 }
 
 func (libraryService *Service) GetSections(ctx context.Context) ([]Section, error) {
-	sets, rebuilt, err := libraryService.cachedSets(ctx)
+	_, sections, err := libraryService.buildIndex(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	var sections []Section
-	if len(sets) == 0 {
-		log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
-		if sections, err = libraryService.getDefaultSections(ctx); err != nil {
-			return nil, err
-		}
-		rebuilt = true
-	} else {
-		sections = make([]Section, len(sets))
-		for i, set := range sets {
-			sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
-		}
+	out := make([]Section, len(sections))
+	for i, s := range sections {
+		out[i] = Section{Name: s.Name, Ids: slices.Clone(s.Ids)}
 	}
-	if !rebuilt {
-		return sections, nil
-	}
-
-	// A fresh build: reseed the scene cache with the ids players may ask
-	// for, recompute the stats and refresh the tag hierarchy.
-	libraryService.muVdCache.Lock()
-	for k := range libraryService.vdCache {
-		delete(libraryService.vdCache, k)
-	}
-	libraryService.Stats.Links = 0
-	for _, v := range sections {
-		libraryService.Stats.Links += len(v.Ids)
-		for _, id := range v.Ids {
-			libraryService.vdCache[id] = nil
-		}
-	}
-	libraryService.Stats.Scenes = len(libraryService.vdCache)
-	links := libraryService.Stats.Links
-	scenesCount := libraryService.Stats.Scenes
-	libraryService.muVdCache.Unlock()
-
-	log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", links).
-		Int("scenes", scenesCount).
-		Msg("Index built")
-
-	_ = libraryService.LoadTags(ctx)
-
-	libraryService.muTagCache.RLock()
-	tagCount := len(libraryService.tagCache)
-	libraryService.muTagCache.RUnlock()
-	log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
-
-	return sections, nil
+	return out, nil
 }
 
 func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Section, error) {
@@ -162,7 +170,7 @@ func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Sectio
 // smart Random section, which would show up as a second, differently
 // shuffled "Random" alongside Playa's own).
 func (libraryService *Service) GetSavedFilterSceneSets(ctx context.Context) ([]SavedFilterSceneSet, error) {
-	sets, _, err := libraryService.cachedSets(ctx)
+	sets, _, err := libraryService.buildIndex(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -20,8 +20,11 @@ type fakeNotFoundGraphQL struct{}
 
 func (f *fakeNotFoundGraphQL) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
 	payload := `{"findScenes":{"scenes":[]}}`
-	if req.OpName == "FindSavedSceneFilters" {
+	switch req.OpName {
+	case "FindSavedSceneFilters":
 		payload = `{"findSavedFilters":[]}`
+	case "FindAllTags":
+		payload = `{"findTags":{"tags":[]}}`
 	}
 	return json.Unmarshal([]byte(payload), resp.Data)
 }
