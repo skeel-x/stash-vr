@@ -61,7 +61,7 @@
 <section class="blocked">
   <h1>Players can't see a library yet</h1>
   <p>Stash-VR could not reach Stash{{if .Status.ConnectionError}}: {{.Status.ConnectionError}}{{end}}. Check the address and API key in setup, then test the connection.</p>
-  <a class="button primary big" href="/setup">Open setup</a>
+  <a class="button primary big" href="{{.Base}}/setup">Open setup</a>
 </section>
 {{end}}
 {{end}}

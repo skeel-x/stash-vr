@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -45,6 +46,7 @@ type fileConfig struct {
 	HeatmapHeightPx    *int     `json:"heatmap_height_px,omitempty"`
 	SmartSectionSize   *int     `json:"smart_section_size,omitempty"`
 	ForceHTTPS         *bool    `json:"force_https,omitempty"`
+	BasePath           *string  `json:"base_path,omitempty"`
 	LogLevel           *string  `json:"log_level,omitempty"`
 	Filters            []Filter `json:"filters"`
 }
@@ -109,6 +111,9 @@ func Load(seed ApplicationConfig) error {
 	if seed.Filters == nil {
 		seed.Filters = []Filter{}
 	}
+	if seed.BasePath, err = NormalizeBasePath(seed.BasePath); err != nil {
+		return err
+	}
 	path := FilePath(seed)
 
 	data, err := os.ReadFile(path)
@@ -133,6 +138,9 @@ func Load(seed ApplicationConfig) error {
 		return fmt.Errorf("parse config %s: %w", path, err)
 	}
 	merged := applyFile(seed, fc)
+	if merged.BasePath, err = NormalizeBasePath(merged.BasePath); err != nil {
+		return fmt.Errorf("config %s: %w", path, err)
+	}
 	if err := Validate(merged); err != nil {
 		return fmt.Errorf("config %s: %w", path, err)
 	}
@@ -167,6 +175,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.ForceHTTPS != nil {
 		base.ForceHTTPS = *fc.ForceHTTPS
 	}
+	if fc.BasePath != nil {
+		base.BasePath = *fc.BasePath
+	}
 	if fc.LogLevel != nil {
 		base.LogLevel = *fc.LogLevel
 	}
@@ -191,6 +202,10 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	if next.Filters == nil {
 		next.Filters = []Filter{}
 	}
+	var err error
+	if next.BasePath, err = NormalizeBasePath(next.BasePath); err != nil {
+		return ApplicationConfig{}, err
+	}
 	if err := Validate(next); err != nil {
 		return ApplicationConfig{}, err
 	}
@@ -199,6 +214,20 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	}
 	store(next)
 	return cloneConfig(next), nil
+}
+
+// NormalizeBasePath returns "" or "/segment[/segment]" for p.
+func NormalizeBasePath(p string) (string, error) {
+	p = strings.Trim(strings.TrimSpace(p), "/")
+	if p == "" {
+		return "", nil
+	}
+	for _, seg := range strings.Split(p, "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return "", fmt.Errorf("%w: base_path must be like /stashvr, got %q", ErrInvalid, p)
+		}
+	}
+	return "/" + p, nil
 }
 
 // Validate checks the runtime-changeable fields.
@@ -234,6 +263,7 @@ func write(path string, c ApplicationConfig) error {
 		HeatmapHeightPx:    &c.HeatmapHeightPx,
 		SmartSectionSize:   &c.SmartSectionSize,
 		ForceHTTPS:         &c.ForceHTTPS,
+		BasePath:           &c.BasePath,
 		LogLevel:           &c.LogLevel,
 		Filters:            c.Filters,
 	}

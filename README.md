@@ -74,6 +74,33 @@ Example: Connect to Stash running on stash-host:9999 with api key XXX and set St
 
 `stash-vr --STASH_GRAPHQL_URL=http://stash-host:9999/graphql --STASH_API_KEY=XXX --LISTEN_ADDRESS=:9000`
 
+### Reverse proxy under a sub-path
+
+Stash-VR can be served under a path prefix such as `https://example.com/stashvr/`. Have the proxy strip the prefix and send it in `X-Forwarded-Prefix`; generated player links and page assets then carry it.
+
+nginx:
+
+```nginx
+location /stashvr/ {
+    proxy_pass http://127.0.0.1:9666/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix /stashvr;
+}
+```
+
+Caddy:
+
+```caddyfile
+handle_path /stashvr/* {
+    reverse_proxy 127.0.0.1:9666 {
+        header_up X-Forwarded-Prefix /stashvr
+    }
+}
+```
+
+If your proxy cannot send the header, set the prefix as `base_path` on the Setup page or with `BASE_PATH` instead.
+
 ### Settings and the web UI
 
 Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Smart sections (Continue watching, Recently added, Random and more) can be switched on and ordered on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`.

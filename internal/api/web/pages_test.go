@@ -164,4 +164,22 @@ func TestOldRoutes_Redirect(t *testing.T) {
 			t.Errorf("%s: expected 301 to %s, got %d %q", old, want, rec.Code, rec.Header().Get("Location"))
 		}
 	}
+
+	rec := getPage(t, h, "/settings", map[string]string{"X-Forwarded-Prefix": "/p"})
+	if rec.Code != http.StatusMovedPermanently || rec.Header().Get("Location") != "/p/setup" {
+		t.Errorf("/settings behind prefix: expected 301 to /p/setup, got %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+}
+
+func TestPlayers_LinksCarryForwardedPrefix(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/", map[string]string{"Host": "vr.example", "X-Forwarded-Proto": "https", "X-Forwarded-Prefix": "/stashvr"}).Body.String()
+
+	for _, want := range []string{`href="https://vr.example/stashvr/heresphere"`, `href="/stashvr/app.css"`, `href="/stashvr/setup"`, `data-base="/stashvr"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
 }

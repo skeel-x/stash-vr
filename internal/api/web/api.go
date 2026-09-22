@@ -40,6 +40,7 @@ type ConfigView struct {
 	GenerateSummaryIds bool            `json:"generate_summary_ids"`
 	HeatmapHeightPx    int             `json:"heatmap_height_px"`
 	ForceHTTPS         bool            `json:"force_https"`
+	BasePath           string          `json:"base_path"`
 	LogLevel           string          `json:"log_level"`
 	SmartSectionSize   int             `json:"smart_section_size"`
 	ListenAddress      string          `json:"listen_address"`
@@ -50,15 +51,16 @@ type ConfigView struct {
 // configInput is what PUT /config accepts. An empty StashApiKey keeps the
 // current key.
 type configInput struct {
-	StashGraphQLUrl    string `json:"stash_graphql_url"`
-	StashApiKey        string `json:"stash_api_key"`
-	FavoriteTag        string `json:"favorite_tag"`
-	ExcludeSortName    string `json:"exclude_sort_name"`
-	GenerateSummaryIds bool   `json:"generate_summary_ids"`
-	HeatmapHeightPx    int    `json:"heatmap_height_px"`
-	ForceHTTPS         bool   `json:"force_https"`
-	LogLevel           string `json:"log_level"`
-	SmartSectionSize   *int   `json:"smart_section_size"`
+	StashGraphQLUrl    string  `json:"stash_graphql_url"`
+	StashApiKey        string  `json:"stash_api_key"`
+	FavoriteTag        string  `json:"favorite_tag"`
+	ExcludeSortName    string  `json:"exclude_sort_name"`
+	GenerateSummaryIds bool    `json:"generate_summary_ids"`
+	HeatmapHeightPx    int     `json:"heatmap_height_px"`
+	ForceHTTPS         bool    `json:"force_https"`
+	BasePath           *string `json:"base_path"`
+	LogLevel           string  `json:"log_level"`
+	SmartSectionSize   *int    `json:"smart_section_size"`
 }
 
 type testInput struct {
@@ -81,6 +83,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		GenerateSummaryIds: cfg.GenerateSummaryIds,
 		HeatmapHeightPx:    cfg.HeatmapHeightPx,
 		ForceHTTPS:         cfg.ForceHTTPS,
+		BasePath:           cfg.BasePath,
 		LogLevel:           cfg.LogLevel,
 		SmartSectionSize:   cfg.SmartSectionSize,
 		ListenAddress:      cfg.ListenAddress,
@@ -220,6 +223,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	next.GenerateSummaryIds = in.GenerateSummaryIds
 	next.HeatmapHeightPx = in.HeatmapHeightPx
 	next.ForceHTTPS = in.ForceHTTPS
+	if in.BasePath != nil {
+		next.BasePath = *in.BasePath
+	}
 	next.LogLevel = in.LogLevel
 	if in.SmartSectionSize != nil {
 		next.SmartSectionSize = *in.SmartSectionSize

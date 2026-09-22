@@ -42,6 +42,10 @@
       {{range .LogLevels}}<option value="{{.}}"{{if eq . $.Config.LogLevel}} selected{{end}}>{{.}}</option>{{end}}
     </select>
   </label>
+  <label>Path prefix
+    <input name="base_path" value="{{.Config.BasePath}}" placeholder="/stashvr">
+    <small>Only when a reverse proxy serves Stash-VR under a sub-path and does not send X-Forwarded-Prefix.</small>
+  </label>
   <label>Listening on
     <input value="{{.Config.ListenAddress}}" disabled>
     <small>Set with LISTEN_ADDRESS. Needs a restart.</small>

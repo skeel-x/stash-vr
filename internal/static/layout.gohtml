@@ -4,22 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}} - Stash-VR</title>
-  <link rel="icon" href="/icon.png" type="image/png">
-  <link rel="stylesheet" href="/app.css">
+  <link rel="icon" href="{{.Base}}/icon.png" type="image/png">
+  <link rel="stylesheet" href="{{.Base}}/app.css">
 </head>
-<body>
+<body data-base="{{.Base}}">
 <header class="bar">
-  <a class="brand" href="/"><img src="/icon.png" alt="">Stash-VR</a>
+  <a class="brand" href="{{.Base}}/"><img src="{{.Base}}/icon.png" alt="">Stash-VR</a>
   <nav>
-    <a href="/"{{if eq .Active "launch"}} aria-current="page"{{end}}>Players</a>
-    <a href="/setup"{{if eq .Active "setup"}} aria-current="page"{{end}}>Setup</a>
-    <a href="/sections"{{if eq .Active "sections"}} aria-current="page"{{end}}>Sections</a>
+    <a href="{{.Base}}/"{{if eq .Active "launch"}} aria-current="page"{{end}}>Players</a>
+    <a href="{{.Base}}/setup"{{if eq .Active "setup"}} aria-current="page"{{end}}>Setup</a>
+    <a href="{{.Base}}/sections"{{if eq .Active "sections"}} aria-current="page"{{end}}>Sections</a>
   </nav>
 </header>
 <main>
 {{template "content" .}}
 </main>
 <footer>Stash-VR {{.Version}}</footer>
-<script src="/app.js"></script>
+<script src="{{.Base}}/app.js"></script>
 </body>
 </html>{{end}}

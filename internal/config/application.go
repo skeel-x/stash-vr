@@ -16,6 +16,7 @@ const (
 	envKeyDisableLogColor    = "DISABLE_LOG_COLOR"
 	envKeyDisableRedact      = "DISABLE_REDACT"
 	envKeyForceHTTPS         = "FORCE_HTTPS"
+	envKeyBasePath           = "BASE_PATH"
 	envKeyHeatmapHeightPx    = "HEATMAP_HEIGHT_PX"
 	envKeyExcludeSortName    = "EXCLUDE_SORT_NAME"
 	envKeyUserConfigPath     = "CONFIG_PATH"
@@ -32,6 +33,7 @@ type ApplicationConfig struct {
 	DisableLogColor    bool
 	IsRedactDisabled   bool
 	ForceHTTPS         bool
+	BasePath           string
 	HeatmapHeightPx    int
 	SmartSectionSize   int
 	ExcludeSortName    string
@@ -64,6 +66,9 @@ func Init() error {
 
 	pflag.Bool(envKeyForceHTTPS, false, "Force Stash-VR to use HTTPS")
 	_ = viper.BindPFlag(envKeyForceHTTPS, pflag.Lookup(envKeyForceHTTPS))
+
+	pflag.String(envKeyBasePath, "", "Path prefix when served under a sub-path behind a reverse proxy, e.g. /stashvr")
+	_ = viper.BindPFlag(envKeyBasePath, pflag.Lookup(envKeyBasePath))
 
 	pflag.Int(envKeyHeatmapHeightPx, 0, "Height of heatmaps")
 	_ = viper.BindPFlag(envKeyHeatmapHeightPx, pflag.Lookup(envKeyHeatmapHeightPx))
@@ -101,6 +106,7 @@ func Init() error {
 		DisableLogColor:    viper.GetBool(envKeyDisableLogColor),
 		IsRedactDisabled:   viper.GetBool(envKeyDisableRedact),
 		ForceHTTPS:         viper.GetBool(envKeyForceHTTPS),
+		BasePath:           viper.GetString(envKeyBasePath),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),

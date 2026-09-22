@@ -228,3 +228,26 @@ func TestSet_SmartSectionSizeBounds(t *testing.T) {
 		t.Fatalf("expected persisted 120, got %d", got)
 	}
 }
+
+func TestSet_BasePathNormalisedAndValidated(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Application()
+	cfg.BasePath = "stashvr/"
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().BasePath; got != "/stashvr" {
+		t.Fatalf("expected normalised /stashvr, got %q", got)
+	}
+	cfg.BasePath = "/a//b"
+	if _, err := Set(cfg); err == nil {
+		t.Fatal("expected a path with empty segments to be rejected")
+	}
+	cfg.BasePath = ""
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+}

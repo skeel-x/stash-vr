@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
+	"stash-vr/internal/api/internal"
 	"stash-vr/internal/build"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
@@ -31,6 +32,7 @@ type FilterRow struct {
 
 type pageData struct {
 	Title       string
+	Base        string
 	Active      string
 	Version     string
 	Status      Status
@@ -56,9 +58,11 @@ func Register(r chi.Router, lib *library.Service) {
 	r.Get("/filters", redirectTo("/sections"))
 }
 
+// redirectTo sends the client to path under the base path the request was
+// served at, computed per request because the prefix may come from a header.
 func redirectTo(path string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, path, http.StatusMovedPermanently)
+		http.Redirect(w, r, internal.GetBasePath(r)+path, http.StatusMovedPermanently)
 	}
 }
 
@@ -69,8 +73,8 @@ func PagesRouter(lib *library.Service) http.Handler {
 	return r
 }
 
-func (h pageHandler) base(title, active string) pageData {
-	return pageData{Title: title, Active: active, Version: build.FullVersion(), LogLevels: logLevels}
+func (h pageHandler) base(r *http.Request, title, active string) pageData {
+	return pageData{Title: title, Base: internal.GetBasePath(r), Active: active, Version: build.FullVersion(), LogLevels: logLevels}
 }
 
 func render(w http.ResponseWriter, r *http.Request, t *template.Template, data pageData) {
@@ -84,20 +88,20 @@ func (h pageHandler) players(w http.ResponseWriter, r *http.Request) {
 	// The page embeds the keyed sample cover URL for the headset check, so it
 	// must not be cached by a browser or an intermediary.
 	w.Header().Set("Cache-Control", "no-store")
-	data := h.base("Players", "launch")
+	data := h.base(r, "Players", "launch")
 	data.Status = BuildStatus(r.Context(), h.lib)
 	data.Links = LinksFor(r)
 	render(w, r, launchTmpl, data)
 }
 
 func (h pageHandler) setup(w http.ResponseWriter, r *http.Request) {
-	data := h.base("Setup", "setup")
+	data := h.base(r, "Setup", "setup")
 	data.Config = MaskedConfig(config.Application())
 	render(w, r, setupTmpl, data)
 }
 
 func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
-	data := h.base("Sections", "sections")
+	data := h.base(r, "Sections", "sections")
 	rows, err := h.lib.SectionRows(r.Context())
 	if err != nil {
 		data.FilterError = err.Error()
