@@ -1,51 +1,54 @@
 {{define "content"}}
-<form id="settings" class="card" autocomplete="off">
-  <h2>Stash connection</h2>
-  <label>GraphQL URL
+<form id="setup" class="form" autocomplete="off">
+  <h1>Setup</h1>
+
+  <h2>Connection</h2>
+  <label>Stash GraphQL address
     <input name="stash_graphql_url" type="url" required value="{{.Config.StashGraphQLUrl}}" placeholder="http://localhost:9999/graphql">
-    <small>As reachable from where Stash-VR runs. The same host must be reachable from your headset for streams and covers.</small>
+    <small>As reachable from where Stash-VR runs. Your headset must reach the same host for streams and covers.</small>
   </label>
   <label>API key
-    <input name="stash_api_key" type="password" value="" placeholder="{{if .Config.StashApiKeySet}}set, leave blank to keep{{else}}paste the key from Stash → Settings → Security{{end}}">
+    <input name="stash_api_key" type="password" value="" placeholder="{{if .Config.StashApiKeySet}}set, leave blank to keep{{else}}paste the key from Stash, Settings, Security{{end}}">
+    <small>Changing the Stash host needs the key again.</small>
   </label>
-  <p class="row">
+  <div class="row">
     <button type="button" id="test">Test connection</button>
     <span class="msg" id="test-msg"></span>
-  </p>
+  </div>
 
-  <h2>Library</h2>
+  <h2>Players</h2>
   <label>Favorite tag
     <input name="favorite_tag" value="{{.Config.FavoriteTag}}">
-    <small>Scenes with this Stash tag show as favorites in HereSphere, and vice versa. Leave empty to disable favorite sync.</small>
+    <small>Scenes with this Stash tag show as favorites in HereSphere, and the other way round. Leave empty to turn favorite sync off.</small>
   </label>
-  <label>Exclude sort name
+  <label>Hidden sort name
     <input name="exclude_sort_name" required value="{{.Config.ExcludeSortName}}">
     <small>Tags whose sort name equals this are hidden from players.</small>
   </label>
   <label class="check"><input name="generate_summary_ids" type="checkbox" {{if .Config.GenerateSummaryIds}}checked{{end}}> Generate summary ids for categorized tags</label>
-  <label>Heatmap height (px)
+  <label>Heatmap height in pixels
     <input name="heatmap_height_px" type="number" min="0" max="200" value="{{.Config.HeatmapHeightPx}}">
-    <small>0 uses the height of the heatmap Stash generates.</small>
+    <small>0 keeps the height Stash generates.</small>
   </label>
+  <label class="check"><input name="force_https" type="checkbox" {{if .Config.ForceHTTPS}}checked{{end}}> Always build https links (only if your proxy does not send X-Forwarded-Proto)</label>
 
   <h2>Server</h2>
-  <label class="check"><input name="force_https" type="checkbox" {{if .Config.ForceHTTPS}}checked{{end}}> Force HTTPS in generated links (only if a reverse proxy does not set X-Forwarded-Proto)</label>
   <label>Log level
     <select name="log_level">
       {{range .LogLevels}}<option value="{{.}}"{{if eq . $.Config.LogLevel}} selected{{end}}>{{.}}</option>{{end}}
     </select>
   </label>
-  <label>Listen address
+  <label>Listening on
     <input value="{{.Config.ListenAddress}}" disabled>
-    <small>Set with LISTEN_ADDRESS; restart required.</small>
+    <small>Set with LISTEN_ADDRESS. Needs a restart.</small>
   </label>
-  <label>Config file
+  <label>Settings file
     <input value="{{.Config.ConfigPath}}" disabled>
   </label>
 
-  <p class="row">
-    <button type="submit" class="primary">Save</button>
+  <div class="row">
+    <button type="submit" class="primary">Save changes</button>
     <span class="msg" id="save-msg"></span>
-  </p>
+  </div>
 </form>
 {{end}}

@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	dashboardTmpl = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "dashboard.gohtml"))
-	settingsTmpl  = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "settings.gohtml"))
-	filtersTmpl   = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "filters.gohtml"))
+	launchTmpl   = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "launch.gohtml"))
+	setupTmpl    = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "setup.gohtml"))
+	sectionsTmpl = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "sections.gohtml"))
 )
 
 var logLevels = []string{"trace", "debug", "info", "warn", "error"}
@@ -49,9 +49,17 @@ type pageHandler struct {
 // /* static file server keeps working alongside the pages.
 func Register(r chi.Router, lib *library.Service) {
 	h := pageHandler{lib: lib}
-	r.Get("/", h.dashboard)
-	r.Get("/settings", h.settings)
-	r.Get("/filters", h.filters)
+	r.Get("/", h.players)
+	r.Get("/setup", h.setup)
+	r.Get("/sections", h.sections)
+	r.Get("/settings", redirectTo("/setup"))
+	r.Get("/filters", redirectTo("/sections"))
+}
+
+func redirectTo(path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, path, http.StatusMovedPermanently)
+	}
 }
 
 // PagesRouter serves only the HTML pages; used by tests.
@@ -72,30 +80,30 @@ func render(w http.ResponseWriter, r *http.Request, t *template.Template, data p
 	}
 }
 
-func (h pageHandler) dashboard(w http.ResponseWriter, r *http.Request) {
+func (h pageHandler) players(w http.ResponseWriter, r *http.Request) {
 	// The page embeds the keyed sample cover URL for the headset check, so it
 	// must not be cached by a browser or an intermediary.
 	w.Header().Set("Cache-Control", "no-store")
-	data := h.base("Dashboard", "dashboard")
+	data := h.base("Players", "launch")
 	data.Status = BuildStatus(r.Context(), h.lib)
 	data.Links = LinksFor(r)
-	render(w, r, dashboardTmpl, data)
+	render(w, r, launchTmpl, data)
 }
 
-func (h pageHandler) settings(w http.ResponseWriter, r *http.Request) {
-	data := h.base("Settings", "settings")
+func (h pageHandler) setup(w http.ResponseWriter, r *http.Request) {
+	data := h.base("Setup", "setup")
 	data.Config = MaskedConfig(config.Application())
-	render(w, r, settingsTmpl, data)
+	render(w, r, setupTmpl, data)
 }
 
-func (h pageHandler) filters(w http.ResponseWriter, r *http.Request) {
-	data := h.base("Filters", "filters")
+func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
+	data := h.base("Sections", "sections")
 	rows, err := h.filterRows(r)
 	if err != nil {
 		data.FilterError = err.Error()
 	}
 	data.FilterRows = rows
-	render(w, r, filtersTmpl, data)
+	render(w, r, sectionsTmpl, data)
 }
 
 // filterRows lists Stash's saved scene filters in the configured order:

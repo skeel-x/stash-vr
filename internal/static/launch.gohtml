@@ -1,0 +1,67 @@
+{{define "content"}}
+<section class="health {{.Status.Connection}}">
+  <button type="button" class="health-line" id="health-toggle" aria-expanded="false" aria-controls="health-detail">
+    <span class="dot" aria-hidden="true"></span>
+    {{if eq .Status.Connection "ok"}}<span>Connected to Stash {{.Status.StashVersion}}, {{.Status.Scenes}} scenes in {{.Status.Sections}} sections.</span>
+    {{else if eq .Status.Connection "unauthorized"}}<span>Stash rejected the API key.</span>
+    {{else}}<span>Can't reach Stash.</span>{{end}}
+    <span class="more">Details</span>
+  </button>
+  <dl id="health-detail" hidden>
+    <dt>This device loads covers from Stash</dt>
+    <dd id="headset-check" data-cover="{{.Status.SampleCoverUrl}}">{{if .Status.SampleCoverUrl}}Checking{{else}}No sample cover to test with{{end}}</dd>
+    {{if .Status.ConnectionError}}<dt>Last error</dt><dd>{{.Status.ConnectionError}}</dd>{{end}}
+    <dt>API key</dt><dd>{{if .Status.ApiKeySet}}Set{{else}}Not set. Stash usually needs one.{{end}}</dd>
+    <dt>Settings file</dt><dd><code>{{.Status.ConfigPath}}</code>{{if not .Status.ConfigFileExists}} (not written yet){{end}}</dd>
+    <dt>Listening on</dt><dd><code>{{.Status.ListenAddress}}</code>, log level {{.Status.LogLevel}}</dd>
+    <dt>Index</dt><dd>{{.Status.Links}} links in {{.Status.Sections}} sections <button type="button" id="reindex" class="small">Rebuild index</button> <span class="msg" id="reindex-msg"></span></dd>
+  </dl>
+</section>
+
+{{if eq .Status.Connection "ok"}}
+<section class="players">
+  <article class="player heresphere">
+    <a class="launch" href="{{.Links.HereSphere}}">
+      <span class="name">HereSphere</span>
+      <span class="action">Open your library</span>
+    </a>
+    <div class="address">
+      <a class="url" href="{{.Links.HereSphere}}">{{.Links.HereSphere}}</a>
+      <button type="button" class="copy" data-copy="{{.Links.HereSphere}}">Copy</button>
+    </div>
+    <p class="note">Bookmark it in HereSphere. Ratings, favorites, tags and markers you set there are saved to Stash.</p>
+  </article>
+
+  <article class="player deovr">
+    <a class="launch" href="{{.Links.DeoVRApi}}">
+      <span class="name">DeoVR</span>
+      <span class="action">Open in DeoVR</span>
+    </a>
+    <div class="address">
+      <a class="url" href="{{.Links.DeoVR}}">{{.Links.DeoVR}}</a>
+      <button type="button" class="copy" data-copy="{{.Links.DeoVR}}">Copy</button>
+    </div>
+    <p class="note">DeoVR also finds the library on this page by itself. If nothing appears, press the play button in the top right.</p>
+    {{if .Links.PlainHTTP}}<p class="note warn">Covers stay blank in DeoVR over plain http. Open this page over https to see them.</p>{{end}}
+  </article>
+
+  <article class="player playa">
+    <div class="launch static">
+      <span class="name">Playa</span>
+      <span class="action">Add this server in Playa</span>
+    </div>
+    <div class="address">
+      <a class="url" href="{{.Links.Playa}}">{{.Links.Playa}}</a>
+      <button type="button" class="copy" data-copy="{{.Links.Playa}}">Copy</button>
+    </div>
+    <p class="note">Playa finds the API on its own. Browsing is read-only. Pick the direct stream for the smoothest playback.</p>
+  </article>
+</section>
+{{else}}
+<section class="blocked">
+  <h1>Players can't see a library yet</h1>
+  <p>Stash-VR could not reach Stash{{if .Status.ConnectionError}}: {{.Status.ConnectionError}}{{end}}. Check the address and API key in setup, then test the connection.</p>
+  <a class="button primary big" href="/setup">Open setup</a>
+</section>
+{{end}}
+{{end}}

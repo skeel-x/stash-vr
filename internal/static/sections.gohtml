@@ -1,0 +1,25 @@
+{{define "content"}}
+<section class="form">
+  <h1>Sections</h1>
+  <p class="lead">Each saved scene filter in Stash is a section in your player. Drag to reorder, rename, or switch a section off. An empty name keeps the Stash name.</p>
+  {{if .FilterError}}<p class="note warn">Could not load saved filters from Stash: {{.FilterError}}</p>{{end}}
+  <table class="sections">
+    <thead><tr><th></th><th>Show</th><th>Stash filter</th><th>Name in player</th></tr></thead>
+    <tbody id="rows">
+    {{range .FilterRows}}
+      <tr data-id="{{.ID}}">
+        <td><span class="handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</span></td>
+        <td><input type="checkbox" class="enabled" aria-label="Show {{.SourceName}}" {{if not .Disabled}}checked{{end}}></td>
+        <td><span class="src">{{.SourceName}}</span><code class="id">{{.ID}}</code></td>
+        <td><input class="name" placeholder="{{.SourceName}}" value="{{if ne .Name .SourceName}}{{.Name}}{{end}}"></td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  <div class="row">
+    <button type="button" id="save-filters" class="primary">Save order</button>
+    <button type="button" id="reset-filters">Reset to Stash order</button>
+    <span class="msg" id="filters-msg"></span>
+  </div>
+</section>
+{{end}}

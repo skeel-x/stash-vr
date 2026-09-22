@@ -20,18 +20,28 @@
     el.className = 'msg' + (kind ? ' ' + kind : '');
   }
 
-  // Dashboard: headset → Stash check, copy buttons, reindex.
+  // Players page: health details, headset check, copy, reindex.
+  const toggle = $('#health-toggle');
+  const detail = $('#health-detail');
+  if (toggle && detail) {
+    toggle.addEventListener('click', () => {
+      const open = detail.hidden;
+      detail.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.querySelector('.more').textContent = open ? 'Hide details' : 'Details';
+    });
+  }
   const headset = $('#headset-check');
   if (headset && headset.dataset.cover) {
     const img = new Image();
-    img.onload = () => { headset.innerHTML = '<span class="pill ok">Reachable</span> this device can load covers from Stash'; };
-    img.onerror = () => { headset.innerHTML = '<span class="pill err">Unreachable</span> this device cannot load images from Stash. Check that your headset can reach the Stash host, and that Stash is served over HTTPS if this page is.'; };
+    img.onload = () => { headset.textContent = 'Yes, this device can load covers from Stash.'; };
+    img.onerror = () => { headset.textContent = 'No. This device cannot load images from Stash. Check that it can reach the Stash host, and that Stash uses https if this page does.'; };
     img.src = headset.dataset.cover;
   }
   document.querySelectorAll('[data-copy]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(btn.dataset.copy); btn.textContent = 'Copied'; }
-      catch (e) { btn.textContent = 'Select and copy'; }
+      catch (e) { btn.textContent = 'Select the address'; }
       setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
     });
   });
@@ -39,20 +49,17 @@
   if (reindex) {
     reindex.addEventListener('click', async () => {
       reindex.disabled = true;
-      setMsg($('#reindex-msg'), 'Rebuilding…');
+      setMsg($('#reindex-msg'), 'Rebuilding');
       try {
         const r = await api('POST', '/reindex');
-        $('#stat-sections').textContent = r.sections;
-        $('#stat-links').textContent = r.links;
-        $('#stat-scenes').textContent = r.scenes;
-        setMsg($('#reindex-msg'), 'Index rebuilt', 'ok');
+        setMsg($('#reindex-msg'), 'Rebuilt: ' + r.sections + ' sections, ' + r.scenes + ' scenes', 'ok');
       } catch (e) { setMsg($('#reindex-msg'), e.message, 'err'); }
       reindex.disabled = false;
     });
   }
 
-  // Settings form.
-  const form = $('#settings');
+  // Setup form.
+  const form = $('#setup');
   if (form) {
     const read = () => ({
       stash_graphql_url: form.stash_graphql_url.value.trim(),
@@ -65,7 +72,7 @@
       log_level: form.log_level.value,
     });
     $('#test').addEventListener('click', async () => {
-      setMsg($('#test-msg'), 'Testing…');
+      setMsg($('#test-msg'), 'Testing');
       try {
         const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: form.stash_api_key.value });
         setMsg($('#test-msg'), r.ok ? 'Connected to Stash ' + r.stash_version : r.error, r.ok ? 'ok' : 'err');
@@ -73,17 +80,17 @@
     });
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      setMsg($('#save-msg'), 'Saving…');
+      setMsg($('#save-msg'), 'Saving');
       try {
         const cfg = await api('PUT', '/config', read());
         form.stash_api_key.value = '';
-        form.stash_api_key.placeholder = cfg.stash_api_key_set ? 'set, leave blank to keep' : 'paste the key from Stash → Settings → Security';
+        form.stash_api_key.placeholder = cfg.stash_api_key_set ? 'set, leave blank to keep' : 'paste the key from Stash, Settings, Security';
         setMsg($('#save-msg'), 'Saved and applied', 'ok');
       } catch (e) { setMsg($('#save-msg'), e.message, 'err'); }
     });
   }
 
-  // Filters page: drag to reorder, save, reset.
+  // Sections page: drag to reorder, save, reset.
   const tbody = $('#rows');
   if (tbody) {
     let dragRow = null;
@@ -134,12 +141,12 @@
       disabled: !tr.querySelector('.enabled').checked,
     }));
     $('#save-filters').addEventListener('click', async () => {
-      setMsg($('#filters-msg'), 'Saving…');
+      setMsg($('#filters-msg'), 'Saving');
       try { await api('PUT', '/filters', rows()); setMsg($('#filters-msg'), 'Saved. Players pick it up on their next index load.', 'ok'); }
       catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
     });
     $('#reset-filters').addEventListener('click', async () => {
-      setMsg($('#filters-msg'), 'Resetting…');
+      setMsg($('#filters-msg'), 'Resetting');
       try { await api('PUT', '/filters', []); location.reload(); }
       catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
     });

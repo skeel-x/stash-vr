@@ -3,27 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{.Title}} · Stash-VR</title>
+  <title>{{.Title}} - Stash-VR</title>
   <link rel="icon" href="/icon.png" type="image/png">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-<header class="top">
+<header class="bar">
   <a class="brand" href="/"><img src="/icon.png" alt="">Stash-VR</a>
   <nav>
-    <a href="/"{{if eq .Active "dashboard"}} class="active"{{end}}>Dashboard</a>
-    <a href="/settings"{{if eq .Active "settings"}} class="active"{{end}}>Settings</a>
-    <a href="/filters"{{if eq .Active "filters"}} class="active"{{end}}>Filters</a>
+    <a href="/"{{if eq .Active "launch"}} aria-current="page"{{end}}>Players</a>
+    <a href="/setup"{{if eq .Active "setup"}} aria-current="page"{{end}}>Setup</a>
+    <a href="/sections"{{if eq .Active "sections"}} aria-current="page"{{end}}>Sections</a>
   </nav>
-  <span class="version" title="Stash-VR version">{{.Version}}</span>
 </header>
 <main>
 {{template "content" .}}
 </main>
-<footer>
-  <a href="https://github.com/o-fl0w/stash-vr" target="_blank" rel="noopener">o-fl0w/stash-vr</a>
-  · Playa integration by RGinting367
-</footer>
+<footer>Stash-VR {{.Version}}</footer>
 <script src="/app.js"></script>
 </body>
 </html>{{end}}

@@ -13,6 +13,7 @@ type PlayerLinks struct {
 	Base       string `json:"base"`
 	HereSphere string `json:"heresphere"`
 	DeoVR      string `json:"deovr"`
+	DeoVRApi   string `json:"deovr_api"`
 	Playa      string `json:"playa"`
 	PlainHTTP  bool   `json:"plain_http"`
 }
@@ -23,6 +24,7 @@ func LinksFor(req *http.Request) PlayerLinks {
 		Base:       base,
 		HereSphere: base + "/heresphere",
 		DeoVR:      base,
+		DeoVRApi:   base + "/deovr",
 		Playa:      base,
 		PlainHTTP:  strings.HasPrefix(base, "http://"),
 	}

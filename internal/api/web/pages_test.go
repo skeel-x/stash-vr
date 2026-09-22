@@ -23,7 +23,7 @@ func getPage(t *testing.T, h http.Handler, path string, headers map[string]strin
 	return rec
 }
 
-func TestDashboard_RendersPlayerLinksFromForwardedProto(t *testing.T) {
+func TestPlayers_RendersLaunchLinksFromForwardedProto(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)
 
@@ -33,9 +33,17 @@ func TestDashboard_RendersPlayerLinksFromForwardedProto(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("status %d", rec.Code)
 	}
-	for _, want := range []string{"Connect your player", "https://vr.example/heresphere", "v0.31.1", `href="/settings"`} {
+	for _, want := range []string{
+		"Open your library",
+		`href="https://vr.example/heresphere"`,
+		`href="https://vr.example/deovr"`,
+		`data-copy="https://vr.example/heresphere"`,
+		`data-copy="https://vr.example"`,
+		"Connected to Stash v0.31.1",
+		`href="/setup"`,
+	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("dashboard missing %q", want)
+			t.Errorf("players page missing %q", want)
 		}
 	}
 	// The keyed sample cover URL is allowed exactly once, inside the
@@ -46,62 +54,73 @@ func TestDashboard_RendersPlayerLinksFromForwardedProto(t *testing.T) {
 	if !strings.Contains(body, `data-cover="http://stash:9999/scene/1/screenshot?apikey=secret"`) {
 		t.Fatal("expected the keyed sample cover only in the data-cover attribute")
 	}
-	// It embeds the keyed cover URL, so the page must not be cached.
 	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
 		t.Fatalf("expected Cache-Control no-store, got %q", cc)
 	}
 }
 
-func TestDashboard_WarnsAboutPlainHttpForDeoVR(t *testing.T) {
+func TestPlayers_WarnsAboutPlainHttpForDeoVR(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)
 
 	rec := getPage(t, h, "/", map[string]string{"Host": "10.0.0.2:9666"})
 
-	if !strings.Contains(rec.Body.String(), "DeoVR does not load covers over plain HTTP") {
-		t.Fatal("expected plain-http warning for DeoVR")
+	if !strings.Contains(rec.Body.String(), "Covers stay blank in DeoVR over plain http") {
+		t.Fatal("expected plain-http note for DeoVR")
 	}
 }
 
-func TestDashboard_ShowsTroubleshootingWhenStashUnreachable(t *testing.T) {
+func TestPlayers_BlockedWhenStashUnreachable(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{versionErr: errors.New("dial tcp: connection refused")})
 	h := PagesRouter(lib)
 
 	rec := getPage(t, h, "/", nil)
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "Stash-VR cannot reach Stash") {
-		t.Fatal("expected the troubleshooting box when Stash is unreachable")
+	if !strings.Contains(body, "Players can't see a library yet") {
+		t.Fatal("expected the blocked block when Stash is unreachable")
 	}
-	if strings.Contains(body, "Connect your player") {
-		t.Fatal("player cards must be hidden when Stash is unreachable")
+	if strings.Contains(body, "Open your library") {
+		t.Fatal("launch strips must be hidden when Stash is unreachable")
 	}
 }
 
-func TestSettings_RendersFormWithoutApiKey(t *testing.T) {
+func TestSetup_RendersFormWithoutApiKey(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)
 
-	rec := getPage(t, h, "/settings", nil)
+	rec := getPage(t, h, "/setup", nil)
 
 	body := rec.Body.String()
 	for _, want := range []string{`name="stash_graphql_url"`, `name="stash_api_key"`, `name="log_level"`, "leave blank to keep"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("settings missing %q", want)
+			t.Errorf("setup missing %q", want)
 		}
 	}
 	if strings.Contains(body, "secret") {
-		t.Fatal("settings page leaked the api key")
+		t.Fatal("setup page leaked the api key")
 	}
 }
 
-func TestFilters_RendersPage(t *testing.T) {
+func TestSections_RendersPage(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)
 
-	rec := getPage(t, h, "/filters", nil)
+	rec := getPage(t, h, "/sections", nil)
 
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Filter overrides") {
-		t.Fatalf("expected filters page, got %d", rec.Code)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Reset to Stash order") {
+		t.Fatalf("expected sections page, got %d", rec.Code)
+	}
+}
+
+func TestOldRoutes_Redirect(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	for old, want := range map[string]string{"/settings": "/setup", "/filters": "/sections"} {
+		rec := getPage(t, h, old, nil)
+		if rec.Code != http.StatusMovedPermanently || rec.Header().Get("Location") != want {
+			t.Errorf("%s: expected 301 to %s, got %d %q", old, want, rec.Code, rec.Header().Get("Location"))
+		}
 	}
 }
