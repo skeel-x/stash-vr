@@ -198,6 +198,20 @@
   if (tbody) {
     makeSortable(tbody);
     const players = ['heresphere', 'deovr', 'playa'];
+    // The first row shown in HereSphere is where the player lands; keep
+    // the badge on it as rows are reordered or unticked.
+    const markLanding = () => {
+      let found = false;
+      tbody.querySelectorAll('tr').forEach((tr) => {
+        const first = !found && tr.querySelector('.show-heresphere').checked;
+        tr.querySelector('.landing').hidden = !first;
+        if (first) found = true;
+      });
+    };
+    tbody.addEventListener('change', (e) => { if (e.target.classList.contains('show-heresphere')) markLanding(); });
+    tbody.addEventListener('dragend', markLanding);
+    tbody.addEventListener('touchend', markLanding);
+    markLanding();
     const rows = () => Array.from(tbody.querySelectorAll('tr')).map((tr) => {
       const on = players.filter((p) => tr.querySelector('.show-' + p).checked);
       const off = players.filter((p) => !on.includes(p));

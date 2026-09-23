@@ -269,3 +269,21 @@ func TestLog_RendersPage(t *testing.T) {
 		}
 	}
 }
+
+func TestSections_MarksLandingRow(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.Filters = append(cfg.Filters, config.Filter{ID: "smart:toprated"})
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/sections", nil).Body.String()
+
+	shown := strings.Count(body, `class="badge landing" title="HereSphere opens on this section">Opens first`)
+	hidden := strings.Count(body, `class="badge landing" title="HereSphere opens on this section" hidden>`)
+	if shown != 1 || hidden < 1 {
+		t.Fatalf("expected exactly one visible landing badge and the rest hidden, got %d visible, %d hidden", shown, hidden)
+	}
+}
