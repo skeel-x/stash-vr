@@ -135,6 +135,9 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `DEOVR_AUTOLOAD`
   * Default: `true`
   * Answer DeoVR's browser on the front page with the library document. Runtime name: `deovr_autoload`.
+* `FUNSCRIPT_INDEX_PATH`
+  * Default: empty (off)
+  * Absolute path to the timestampTrade plugin's `funscript_index.sqlite`; scripts it lists for a scene are offered as alternates in HereSphere. Runtime name: `funscript_index_path`.
 
 </details>
 
@@ -205,6 +208,21 @@ Changes reflect in HereSphere when videos are re-opened.
 #### Favorites
 
 When the favorite-feature of HereSphere is first used Stash-VR will create a tag in Stash named according to `FAVORITE_TAG` (set in docker env., defaults to `FAVORITE`) and apply that tag to your scene.
+
+#### Funscript variants
+
+Stash-VR lists every funscript it finds next to a scene's video in
+HereSphere's script picker. `<video>.funscript` is "Standard"; a file
+named `<video>.ai.funscript`, `<video>_v2.funscript` or
+`<video> alternate 1.funscript` shows as "AI", "V2" or "Alternate 1".
+Multi-axis companion scripts (`.roll`, `.pitch`, `.twist`, `.sway`,
+`.surge`, `.L1`, `.L2`, `.R0`-`.R2`) are not listed.
+
+If you use the timestampTrade plugin, set `funscript_index_path` in Setup
+(or `FUNSCRIPT_INDEX_PATH`) to its `funscript_index.sqlite`; scripts it
+lists for a scene appear as "Alternate 1", "Alternate 2", ... with the
+creator's name when known. Copies identical to a script already listed
+are skipped. Variants are rescanned every five minutes or on Rebuild index.
 
 ### DeoVR
 
