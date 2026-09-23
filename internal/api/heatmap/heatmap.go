@@ -89,7 +89,7 @@ func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 		}
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	img, format, err := image.Decode(resp.Body)
 	if err != nil {
@@ -111,7 +111,7 @@ func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, bo
 	if err != nil {
 		return "", nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	ct := resp.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "image/jpeg") || strings.HasPrefix(ct, "image/png") {

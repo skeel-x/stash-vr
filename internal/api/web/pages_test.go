@@ -259,7 +259,7 @@ func TestSetup_RendersVideoRulesAndProfiles(t *testing.T) {
 
 func TestLog_RendersPage(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
-	fmt.Fprintln(logger.Tail, "hello from the log")
+	_, _ = fmt.Fprintln(logger.Tail, "hello from the log")
 	h := PagesRouter(lib)
 
 	body := getPage(t, h, "/log", nil).Body.String()
