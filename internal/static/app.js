@@ -95,9 +95,9 @@
     });
   }
 
-  // Sections page: drag to reorder, save, reset.
-  const tbody = $('#rows');
-  if (tbody) {
+  // makeSortable lets the rows of tbody be reordered by dragging their
+  // .handle, with mouse or touch.
+  function makeSortable(tbody) {
     let dragRow = null;
     tbody.addEventListener('dragstart', (e) => {
       const handle = e.target.closest('.handle');
@@ -139,7 +139,44 @@
     const endTouch = () => { if (touchRow) touchRow.classList.remove('dragging'); touchRow = null; };
     tbody.addEventListener('touchend', endTouch);
     tbody.addEventListener('touchcancel', endTouch);
+  }
 
+  // Setup page: video rules table.
+  const rulesBody = $('#rules');
+  if (rulesBody) {
+    makeSortable(rulesBody);
+    const ruleRows = () => Array.from(rulesBody.querySelectorAll('tr[data-rule]')).map((tr) => ({
+      tag: tr.querySelector('.tag').value.trim(),
+      projection: tr.querySelector('.projection').value,
+      stereo: tr.querySelector('.stereo').value,
+      fov: Number(tr.querySelector('.fov').value || 0),
+      lens: tr.querySelector('.lens').value,
+      passthrough: tr.querySelector('.passthrough').checked,
+      profile: tr.querySelector('.profile').value,
+    }));
+    rulesBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('.remove');
+      if (btn) btn.closest('tr').remove();
+    });
+    $('#add-rule').addEventListener('click', () => {
+      rulesBody.appendChild($('#rule-template').content.firstElementChild.cloneNode(true));
+    });
+    $('#save-rules').addEventListener('click', async () => {
+      setMsg($('#rules-msg'), 'Saving');
+      try { await api('PUT', '/video-rules', ruleRows()); setMsg($('#rules-msg'), 'Saved. Scenes use the new rules when opened next.', 'ok'); }
+      catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
+    });
+    $('#reset-rules').addEventListener('click', async () => {
+      setMsg($('#rules-msg'), 'Resetting');
+      try { await api('PUT', '/video-rules', []); location.reload(); }
+      catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
+    });
+  }
+
+  // Sections page: drag to reorder, save, reset.
+  const tbody = $('#rows');
+  if (tbody) {
+    makeSortable(tbody);
     const rows = () => Array.from(tbody.querySelectorAll('tr')).map((tr) => ({
       id: tr.dataset.id,
       name: tr.querySelector('.name').value.trim(),

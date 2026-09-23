@@ -33,21 +33,22 @@ const (
 // ConfigView is the settings as sent to the browser: the API key is replaced
 // by a flag.
 type ConfigView struct {
-	StashGraphQLUrl    string          `json:"stash_graphql_url"`
-	StashApiKeySet     bool            `json:"stash_api_key_set"`
-	FavoriteTag        string          `json:"favorite_tag"`
-	ExcludeSortName    string          `json:"exclude_sort_name"`
-	GenerateSummaryIds bool            `json:"generate_summary_ids"`
-	HeatmapHeightPx    int             `json:"heatmap_height_px"`
-	ForceHTTPS         bool            `json:"force_https"`
-	BasePath           string          `json:"base_path"`
-	DeovrAutoload      bool            `json:"deovr_autoload"`
-	FunscriptIndexPath string          `json:"funscript_index_path"`
-	LogLevel           string          `json:"log_level"`
-	SmartSectionSize   int             `json:"smart_section_size"`
-	ListenAddress      string          `json:"listen_address"`
-	ConfigPath         string          `json:"config_path"`
-	Filters            []config.Filter `json:"filters"`
+	StashGraphQLUrl    string             `json:"stash_graphql_url"`
+	StashApiKeySet     bool               `json:"stash_api_key_set"`
+	FavoriteTag        string             `json:"favorite_tag"`
+	ExcludeSortName    string             `json:"exclude_sort_name"`
+	GenerateSummaryIds bool               `json:"generate_summary_ids"`
+	HeatmapHeightPx    int                `json:"heatmap_height_px"`
+	ForceHTTPS         bool               `json:"force_https"`
+	BasePath           string             `json:"base_path"`
+	DeovrAutoload      bool               `json:"deovr_autoload"`
+	FunscriptIndexPath string             `json:"funscript_index_path"`
+	LogLevel           string             `json:"log_level"`
+	SmartSectionSize   int                `json:"smart_section_size"`
+	ListenAddress      string             `json:"listen_address"`
+	ConfigPath         string             `json:"config_path"`
+	Filters            []config.Filter    `json:"filters"`
+	VideoRules         []config.VideoRule `json:"video_rules"`
 }
 
 // configInput is what PUT /config accepts. An empty StashApiKey keeps the
@@ -95,6 +96,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		ListenAddress:      cfg.ListenAddress,
 		ConfigPath:         config.FilePath(cfg),
 		Filters:            cfg.Filters,
+		VideoRules:         cfg.VideoRules,
 	}
 }
 
@@ -115,6 +117,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Put("/config", h.putConfig)
 	r.Post("/config/test", h.testConfig)
 	r.Put("/filters", h.putFilters)
+	r.Put("/video-rules", h.putVideoRules)
 	r.Post("/reindex", h.reindex)
 	return r
 }
@@ -319,6 +322,31 @@ func (h *apiHandler) putFilters(w http.ResponseWriter, r *http.Request) {
 	}
 	h.lib.ResetSections()
 	writeJson(ctx, w, map[string]any{"filters": saved.Filters})
+}
+
+// putVideoRules replaces the rules table. An empty list restores the
+// defaults so "Reset to defaults" needs no separate endpoint.
+func (h *apiHandler) putVideoRules(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	in, err := internal.UnmarshalBody[[]config.VideoRule](r)
+	if err != nil {
+		writeError(ctx, w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
+		return
+	}
+	if len(in) == 0 {
+		in = config.DefaultVideoRules()
+	}
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+
+	cfg := config.Application()
+	cfg.VideoRules = in
+	saved, err := config.Set(cfg)
+	if err != nil {
+		writeError(ctx, w, settingsErrorCode(err), err.Error())
+		return
+	}
+	writeJson(ctx, w, map[string]any{"video_rules": saved.VideoRules})
 }
 
 func (h *apiHandler) reindex(w http.ResponseWriter, r *http.Request) {

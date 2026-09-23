@@ -214,3 +214,19 @@ func TestPlayers_DeoVRUserAgentGetsHtmlWhenAutoloadOff(t *testing.T) {
 		t.Fatalf("expected HTML with autoload off, got %q", ct)
 	}
 }
+
+func TestSetup_RendersVideoRulesAndProfiles(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	if err := lib.SaveProfile("11649", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/setup", nil).Body.String()
+
+	for _, want := range []string{"Video rules", `data-rule`, `value="DOME"`, `value="Augmented Reality"`, `<option value="11649"`, "Profiles stored: 1", `id="save-rules"`, `id="reset-rules"`, `id="add-rule"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+}

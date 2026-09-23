@@ -530,3 +530,46 @@ func TestPutConfig_PersistsFunscriptIndexPath(t *testing.T) {
 		t.Fatalf("expected 400 for a relative path, got %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestPutVideoRules_RoundTripAndValidation(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	rules := []map[string]any{
+		{"tag": "DOME", "projection": "equirectangular", "stereo": "sbs"},
+		{"tag": "Passthrough", "passthrough": true, "profile": "11649"},
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/video-rules", rules)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200, got %d %s", rec.Code, rec.Body.String())
+	}
+	saved, _ := out["video_rules"].([]any)
+	if len(saved) != 2 || config.Application().VideoRules[1].Profile != "11649" {
+		t.Fatalf("expected 2 rules stored, got %v / %+v", out, config.Application().VideoRules)
+	}
+	_, cfgOut := do(t, h, http.MethodGet, "/config", nil)
+	if got, _ := cfgOut["video_rules"].([]any); len(got) != 2 {
+		t.Fatalf("expected GET /config to list the rules, got %v", cfgOut["video_rules"])
+	}
+
+	// A settings save must not touch the rules table.
+	rec, _ = do(t, h, http.MethodPut, "/config", map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "log_level": "info",
+	})
+	if rec.Code != 200 || len(config.Application().VideoRules) != 2 {
+		t.Fatalf("expected PUT /config to keep the 2 rules, got %d %+v", rec.Code, config.Application().VideoRules)
+	}
+
+	rec, _ = do(t, h, http.MethodPut, "/video-rules", []map[string]any{{"tag": "X", "projection": "dome"}})
+	if rec.Code != 400 {
+		t.Fatalf("expected 400 for a bad projection, got %d", rec.Code)
+	}
+	if len(config.Application().VideoRules) != 2 {
+		t.Fatal("a rejected PUT must not change the stored rules")
+	}
+
+	rec, out = do(t, h, http.MethodPut, "/video-rules", []any{})
+	if rec.Code != 200 || len(config.Application().VideoRules) != 13 {
+		t.Fatalf("expected an empty PUT to restore the %d defaults, got %d %v", 13, rec.Code, out)
+	}
+}

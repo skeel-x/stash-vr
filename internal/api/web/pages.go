@@ -32,6 +32,13 @@ type FilterRow struct {
 	Smart      bool
 }
 
+// ProfileOption is a stored HereSphere profile offered to a video rule; the
+// title is empty when the scene could not be looked up.
+type ProfileOption struct {
+	ID    string
+	Title string
+}
+
 type pageData struct {
 	Title       string
 	Base        string
@@ -43,6 +50,31 @@ type pageData struct {
 	LogLevels   []string
 	FilterRows  []FilterRow
 	FilterError string
+	VideoRules  []config.VideoRule
+	Profiles    []ProfileOption
+	Projections []string
+	Stereos     []string
+	Lenses      []string
+}
+
+// ruleRow is what the rule-row template renders: one rule with the option
+// lists its selects offer.
+type ruleRow struct {
+	Rule        config.VideoRule
+	Projections []string
+	Stereos     []string
+	Lenses      []string
+	Profiles    []ProfileOption
+}
+
+// Row binds a rule to the page's option lists for the rule-row template.
+func (d pageData) Row(r config.VideoRule) ruleRow {
+	return ruleRow{Rule: r, Projections: d.Projections, Stereos: d.Stereos, Lenses: d.Lenses, Profiles: d.Profiles}
+}
+
+// EmptyRow is the blank row the "Add rule" button clones.
+func (d pageData) EmptyRow() ruleRow {
+	return d.Row(config.VideoRule{})
 }
 
 type pageHandler struct {
@@ -105,7 +137,20 @@ func (h pageHandler) players(w http.ResponseWriter, r *http.Request) {
 
 func (h pageHandler) setup(w http.ResponseWriter, r *http.Request) {
 	data := h.base(r, "Setup", "setup")
-	data.Config = MaskedConfig(config.Application())
+	cfg := config.Application()
+	data.Config = MaskedConfig(cfg)
+	data.VideoRules = cfg.VideoRules
+	data.Projections = []string{"equirectangular", "equirectangular360", "fisheye", "cubemap", "equiangularCubemap", "perspective"}
+	data.Stereos = []string{"mono", "sbs", "tb"}
+	data.Lenses = []string{"MKX200", "MKX220", "VRCA220"}
+	// A scene that cannot be looked up is still listed by its id.
+	for _, id := range h.lib.ListProfiles() {
+		title := ""
+		if vd, err := h.lib.GetScene(r.Context(), id, false); err == nil {
+			title = vd.Title()
+		}
+		data.Profiles = append(data.Profiles, ProfileOption{ID: id, Title: title})
+	}
 	render(w, r, setupTmpl, data)
 }
 

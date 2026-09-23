@@ -118,6 +118,11 @@ table.sections th{text-align:left;color:var(--muted);font-weight:500;font-size:1
 table.sections td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle;min-height:56px}
 table.sections td input.name{margin:0;min-height:48px}
 table.sections td input.enabled{width:26px;height:26px}
+table.rules td{padding:6px 4px}
+table.rules input,table.rules select{margin:0;min-width:0;width:100%;min-height:48px;padding:0 8px}
+table.rules .fov{width:5rem}
+table.rules .passthrough{width:26px;height:26px}
+table.rules .remove{min-height:44px;padding:0 12px;font-size:20px;line-height:1}
 .handle{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:6px;color:var(--muted);cursor:grab;user-select:none;touch-action:none;font-size:22px}
 .handle:hover{background:var(--raised)}
 tr.dragging{opacity:.5}
@@ -126,6 +131,6 @@ tr.dragging{opacity:.5}
 @media (max-width:560px){
   .bar{flex-wrap:wrap}
   .launch .action{font-size:28px}
-  table.sections th:nth-child(3),table.sections td:nth-child(3){display:none}
+  table.sections:not(.rules) th:nth-child(3),table.sections:not(.rules) td:nth-child(3){display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
