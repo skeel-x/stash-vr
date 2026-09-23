@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/config"
+	"stash-vr/internal/hsp"
 	"stash-vr/internal/library"
 	"stash-vr/internal/logger"
 	"stash-vr/internal/stash"
@@ -163,6 +166,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Post("/config/test", h.testConfig)
 	r.Put("/filters", h.putFilters)
 	r.Put("/video-rules", h.putVideoRules)
+	r.Get("/profiles/{id}", h.getProfile)
 	r.Post("/reindex", h.reindex)
 	r.Get("/log", h.getLog)
 	r.Get("/random", h.getRandom)
@@ -468,4 +472,93 @@ func (h *apiHandler) getRandom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJson(ctx, w, map[string]any{"scenes": scenes})
+}
+
+// profileView is a stored HereSphere profile's screen and background
+// settings, keyed like the video rule fields they fill in.
+type profileView struct {
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	PositionX       *float64 `json:"position_x,omitempty"`
+	PositionY       *float64 `json:"position_y,omitempty"`
+	PositionZ       *float64 `json:"position_z,omitempty"`
+	Pitch           *float64 `json:"pitch,omitempty"`
+	Yaw             *float64 `json:"yaw,omitempty"`
+	Roll            *float64 `json:"roll,omitempty"`
+	ZoomX           *float64 `json:"zoom_x,omitempty"`
+	ZoomY           *float64 `json:"zoom_y,omitempty"`
+	PanX            *float64 `json:"pan_x,omitempty"`
+	PanY            *float64 `json:"pan_y,omitempty"`
+	OriginX         *float64 `json:"origin_x,omitempty"`
+	OriginY         *float64 `json:"origin_y,omitempty"`
+	OriginZ         *float64 `json:"origin_z,omitempty"`
+	Background      string   `json:"background,omitempty"`
+	BackgroundColor string   `json:"background_color,omitempty"`
+	Mask            string   `json:"mask,omitempty"`
+}
+
+// getProfile decodes the profile stored for a scene so the setup page can
+// copy its screen settings into a rule.
+func (h *apiHandler) getProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+	if !h.lib.HasProfile(id) {
+		writeError(ctx, w, http.StatusNotFound, "no profile stored for scene "+id)
+		return
+	}
+	data, err := os.ReadFile(h.lib.ProfilePath(id))
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	p, err := hsp.Decode(data)
+	if err != nil {
+		writeError(ctx, w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	writeJson(ctx, w, profileValues(id, p))
+}
+
+var (
+	profileBackgrounds = map[uint8]string{hsp.BackgroundGlobal: "global", hsp.BackgroundColor: "color", hsp.BackgroundPassthrough: "passthrough"}
+	profileMasks       = map[uint8]string{hsp.MaskNone: "none", hsp.MaskChromaKey: "chroma", hsp.MaskAlphaPacked: "alpha"}
+)
+
+// profileValues takes the first keyframe of each section; a section the
+// profile lacks leaves its fields unset.
+func profileValues(id string, p *hsp.Profile) profileView {
+	v := profileView{ID: id, Title: p.Title}
+	if len(p.Alignment) > 0 {
+		a := p.Alignment[0]
+		v.PositionX, v.PositionY, v.PositionZ = num(a.Position.X), num(a.Position.Y), num(a.Position.Z)
+		v.Pitch, v.Yaw, v.Roll = num(a.Rotation.Pitch), num(a.Rotation.Yaw), num(a.Rotation.Roll)
+	}
+	if len(p.Format) > 0 {
+		f := p.Format[0]
+		v.ZoomX, v.ZoomY, v.PanX, v.PanY = num(f.Zoom.X), num(f.Zoom.Y), num(f.Pan.X), num(f.Pan.Y)
+	}
+	if len(p.Origin) > 0 {
+		o := p.Origin[0].Origin
+		v.OriginX, v.OriginY, v.OriginZ = num(o.X), num(o.Y), num(o.Z)
+	}
+	if len(p.Environment) > 0 {
+		e := p.Environment[0]
+		v.Background = profileBackgrounds[e.Background]
+		v.Mask = profileMasks[e.Mask]
+		if e.Background == hsp.BackgroundColor {
+			v.BackgroundColor = e.BackgroundColor.Hex()
+		}
+	}
+	return v
+}
+
+// num widens a stored float32 to the shortest float64 that prints the
+// same, so 4.7806 does not come back as 4.780600070953369. NaN and
+// infinities, which JSON cannot carry, stay unset.
+func num(f float32) *float64 {
+	if math.IsNaN(float64(f)) || math.IsInf(float64(f), 0) {
+		return nil
+	}
+	v, _ := strconv.ParseFloat(strconv.FormatFloat(float64(f), 'g', -1, 32), 64)
+	return &v
 }

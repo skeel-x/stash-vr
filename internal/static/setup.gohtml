@@ -108,5 +108,19 @@
           <label class="field">Profile<select class="profile"><option value="">none</option>{{range .Profiles}}<option value="{{.ID}}"{{if eq .ID $r.Profile}} selected{{end}}>{{.ID}}{{if .Title}} {{.Title}}{{end}}</option>{{end}}</select></label>
           <label class="field check"><input class="passthrough" type="checkbox" {{if $r.Passthrough}}checked{{end}}> Passthrough</label>
         </div>
+        <details class="rule-screen"{{if .ScreenOpen}} open{{end}}>
+          <summary>Screen and background</summary>
+          <p class="hint">Values use HereSphere's own units. The easiest way to get them right is to adjust a scene in HereSphere, save it, then copy from that saved profile. Blank fields stay unchanged.</p>
+          <div class="rule-fields geometry">
+            {{range .Geometry}}<label class="field">{{.Label}}<input class="geom" data-key="{{.Key}}" type="number" step="any" value="{{.Value}}" placeholder="unchanged"></label>
+            {{end}}<label class="field">Background<select class="background"><option value="">unchanged</option><option value="global"{{if eq $r.Background "global"}} selected{{end}}>global setting</option><option value="color"{{if eq $r.Background "color"}} selected{{end}}>color</option><option value="passthrough"{{if eq $r.Background "passthrough"}} selected{{end}}>passthrough</option></select></label>
+            <label class="field">Background color<input class="background-color" type="color" value="{{.BackgroundColor}}" aria-label="Background color, used with the color background"></label>
+            <label class="field">Mask<select class="mask"><option value="">unchanged</option><option value="none"{{if eq $r.Mask "none"}} selected{{end}}>none</option><option value="alpha"{{if eq $r.Mask "alpha"}} selected{{end}}>alpha packed</option><option value="chroma"{{if eq $r.Mask "chroma"}} selected{{end}}>chroma key</option></select></label>
+          </div>
+          <div class="row copy-row">
+            <select class="copy-profile" aria-label="Copy from a saved profile"{{if not .Profiles}} disabled{{end}}><option value="">Copy from a saved profile</option>{{range .Profiles}}<option value="{{.ID}}">{{.ID}}{{if .Title}} {{.Title}}{{end}}</option>{{end}}</select>
+            <span class="msg"></span>
+          </div>
+        </details>
       </div>
 {{end}}

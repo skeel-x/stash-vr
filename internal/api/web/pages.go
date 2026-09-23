@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -94,6 +95,51 @@ type ruleRow struct {
 // Row binds a rule to the page's option lists for the rule-row template.
 func (d pageData) Row(r config.VideoRule) ruleRow {
 	return ruleRow{Rule: r, Projections: d.Projections, Stereos: d.Stereos, Lenses: d.Lenses, Profiles: d.Profiles}
+}
+
+// geometryField is one number input of a rule's "Screen and background"
+// group; Key is the rule's JSON field.
+type geometryField struct {
+	Key   string
+	Label string
+	Value string
+}
+
+// Geometry lists the rule's screen fields in display order, blank when
+// unset.
+func (r ruleRow) Geometry() []geometryField {
+	v := &r.Rule
+	fields := []struct {
+		key, label string
+		value      *float64
+	}{
+		{"position_x", "Position X", v.PositionX}, {"position_y", "Position Y", v.PositionY}, {"position_z", "Position Z", v.PositionZ},
+		{"pitch", "Pitch", v.Pitch}, {"yaw", "Yaw", v.Yaw}, {"roll", "Roll", v.Roll},
+		{"zoom_x", "Zoom X", v.ZoomX}, {"zoom_y", "Zoom Y", v.ZoomY},
+		{"pan_x", "Pan X", v.PanX}, {"pan_y", "Pan Y", v.PanY},
+		{"origin_x", "Origin X", v.OriginX}, {"origin_y", "Origin Y", v.OriginY}, {"origin_z", "Origin Z", v.OriginZ},
+	}
+	out := make([]geometryField, len(fields))
+	for i, f := range fields {
+		out[i] = geometryField{Key: f.key, Label: f.label}
+		if f.value != nil {
+			out[i].Value = strconv.FormatFloat(*f.value, 'f', -1, 64)
+		}
+	}
+	return out
+}
+
+// ScreenOpen reports whether the rule's "Screen and background" group
+// starts expanded: only when something in it is set.
+func (r ruleRow) ScreenOpen() bool { return r.Rule.HasGeometry() }
+
+// BackgroundColor is the colour input's value; a colour input cannot be
+// blank, so an unset colour shows black.
+func (r ruleRow) BackgroundColor() string {
+	if r.Rule.BackgroundColor == "" {
+		return "#000000"
+	}
+	return strings.ToLower(r.Rule.BackgroundColor)
 }
 
 // EmptyRow is the blank row the "Add rule" button clones.

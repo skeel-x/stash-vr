@@ -137,11 +137,18 @@ table.sections td input[type=checkbox]{width:26px;height:26px}
 .rule-fields .field select,.rule-fields .field input{margin:0;min-width:0;width:100%;min-height:44px;padding:0 8px;color:var(--text);font-size:16px}
 .rule-fields .field.check{flex-direction:row;align-items:center;gap:10px;align-self:end;min-height:44px;color:var(--text);font-size:16px}
 .rule-fields .field.check input{width:26px;height:26px;min-height:0;flex:none}
+.rule-screen{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}
+.rule-screen summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--muted);font-size:14px}
+.rule-screen[open] summary{color:var(--text)}
+.rule-screen .hint{margin:4px 0 0;color:var(--muted);font-size:14px}
+.rule-fields .field input[type=color]{padding:4px;cursor:pointer}
+.rule-screen .copy-row{margin-top:12px;flex-wrap:wrap}
+.rule-screen .copy-profile{margin:0;min-height:44px;max-width:100%}
 .handle{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:6px;color:var(--muted);cursor:grab;user-select:none;touch-action:none;font-size:22px}
 .handle:hover{background:var(--raised)}
 tr.dragging{opacity:.5}
 .id{margin-left:8px;color:var(--muted);font-size:14px}
-.badge{margin-left:8px;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;vertical-align:middle}
+.badge{display:inline-block;white-space:nowrap;margin-left:8px;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;vertical-align:middle}
 .badge.landing{color:var(--heresphere);border-color:currentColor}
 @media (max-width:560px){
   .bar{flex-wrap:wrap}

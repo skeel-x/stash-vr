@@ -337,3 +337,37 @@ func TestSections_MarksLandingRow(t *testing.T) {
 		t.Fatalf("expected exactly one visible landing badge and the rest hidden, got %d visible, %d hidden", shown, hidden)
 	}
 }
+
+func TestSetup_RendersScreenAndBackgroundGroup(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	if err := lib.SaveProfile("11649", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	y, zoom := 4.78, 1.5
+	cfg := config.Application()
+	cfg.VideoRules = []config.VideoRule{
+		{Tag: "Passthrough", Passthrough: true, PositionY: &y, ZoomX: &zoom, Background: "color", BackgroundColor: "#1a2b3c", Mask: "alpha"},
+		{Tag: "DOME", Projection: "equirectangular"},
+	}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/setup", nil).Body.String()
+
+	for _, want := range []string{
+		"Screen and background", `<details class="rule-screen" open>`, `<details class="rule-screen">`,
+		`data-key="position_y" type="number"`, `value="4.78"`, `data-key="zoom_x"`, `value="1.5"`, `data-key="origin_z"`,
+		`<option value="color" selected>`, `class="background-color" type="color" value="#1a2b3c"`, `<option value="alpha" selected>`,
+		`class="copy-profile"`, "Copy from a saved profile", "Values use HereSphere's own units.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	// Unset geometry renders blank, not 0.
+	if strings.Contains(body, `data-key="position_x" type="number" step="any" value="0"`) {
+		t.Error("unset position_x must render blank")
+	}
+}

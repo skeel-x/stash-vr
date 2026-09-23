@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 	"github.com/rs/zerolog"
 	"stash-vr/internal/config"
+	hspfile "stash-vr/internal/hsp"
 	"stash-vr/internal/library"
 	"stash-vr/internal/logger"
 )
@@ -803,5 +805,88 @@ func TestGetRandom_ReturnsScenesFromIndex(t *testing.T) {
 		if rec.Code != 400 {
 			t.Fatalf("expected 400 for n=%s, got %d", bad, rec.Code)
 		}
+	}
+}
+
+func TestGetProfile_ReturnsDecodedValues(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	p := hspfile.Default()
+	p.Title = "Captured"
+	p.Alignment[0].Position = hspfile.Vec3{X: 0, Y: 4.7806, Z: -1.5}
+	p.Alignment[0].Rotation = hspfile.Rotator{Pitch: 2, Yaw: -3, Roll: 0.5}
+	p.Format[0].Zoom = hspfile.Vec2{X: 1.25, Y: 1}
+	p.Format[0].Pan = hspfile.Vec2{X: 0.1, Y: 0}
+	p.Origin[0].Origin = hspfile.Vec3{X: -0.0627, Y: -0.0194, Z: 0.05}
+	p.Environment[0].Background = hspfile.BackgroundColor
+	p.Environment[0].BackgroundColor = hspfile.ColorFromHex("#1a2b3c")
+	p.Environment[0].Mask = hspfile.MaskAlphaPacked
+	data, err := hspfile.Encode(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lib.SaveProfile("11649", data); err != nil {
+		t.Fatal(err)
+	}
+
+	rec, out := do(t, h, http.MethodGet, "/profiles/11649", nil)
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	want := map[string]any{
+		"id": "11649", "title": "Captured",
+		"position_x": 0.0, "position_y": 4.7806, "position_z": -1.5, "pitch": 2.0, "yaw": -3.0, "roll": 0.5,
+		"zoom_x": 1.25, "zoom_y": 1.0, "pan_x": 0.1, "pan_y": 0.0, "origin_x": -0.0627, "origin_y": -0.0194, "origin_z": 0.05,
+		"background": "color", "background_color": "#1a2b3c", "mask": "alpha",
+	}
+	for k, v := range want {
+		if out[k] != v {
+			t.Errorf("%s = %v (%T), want %v", k, out[k], out[k], v)
+		}
+	}
+}
+
+func TestGetProfile_Errors(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	if err := lib.SaveProfile("12", []byte("not a profile")); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"/profiles/99", "/profiles/abc", "/profiles/..%2Fconfig.json"} {
+		if rec, _ := do(t, h, http.MethodGet, p, nil); rec.Code != 404 {
+			t.Errorf("%s: expected 404, got %d", p, rec.Code)
+		}
+	}
+	if rec, out := do(t, h, http.MethodGet, "/profiles/12", nil); rec.Code != http.StatusUnprocessableEntity || out["error"] == nil {
+		t.Fatalf("unreadable profile: %d %v", rec.Code, out)
+	}
+}
+
+func TestProfileValues_EnumsAndMissingSections(t *testing.T) {
+	p := hspfile.Default()
+	cases := []struct {
+		bg, mask         uint8
+		wantBg, wantMask string
+	}{
+		{hspfile.BackgroundGlobal, hspfile.MaskNone, "global", "none"},
+		{hspfile.BackgroundPassthrough, hspfile.MaskChromaKey, "passthrough", "chroma"},
+		{9, 9, "", ""},
+	}
+	for _, c := range cases {
+		p.Environment[0].Background, p.Environment[0].Mask = c.bg, c.mask
+		v := profileValues("1", p)
+		if v.Background != c.wantBg || v.Mask != c.wantMask {
+			t.Errorf("%d/%d: got %q/%q", c.bg, c.mask, v.Background, v.Mask)
+		}
+		if v.BackgroundColor != "" {
+			t.Errorf("colour only applies to a colour background, got %q", v.BackgroundColor)
+		}
+	}
+	p.Alignment[0].Position.X = float32(math.NaN())
+	if v := profileValues("1", p); v.PositionX != nil || v.PositionY == nil {
+		t.Fatalf("NaN must stay unset: %+v", v)
+	}
+	empty := profileValues("1", &hspfile.Profile{})
+	if empty.PositionX != nil || empty.ZoomX != nil || empty.OriginX != nil || empty.Background != "" {
+		t.Fatalf("missing sections must stay unset: %+v", empty)
 	}
 }

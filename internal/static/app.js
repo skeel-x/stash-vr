@@ -172,15 +172,49 @@
   const rulesBody = $('#rules');
   if (rulesBody) {
     makeSortable(rulesBody);
-    const ruleRows = () => Array.from(rulesBody.querySelectorAll('[data-rule]')).map((tr) => ({
-      tag: tr.querySelector('.tag').value.trim(),
-      projection: tr.querySelector('.projection').value,
-      stereo: tr.querySelector('.stereo').value,
-      fov: Number(tr.querySelector('.fov').value || 0),
-      lens: tr.querySelector('.lens').value,
-      passthrough: tr.querySelector('.passthrough').checked,
-      profile: tr.querySelector('.profile').value,
-    }));
+    // Blank screen fields are left out, so the rule keeps them unset.
+    const ruleRows = () => Array.from(rulesBody.querySelectorAll('[data-rule]')).map((tr) => {
+      const rule = {
+        tag: tr.querySelector('.tag').value.trim(),
+        projection: tr.querySelector('.projection').value,
+        stereo: tr.querySelector('.stereo').value,
+        fov: Number(tr.querySelector('.fov').value || 0),
+        lens: tr.querySelector('.lens').value,
+        passthrough: tr.querySelector('.passthrough').checked,
+        profile: tr.querySelector('.profile').value,
+      };
+      tr.querySelectorAll('.geom').forEach((input) => {
+        const v = input.value.trim();
+        if (v !== '') rule[input.dataset.key] = Number(v);
+      });
+      const background = tr.querySelector('.background').value;
+      if (background) rule.background = background;
+      if (background === 'color') rule.background_color = tr.querySelector('.background-color').value;
+      const mask = tr.querySelector('.mask').value;
+      if (mask) rule.mask = mask;
+      return rule;
+    });
+    // "Copy from a saved profile" fills the rule's screen fields from the
+    // decoded profile; nothing is saved until "Save rules".
+    rulesBody.addEventListener('change', async (e) => {
+      const select = e.target.closest('.copy-profile');
+      if (!select || !select.value) return;
+      const rule = select.closest('[data-rule]');
+      const msg = rule.querySelector('.copy-row .msg');
+      setMsg(msg, 'Loading');
+      try {
+        const p = await api('GET', '/profiles/' + encodeURIComponent(select.value));
+        rule.querySelectorAll('.geom').forEach((input) => {
+          const v = p[input.dataset.key];
+          input.value = v === undefined || v === null ? '' : String(v);
+        });
+        rule.querySelector('.background').value = p.background || '';
+        if (p.background_color) rule.querySelector('.background-color').value = p.background_color;
+        rule.querySelector('.mask').value = p.mask || '';
+        setMsg(msg, 'Copied from ' + (p.title || 'scene ' + p.id) + '. Save rules to keep it.', 'ok');
+      } catch (err) { setMsg(msg, err.message, 'err'); }
+      select.value = '';
+    });
     rulesBody.addEventListener('click', (e) => {
       const btn = e.target.closest('.remove');
       if (btn) btn.closest('[data-rule]').remove();
