@@ -18,6 +18,7 @@ const (
 	envKeyForceHTTPS         = "FORCE_HTTPS"
 	envKeyBasePath           = "BASE_PATH"
 	envKeyDeovrAutoload      = "DEOVR_AUTOLOAD"
+	envKeyFunscriptIndexPath = "FUNSCRIPT_INDEX_PATH"
 	envKeyHeatmapHeightPx    = "HEATMAP_HEIGHT_PX"
 	envKeyExcludeSortName    = "EXCLUDE_SORT_NAME"
 	envKeyUserConfigPath     = "CONFIG_PATH"
@@ -36,6 +37,7 @@ type ApplicationConfig struct {
 	ForceHTTPS         bool
 	BasePath           string
 	DeovrAutoload      bool
+	FunscriptIndexPath string
 	HeatmapHeightPx    int
 	SmartSectionSize   int
 	ExcludeSortName    string
@@ -75,6 +77,9 @@ func Init() error {
 	pflag.Bool(envKeyDeovrAutoload, true, "Send the DeoVR library when DeoVR's browser opens the front page")
 	_ = viper.BindPFlag(envKeyDeovrAutoload, pflag.Lookup(envKeyDeovrAutoload))
 
+	pflag.String(envKeyFunscriptIndexPath, "", "Path to the timestampTrade plugin's funscript_index.sqlite; its scripts are offered as alternates")
+	_ = viper.BindPFlag(envKeyFunscriptIndexPath, pflag.Lookup(envKeyFunscriptIndexPath))
+
 	pflag.Int(envKeyHeatmapHeightPx, 0, "Height of heatmaps")
 	_ = viper.BindPFlag(envKeyHeatmapHeightPx, pflag.Lookup(envKeyHeatmapHeightPx))
 
@@ -113,6 +118,7 @@ func Init() error {
 		ForceHTTPS:         viper.GetBool(envKeyForceHTTPS),
 		BasePath:           viper.GetString(envKeyBasePath),
 		DeovrAutoload:      viper.GetBool(envKeyDeovrAutoload),
+		FunscriptIndexPath: viper.GetString(envKeyFunscriptIndexPath),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),

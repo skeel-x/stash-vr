@@ -497,3 +497,36 @@ func TestPutConfig_LogLevelChangeSetsGlobalLevel(t *testing.T) {
 		t.Fatalf("expected the global level back to info, got %v", zerolog.GlobalLevel())
 	}
 }
+
+func TestPutConfig_PersistsFunscriptIndexPath(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"funscript_index_path": "/opt/stash/funscript_index.sqlite",
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["funscript_index_path"] != "/opt/stash/funscript_index.sqlite" {
+		t.Fatalf("expected 200 with the path echoed, got %d %v", rec.Code, out)
+	}
+	if config.Application().FunscriptIndexPath != "/opt/stash/funscript_index.sqlite" {
+		t.Fatal("expected the path to be stored")
+	}
+
+	delete(body, "funscript_index_path")
+	rec, _ = do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || config.Application().FunscriptIndexPath != "/opt/stash/funscript_index.sqlite" {
+		t.Fatalf("expected the path kept when the field is missing, got %d %q", rec.Code, config.Application().FunscriptIndexPath)
+	}
+
+	body["funscript_index_path"] = "relative.sqlite"
+	rec, _ = do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 400 {
+		t.Fatalf("expected 400 for a relative path, got %d %s", rec.Code, rec.Body.String())
+	}
+}

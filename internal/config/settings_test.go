@@ -251,3 +251,26 @@ func TestSet_BasePathNormalisedAndValidated(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSet_FunscriptIndexPathMustBeAbsolute(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Application()
+	cfg.FunscriptIndexPath = "relative/index.sqlite"
+	if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("expected ErrInvalid for a relative path, got %v", err)
+	}
+	cfg.FunscriptIndexPath = "/opt/stash/funscript_index.sqlite"
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().FunscriptIndexPath; got != "/opt/stash/funscript_index.sqlite" {
+		t.Fatalf("stored %q", got)
+	}
+	cfg.FunscriptIndexPath = ""
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+}

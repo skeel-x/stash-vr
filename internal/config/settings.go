@@ -48,6 +48,7 @@ type fileConfig struct {
 	ForceHTTPS         *bool    `json:"force_https,omitempty"`
 	BasePath           *string  `json:"base_path,omitempty"`
 	DeovrAutoload      *bool    `json:"deovr_autoload,omitempty"`
+	FunscriptIndexPath *string  `json:"funscript_index_path,omitempty"`
 	LogLevel           *string  `json:"log_level,omitempty"`
 	Filters            []Filter `json:"filters"`
 }
@@ -182,6 +183,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.DeovrAutoload != nil {
 		base.DeovrAutoload = *fc.DeovrAutoload
 	}
+	if fc.FunscriptIndexPath != nil {
+		base.FunscriptIndexPath = *fc.FunscriptIndexPath
+	}
 	if fc.LogLevel != nil {
 		base.LogLevel = *fc.LogLevel
 	}
@@ -254,6 +258,9 @@ func Validate(c ApplicationConfig) error {
 	if c.ExcludeSortName == "" {
 		return fmt.Errorf("%w: exclude_sort_name must not be empty", ErrInvalid)
 	}
+	if c.FunscriptIndexPath != "" && !filepath.IsAbs(c.FunscriptIndexPath) {
+		return fmt.Errorf("%w: funscript_index_path must be empty or an absolute path, got %q", ErrInvalid, c.FunscriptIndexPath)
+	}
 	return nil
 }
 
@@ -269,6 +276,7 @@ func write(path string, c ApplicationConfig) error {
 		ForceHTTPS:         &c.ForceHTTPS,
 		BasePath:           &c.BasePath,
 		DeovrAutoload:      &c.DeovrAutoload,
+		FunscriptIndexPath: &c.FunscriptIndexPath,
 		LogLevel:           &c.LogLevel,
 		Filters:            c.Filters,
 	}

@@ -10,6 +10,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"stash-vr/internal/config"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -71,6 +73,17 @@ func (libraryService *Service) discoverScripts(ctx context.Context, id string) [
 	if err != nil {
 		log.Ctx(ctx).Debug().Err(err).Str("scene", id).Msg("Script discovery: directory unreadable")
 		return []ScriptVariant{}
+	}
+	if dbPath := config.Application().FunscriptIndexPath; dbPath != "" {
+		rows, err := indexScripts(ctx, dbPath, id)
+		if err != nil {
+			if libraryService.indexWarned.CompareAndSwap(false, true) {
+				log.Ctx(ctx).Warn().Err(err).Str("path", dbPath).Msg("Funscript index unavailable; alternates disabled until it can be read")
+			}
+			return variants
+		}
+		libraryService.indexWarned.Store(false)
+		variants = mergeAlternates(variants, rows)
 	}
 	return variants
 }

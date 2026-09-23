@@ -37,6 +37,9 @@ type Service struct {
 
 	muScripts   sync.Mutex
 	scriptCache map[string]scriptEntry
+	// indexWarned is set once the funscript index has been logged as
+	// unavailable, so a broken path warns once rather than per scene.
+	indexWarned atomic.Bool
 }
 
 // clientBox wraps the client so different concrete client types can be

@@ -42,6 +42,7 @@ type ConfigView struct {
 	ForceHTTPS         bool            `json:"force_https"`
 	BasePath           string          `json:"base_path"`
 	DeovrAutoload      bool            `json:"deovr_autoload"`
+	FunscriptIndexPath string          `json:"funscript_index_path"`
 	LogLevel           string          `json:"log_level"`
 	SmartSectionSize   int             `json:"smart_section_size"`
 	ListenAddress      string          `json:"listen_address"`
@@ -61,6 +62,7 @@ type configInput struct {
 	ForceHTTPS         bool    `json:"force_https"`
 	BasePath           *string `json:"base_path"`
 	DeovrAutoload      *bool   `json:"deovr_autoload"`
+	FunscriptIndexPath *string `json:"funscript_index_path"`
 	LogLevel           string  `json:"log_level"`
 	SmartSectionSize   *int    `json:"smart_section_size"`
 }
@@ -87,6 +89,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		ForceHTTPS:         cfg.ForceHTTPS,
 		BasePath:           cfg.BasePath,
 		DeovrAutoload:      cfg.DeovrAutoload,
+		FunscriptIndexPath: cfg.FunscriptIndexPath,
 		LogLevel:           cfg.LogLevel,
 		SmartSectionSize:   cfg.SmartSectionSize,
 		ListenAddress:      cfg.ListenAddress,
@@ -231,6 +234,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.DeovrAutoload != nil {
 		next.DeovrAutoload = *in.DeovrAutoload
+	}
+	if in.FunscriptIndexPath != nil {
+		next.FunscriptIndexPath = *in.FunscriptIndexPath
 	}
 	next.LogLevel = in.LogLevel
 	if in.SmartSectionSize != nil {

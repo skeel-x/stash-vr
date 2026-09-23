@@ -30,6 +30,10 @@
     <input name="heatmap_height_px" type="number" min="0" max="200" value="{{.Config.HeatmapHeightPx}}">
     <small>0 keeps the height Stash generates.</small>
   </label>
+  <label>Funscript index
+    <input name="funscript_index_path" value="{{.Config.FunscriptIndexPath}}" placeholder="/opt/stash/funscript_index.sqlite">
+    <small>Optional. Path to the timestampTrade plugin's funscript_index.sqlite; scripts it lists for a scene are offered as alternates in HereSphere.</small>
+  </label>
   <label>Scenes per smart section
     <input name="smart_section_size" type="number" min="10" max="500" value="{{.Config.SmartSectionSize}}">
     <small>Continue watching, Recently added, Random and the other computed sections show this many scenes.</small>
