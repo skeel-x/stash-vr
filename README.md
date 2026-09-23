@@ -138,6 +138,8 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `FUNSCRIPT_INDEX_PATH`
   * Default: empty (off)
   * Absolute path to the timestampTrade plugin's `funscript_index.sqlite`; scripts it lists for a scene are offered as alternates in HereSphere. Runtime name: `funscript_index_path`.
+* `video_rules`
+  * File only, edited on the Setup page. The ordered tag-to-format rules table; an empty list restores the defaults.
 
 </details>
 
@@ -208,6 +210,23 @@ Changes reflect in HereSphere when videos are re-opened.
 #### Favorites
 
 When the favorite-feature of HereSphere is first used Stash-VR will create a tag in Stash named according to `FAVORITE_TAG` (set in docker env., defaults to `FAVORITE`) and apply that tag to your scene.
+
+#### Video rules and profiles
+
+The Setup page has a rules table that maps Stash tags to how a scene is
+shown: projection (equirectangular, 360, fisheye, cubemap, flat), stereo
+layout, field of view, lens and passthrough. Rules apply top to bottom and
+later rules override earlier ones. The defaults match the DOME, SPHERE,
+FISHEYE, MKX200, RF52, CUBEMAP, EAC, FLAT, SBS and TB tags Stash-VR always
+understood, and switch passthrough on for scenes tagged Passthrough,
+Alpha or Augmented Reality. All three players read the same table.
+
+HereSphere is asked to write its per-scene profile back. When you adjust
+the screen (distance, position, scale, background) and save in HereSphere,
+Stash-VR stores the profile under `<config>/hsp/` and hands it back the
+next time the scene opens, on any headset. A rule can name one of these
+scenes as its profile, so every scene with that tag opens with the same
+geometry until it has a profile of its own.
 
 #### Funscript variants
 
