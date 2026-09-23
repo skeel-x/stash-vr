@@ -3,7 +3,7 @@ package playa
 import (
 	"fmt"
 	"slices"
-	"stash-vr/internal/api/internal"
+	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
 	"stash-vr/internal/util"
@@ -305,37 +305,37 @@ func projectionAndStereo(vd *library.VideoData) (string, string) {
 	stereo := "MN"
 	hasGenericVR := false
 
+	f := library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
+	switch f.Projection {
+	case "equirectangular":
+		projection = "180"
+	case "equirectangular360", "cubemap", "equiangularCubemap":
+		projection = "360"
+	case "fisheye":
+		projection = "FSH"
+	case "perspective":
+		projection = "FLT"
+	}
+	switch f.Stereo {
+	case "sbs":
+		stereo = "LR"
+	case "tb":
+		stereo = "TB"
+	case "mono":
+		stereo = "MN"
+	}
 	for _, tag := range realSceneTags(vd) {
-		switch {
-		case equalsLegendTag(tag, internal.TagVR_DOME):
-			projection = "180"
-			if stereo == "MN" {
-				stereo = "LR"
-			}
-		case equalsLegendTag(tag, internal.TagVR_SPHERE):
-			projection = "360"
-			if stereo == "MN" {
-				stereo = "LR"
-			}
-		case equalsLegendTag(tag, internal.TagVR_FISHEYE), equalsLegendTag(tag, internal.TagVR_MKX200), equalsLegendTag(tag, internal.TagVR_RF52):
-			projection = "FSH"
-			if stereo == "MN" {
-				stereo = "LR"
-			}
-		case equalsLegendTag(tag, internal.TagVR_TB):
-			stereo = "TB"
-		case equalsLegendTag(tag, internal.TagVR_SBS):
-			if stereo == "MN" {
-				stereo = "LR"
-			}
-		case equalsLegendTag(tag, "VR"), equalsLegendTag(tag, "Virtual Reality"):
+		if equalsLegendTag(tag, "VR") || equalsLegendTag(tag, "Virtual Reality") {
 			hasGenericVR = true
 		}
 	}
 
+	// A stereo-only rule still means a VR scene, and a generic VR tag with
+	// no projection rule defaults to 180 SBS; an explicit FLAT rule
+	// (f.Projection set) stays flat even beside a generic VR tag.
 	if projection == "FLT" && stereo != "MN" {
 		projection = "180"
-	} else if projection == "FLT" && stereo == "MN" && hasGenericVR {
+	} else if projection == "FLT" && stereo == "MN" && hasGenericVR && f.Projection == "" {
 		projection = "180"
 		stereo = "LR"
 	}

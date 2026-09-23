@@ -2,13 +2,65 @@ package heresphere
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
+	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash/gql"
 	"stash-vr/internal/util"
 )
+
+func loadDefaultRules(t *testing.T) {
+	t.Helper()
+	if err := config.Load(config.ApplicationConfig{
+		ListenAddress: ":9666", StashGraphQLUrl: "http://stash:9999/graphql", FavoriteTag: "FAVORITE",
+		LogLevel: "info", ExcludeSortName: "hidden", SmartSectionSize: 50, ConfigPath: t.TempDir(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBuildVideoData_FormatFromRules(t *testing.T) {
+	loadDefaultRules(t)
+	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		Files:         []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4", Duration: 100, Height: 1080}},
+		Paths:         &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")},
+		TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "MKX200"}}, {TagParts: gql.TagParts{Id: "2", Name: "TB"}}, {TagParts: gql.TagParts{Id: "3", Name: "Passthrough"}}}},
+	}
+	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dto.Projection != "fisheye" || dto.Stereo != "tb" || dto.Lens != "MKX200" || dto.Fov != 200 {
+		t.Fatalf("format = %s/%s/%s/%v", dto.Projection, dto.Stereo, dto.Lens, dto.Fov)
+	}
+	if dto.AlphaPackedSettings == nil || !dto.AlphaPackedSettings.DefaultSettings {
+		t.Fatal("expected alphaPackedSettings for a Passthrough scene")
+	}
+	if dto.WriteHSP == nil || !*dto.WriteHSP {
+		t.Fatal("expected writeHSP on")
+	}
+	b, _ := json.Marshal(dto)
+	if !strings.Contains(string(b), `"alphaPackedSettings":{"defaultSettings":true}`) || strings.Contains(string(b), `"hsp"`) {
+		t.Fatalf("unexpected JSON %s", b)
+	}
+}
+
+func TestBuildVideoData_NoAlphaWithoutPassthrough(t *testing.T) {
+	loadDefaultRules(t)
+	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		Files: []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4"}}, Paths: &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")}, TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "DOME"}}}}}
+	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dto.AlphaPackedSettings != nil || dto.Projection != "equirectangular" || dto.Stereo != "sbs" {
+		t.Fatalf("got %+v", dto)
+	}
+}
 
 func TestBuildVideoData_ThumbnailAlwaysUsesCoverEndpoint(t *testing.T) {
 	sp := &gql.SceneParts{

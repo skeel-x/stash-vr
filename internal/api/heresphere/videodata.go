@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"stash-vr/internal/api/heatmap"
-	"stash-vr/internal/api/internal"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
@@ -19,28 +18,35 @@ type videoDataDto struct {
 
 	Title string `json:"title"`
 	//Description    string      `json:"description,omitempty"`
-	ThumbnailImage *string       `json:"thumbnailImage,omitempty"`
-	ThumbnailVideo *string       `json:"thumbnailVideo,omitempty"`
-	DateReleased   *string       `json:"dateReleased,omitempty"`
-	DateAdded      string        `json:"dateAdded,omitempty"`
-	Duration       float64       `json:"duration,omitempty"`
-	Rating         *float32      `json:"rating,omitempty"`
-	Favorites      *int          `json:"favorites,omitempty"`
-	Comments       *int          `json:"comments,omitempty"`
-	IsFavorite     *bool         `json:"isFavorite,omitempty"`
-	Projection     string        `json:"projection,omitempty"`
-	Stereo         string        `json:"stereo,omitempty"`
-	Fov            float32       `json:"fov,omitempty"`
-	Lens           string        `json:"lens,omitempty"`
-	EventServer    *string       `json:"eventServer,omitempty"`
-	Scripts        []scriptDto   `json:"scripts,omitempty"`
-	Tags           []tagDto      `json:"tags,omitempty"`
-	Media          []mediaDto    `json:"media,omitempty"`
-	Subtitles      []subtitleDto `json:"subtitles,omitempty"`
+	ThumbnailImage      *string         `json:"thumbnailImage,omitempty"`
+	ThumbnailVideo      *string         `json:"thumbnailVideo,omitempty"`
+	DateReleased        *string         `json:"dateReleased,omitempty"`
+	DateAdded           string          `json:"dateAdded,omitempty"`
+	Duration            float64         `json:"duration,omitempty"`
+	Rating              *float32        `json:"rating,omitempty"`
+	Favorites           *int            `json:"favorites,omitempty"`
+	Comments            *int            `json:"comments,omitempty"`
+	IsFavorite          *bool           `json:"isFavorite,omitempty"`
+	Projection          string          `json:"projection,omitempty"`
+	Stereo              string          `json:"stereo,omitempty"`
+	Fov                 float32         `json:"fov,omitempty"`
+	Lens                string          `json:"lens,omitempty"`
+	Hsp                 *string         `json:"hsp,omitempty"`
+	AlphaPackedSettings *alphaPackedDto `json:"alphaPackedSettings,omitempty"`
+	EventServer         *string         `json:"eventServer,omitempty"`
+	Scripts             []scriptDto     `json:"scripts,omitempty"`
+	Tags                []tagDto        `json:"tags,omitempty"`
+	Media               []mediaDto      `json:"media,omitempty"`
+	Subtitles           []subtitleDto   `json:"subtitles,omitempty"`
 
 	WriteFavorite *bool `json:"writeFavorite,omitempty"`
 	WriteRating   *bool `json:"writeRating,omitempty"`
 	WriteTags     *bool `json:"writeTags,omitempty"`
+	WriteHSP      *bool `json:"writeHSP,omitempty"`
+}
+
+type alphaPackedDto struct {
+	DefaultSettings bool `json:"defaultSettings"`
 }
 
 type mediaDto struct {
@@ -78,6 +84,7 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 		WriteFavorite: util.Ptr(true),
 		WriteRating:   util.Ptr(true),
 		WriteTags:     util.Ptr(true),
+		WriteHSP:      util.Ptr(true),
 		EventServer:   util.Ptr(getEventsUrl(baseUrl, videoId)),
 	}
 
@@ -114,7 +121,7 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 
 	setMediaSources(vd, &dto)
 
-	set3DFormat(vd, &dto)
+	setFormat(vd, &dto, library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags))
 
 	setScripts(vd, &dto, baseUrl, variants)
 
@@ -192,45 +199,14 @@ func setScripts(vd *library.VideoData, dto *videoDataDto, baseUrl string, varian
 	}
 }
 
-func set3DFormat(vd *library.VideoData, dto *videoDataDto) {
-	for _, t := range vd.SceneParts.Tags {
-		switch {
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_DOME):
-			dto.Projection = "equirectangular"
-			dto.Stereo = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_SPHERE):
-			dto.Projection = "equirectangular360"
-			dto.Stereo = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_FISHEYE):
-			dto.Projection = "fisheye"
-			dto.Stereo = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_MKX200):
-			dto.Projection = "fisheye"
-			dto.Stereo = "sbs"
-			dto.Lens = "MKX200"
-			dto.Fov = 200.0
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_RF52):
-			dto.Projection = "fisheye"
-			dto.Stereo = "sbs"
-			dto.Fov = 190.0
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_CUBEMAP):
-			dto.Projection = "cubemap"
-			dto.Stereo = "sbs"
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_EAC):
-			dto.Projection = "equiangularCubemap"
-			dto.Stereo = "sbs"
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_SBS):
-			dto.Stereo = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_TB):
-			dto.Stereo = "tb"
-			continue
-		}
+// setFormat writes the resolved rule format into the HereSphere fields.
+func setFormat(vd *library.VideoData, dto *videoDataDto, f library.Format) {
+	dto.Projection = f.Projection
+	dto.Stereo = f.Stereo
+	dto.Lens = f.Lens
+	dto.Fov = f.Fov
+	if f.Passthrough {
+		dto.AlphaPackedSettings = &alphaPackedDto{DefaultSettings: true}
 	}
 }
 

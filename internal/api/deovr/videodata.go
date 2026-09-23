@@ -3,7 +3,7 @@ package deovr
 import (
 	"fmt"
 	"stash-vr/internal/api/heatmap"
-	"stash-vr/internal/api/internal"
+	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
 	"stash-vr/internal/util"
@@ -72,7 +72,7 @@ func buildVideoData(vd *library.VideoData, baseUrl string) (*videoDataDto, error
 
 	setStreamSources(vd, &dto)
 	setMarkers(vd, &dto)
-	set3DFormat(vd, &dto)
+	setFormat(&dto, library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags))
 
 	return &dto, nil
 }
@@ -110,42 +110,37 @@ func setMarkers(vd *library.VideoData, dto *videoDataDto) {
 	}
 }
 
-func set3DFormat(vd *library.VideoData, dto *videoDataDto) {
-	for _, t := range vd.SceneParts.Tags {
+// setFormat maps the resolved rule format to DeoVR's screen and stereo
+// vocabulary. DeoVR has no passthrough or cubemap modes; cubemaps fall
+// back to a sphere.
+func setFormat(dto *videoDataDto, f library.Format) {
+	switch f.Projection {
+	case "equirectangular":
+		dto.ScreenType = "dome"
+	case "equirectangular360", "cubemap", "equiangularCubemap":
+		dto.ScreenType = "sphere"
+	case "fisheye":
 		switch {
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_DOME):
-			dto.Is3d = true
-			dto.ScreenType = "dome"
-			dto.StereoMode = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_SPHERE):
-			dto.Is3d = true
-			dto.ScreenType = "sphere"
-			dto.StereoMode = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_FISHEYE):
-			dto.Is3d = true
-			dto.ScreenType = "fisheye"
-			dto.StereoMode = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_MKX200):
-			dto.Is3d = true
+		case f.Lens == "MKX200":
 			dto.ScreenType = "mkx200"
-			dto.StereoMode = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_RF52):
-			dto.Is3d = true
+		case f.Fov == 190:
 			dto.ScreenType = "rf52"
-			dto.StereoMode = "cuv"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_SBS):
-			dto.Is3d = true
-			dto.StereoMode = "sbs"
-			continue
-		case util.StrSliceEquals(t.Name, t.Aliases, internal.TagVR_TB):
-			dto.Is3d = true
-			dto.StereoMode = "tb"
-			continue
+		default:
+			dto.ScreenType = "fisheye"
 		}
+	case "perspective":
+		dto.ScreenType = "flat"
 	}
+	switch f.Stereo {
+	case "sbs":
+		dto.StereoMode = "sbs"
+	case "tb":
+		dto.StereoMode = "tb"
+	case "mono":
+		dto.StereoMode = "off"
+	}
+	if dto.ScreenType == "rf52" {
+		dto.StereoMode = "cuv"
+	}
+	dto.Is3d = dto.ScreenType != "" || dto.StereoMode != ""
 }
