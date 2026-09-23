@@ -237,22 +237,44 @@
     });
   }
 
-  // Log page: refresh and auto-refresh the tail.
+  // Log page: refresh and auto-refresh the tail, filtered by level and text.
   const logPre = $('#log-lines');
   if (logPre) {
+    const levelSel = $('#log-level');
+    const textIn = $('#log-filter');
+    // The fetched (unfiltered) tail; the filter is applied on render so it survives refreshes.
+    let lines = logPre.textContent.split('\n');
+    if (lines.length && lines[lines.length - 1] === '') lines.pop();
+    const rank = { debug: 0, info: 1, warn: 2, error: 3 };
+    // Console lines carry one of these tokens; a line without one counts as info.
+    const levelOf = (line) => {
+      if (line.includes(' DBG ')) return 0;
+      if (line.includes(' WRN ')) return 2;
+      if (line.includes(' ERR ')) return 3;
+      return 1;
+    };
+    const render = () => {
+      const min = levelSel.value === 'all' ? 0 : rank[levelSel.value];
+      const needle = textIn.value.trim().toLowerCase();
+      const shown = lines.filter((l) => levelOf(l) >= min && (!needle || l.toLowerCase().includes(needle)));
+      logPre.textContent = shown.length ? shown.join('\n') + '\n' : '';
+      logPre.scrollTop = logPre.scrollHeight;
+    };
     const load = async () => {
       try {
         const r = await api('GET', '/log?lines=300');
-        logPre.textContent = r.lines.join('\n') + '\n';
-        logPre.scrollTop = logPre.scrollHeight;
+        lines = r.lines;
+        render();
         setMsg($('#log-msg'), '', 'ok');
       } catch (e) { setMsg($('#log-msg'), e.message, 'err'); }
     };
+    levelSel.addEventListener('change', render);
+    textIn.addEventListener('input', render);
     $('#log-refresh').addEventListener('click', load);
     let timer = null;
     $('#log-auto').addEventListener('change', (e) => {
       if (e.target.checked) { load(); timer = setInterval(load, 5000); } else { clearInterval(timer); timer = null; }
     });
-    logPre.scrollTop = logPre.scrollHeight;
+    render();
   }
 })();

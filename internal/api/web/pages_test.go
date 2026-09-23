@@ -263,7 +263,7 @@ func TestLog_RendersPage(t *testing.T) {
 	h := PagesRouter(lib)
 
 	body := getPage(t, h, "/log", nil).Body.String()
-	for _, want := range []string{"hello from the log", `id="log-lines"`, `id="log-refresh"`, `id="log-auto"`, `href="/log"`} {
+	for _, want := range []string{"hello from the log", `id="log-lines"`, `id="log-refresh"`, `id="log-auto"`, `id="log-level"`, `id="log-filter"`, `href="/log"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
 		}

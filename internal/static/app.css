@@ -116,6 +116,8 @@ input:disabled{color:var(--muted)}
 .msg.err{color:var(--err)}
 
 /* log page */
+#log-level,#log-filter{width:auto;margin-top:0;min-height:44px}
+#log-filter{flex:1;min-width:160px}
 pre.log{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin:16px 0 0;max-height:70vh;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.4;white-space:pre-wrap;word-break:break-all}
 
 /* sections table */

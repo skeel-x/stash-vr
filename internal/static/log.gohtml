@@ -5,6 +5,8 @@
   <div class="row">
     <button type="button" id="log-refresh">Refresh</button>
     <label class="check"><input type="checkbox" id="log-auto"> Auto-refresh every 5 s</label>
+    <select id="log-level" aria-label="Level"><option value="all">All levels</option><option value="info">Info and above</option><option value="warn">Warnings and errors</option><option value="error">Errors</option></select>
+    <input id="log-filter" type="search" placeholder="Filter text" aria-label="Filter text">
     <span class="msg" id="log-msg"></span>
   </div>
   <pre class="log" id="log-lines">{{range .LogLines}}{{.}}
