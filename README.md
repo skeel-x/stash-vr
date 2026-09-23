@@ -263,6 +263,15 @@ next time the scene opens, on any headset. A rule can name one of these
 scenes as its profile, so every scene with that tag opens with the same
 geometry until it has a profile of its own.
 
+Rules can also carry the screen settings themselves: position, rotation,
+zoom, pan, origin, background (global, colour, passthrough) and mask
+(none, alpha packed, chroma key), under "Screen and background" on each
+rule card. Stash-VR then builds a HereSphere profile for every matching
+scene that has no saved profile of its own. The values use HereSphere's
+own units; "Copy from a saved profile" fills them from a scene you have
+tuned and saved in the headset. Earlier versions of saved profiles are
+kept in `hsp/history`.
+
 #### Funscript variants
 
 Stash-VR lists every funscript it finds next to a scene's video in
