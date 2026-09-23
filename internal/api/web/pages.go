@@ -3,6 +3,7 @@ package web
 import (
 	"html/template"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -35,6 +36,13 @@ type FilterRow struct {
 	Name       string
 	Disabled   bool
 	Smart      bool
+	HiddenIn   []string
+}
+
+// ShowIn reports whether the section is listed in player: it must be
+// enabled and not hidden for that player.
+func (r FilterRow) ShowIn(player string) bool {
+	return !r.Disabled && !slices.Contains(r.HiddenIn, player)
 }
 
 // ProfileOption is a stored HereSphere profile offered to a video rule; the
@@ -168,7 +176,7 @@ func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
 		data.FilterError = err.Error()
 	}
 	for _, row := range rows {
-		data.FilterRows = append(data.FilterRows, FilterRow{ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled, Smart: row.Smart})
+		data.FilterRows = append(data.FilterRows, FilterRow{ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled, Smart: row.Smart, HiddenIn: row.HiddenIn})
 	}
 	render(w, r, sectionsTmpl, data)
 }

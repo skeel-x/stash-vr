@@ -44,7 +44,7 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseU
 		return Page[VideoListView]{}, err
 	}
 	candidateSet := sliceToSet(allIDs)
-	savedFilters, err := h.libraryService.GetSavedFilterSceneSets(ctx)
+	savedFilters, err := h.libraryService.GetSavedFilterSceneSetsFor(ctx, "playa")
 	if err != nil {
 		return Page[VideoListView]{}, err
 	}

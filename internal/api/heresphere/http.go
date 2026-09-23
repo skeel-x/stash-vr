@@ -29,7 +29,7 @@ func (h *httpHandler) indexHandler(w http.ResponseWriter, req *http.Request) {
 	mpf := stash.GetMinPlayPercent(ctx, h.libraryService.Client()) / 100
 	minPlayFraction = &mpf
 
-	sections, err := h.libraryService.GetSections(ctx)
+	sections, err := h.libraryService.GetSectionsFor(ctx, "heresphere")
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("failed to get sections")
 		w.WriteHeader(http.StatusInternalServerError)

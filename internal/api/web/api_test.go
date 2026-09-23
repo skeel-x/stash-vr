@@ -596,3 +596,34 @@ func TestGetLog_ReturnsTailWithClamp(t *testing.T) {
 		t.Fatalf("expected 400 for a bad count, got %d", rec.Code)
 	}
 }
+
+func TestPutFilters_PersistsHiddenIn(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodPut, "/filters", []map[string]any{
+		{"id": "1", "name": "", "disabled": false, "hidden_in": []string{"deovr"}},
+	})
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	f := config.Application().Filters
+	if len(f) != 1 || len(f[0].HiddenIn) != 1 || f[0].HiddenIn[0] != "deovr" {
+		t.Fatalf("unexpected filters %#v", f)
+	}
+	filters, _ := out["filters"].([]any)
+	if len(filters) != 1 {
+		t.Fatalf("expected the saved filters echoed back, got %v", out)
+	}
+	hidden, _ := filters[0].(map[string]any)["hidden_in"].([]any)
+	if len(hidden) != 1 || hidden[0] != "deovr" {
+		t.Fatalf("expected hidden_in echoed back, got %v", out)
+	}
+
+	rec, _ = do(t, h, http.MethodPut, "/filters", []map[string]any{
+		{"id": "1", "hidden_in": []string{"vlc"}},
+	})
+	if rec.Code != 400 {
+		t.Fatalf("expected 400 for an unknown player, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

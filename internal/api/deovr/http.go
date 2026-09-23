@@ -17,7 +17,7 @@ func (h httpHandler) indexHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	baseUrl := internal.GetBaseUrl(req)
 
-	sections, err := h.LibraryService.GetSections(ctx)
+	sections, err := h.LibraryService.GetSectionsFor(ctx, "deovr")
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("failed to get sections")
 		w.WriteHeader(http.StatusInternalServerError)

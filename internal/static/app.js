@@ -177,11 +177,17 @@
   const tbody = $('#rows');
   if (tbody) {
     makeSortable(tbody);
-    const rows = () => Array.from(tbody.querySelectorAll('tr')).map((tr) => ({
-      id: tr.dataset.id,
-      name: tr.querySelector('.name').value.trim(),
-      disabled: !tr.querySelector('.enabled').checked,
-    }));
+    const players = ['heresphere', 'deovr', 'playa'];
+    const rows = () => Array.from(tbody.querySelectorAll('tr')).map((tr) => {
+      const on = players.filter((p) => tr.querySelector('.show-' + p).checked);
+      const off = players.filter((p) => !on.includes(p));
+      return {
+        id: tr.dataset.id,
+        name: tr.querySelector('.name').value.trim(),
+        disabled: on.length === 0,
+        hidden_in: on.length === 0 ? [] : off,
+      };
+    });
     $('#save-filters').addEventListener('click', async () => {
       setMsg($('#filters-msg'), 'Saving');
       try { await api('PUT', '/filters', rows()); setMsg($('#filters-msg'), 'Saved. Players pick it up on their next index load.', 'ok'); }
