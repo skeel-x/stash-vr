@@ -17,7 +17,7 @@ func loadDefaultRules(t *testing.T) {
 	t.Helper()
 	if err := config.Load(config.ApplicationConfig{
 		ListenAddress: ":9666", StashGraphQLUrl: "http://stash:9999/graphql", FavoriteTag: "FAVORITE",
-		LogLevel: "info", ExcludeSortName: "hidden", SmartSectionSize: 50, ConfigPath: t.TempDir(),
+		LogLevel: "info", ExcludeSortName: "hidden", SmartSectionSize: 50, PerformerFacets: true, ConfigPath: t.TempDir(),
 	}); err != nil {
 		t.Fatal(err)
 	}

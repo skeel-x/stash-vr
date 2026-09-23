@@ -69,6 +69,35 @@ func TestLoad_FileWinsOverSeedAndMissingKeysFallBack(t *testing.T) {
 	}
 }
 
+func TestLoad_PerformerFacetsSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+	seed.PerformerFacets = true
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !Application().PerformerFacets {
+		t.Fatal("expected performer facets on from the seed")
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"performer_facets": true`) {
+		t.Fatalf("expected performer_facets persisted, got %s", data)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"performer_facets":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if Application().PerformerFacets {
+		t.Fatal("expected the file to turn performer facets off")
+	}
+}
+
 func TestLoad_UnparsableFileFailsNamingPath(t *testing.T) {
 	seed := seedFor(t)
 	if err := os.WriteFile(FilePath(seed), []byte("{oops"), 0o600); err != nil {

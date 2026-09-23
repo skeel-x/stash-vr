@@ -65,6 +65,7 @@ func newEnv(t *testing.T, stash *fakeStash) (*library.Service, http.Handler) {
 		ExcludeSortName:  "hidden",
 		SmartSectionSize: 50,
 		DeovrAutoload:    true,
+		PerformerFacets:  true,
 		ConfigPath:       t.TempDir(),
 		// The fake Stash always answers FindSceneIdsByFilter with 0 scenes, so
 		// the default smart sections (enabled out of the box) would otherwise
@@ -233,6 +234,39 @@ func TestPutConfig_PersistsDeovrAutoload(t *testing.T) {
 	}
 	if config.Application().DeovrAutoload {
 		t.Fatal("expected autoload kept off when the field is missing")
+	}
+}
+
+func TestPutConfig_PersistsPerformerFacets(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"performer_facets": false,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["performer_facets"] != false {
+		t.Fatalf("expected 200 with performer_facets false, got %d %v", rec.Code, out)
+	}
+	if config.Application().PerformerFacets {
+		t.Fatal("expected facets off to be stored")
+	}
+	data, _ := os.ReadFile(config.FilePath(config.Application()))
+	if !strings.Contains(string(data), `"performer_facets": false`) {
+		t.Fatalf("expected performer_facets persisted to config.json, got %s", data)
+	}
+
+	delete(body, "performer_facets")
+	rec, _ = do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200 without the field, got %d %s", rec.Code, rec.Body.String())
+	}
+	if config.Application().PerformerFacets {
+		t.Fatal("expected facets kept off when the field is missing")
 	}
 }
 

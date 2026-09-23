@@ -119,6 +119,7 @@ type fileConfig struct {
 	ForceHTTPS         *bool       `json:"force_https,omitempty"`
 	BasePath           *string     `json:"base_path,omitempty"`
 	DeovrAutoload      *bool       `json:"deovr_autoload,omitempty"`
+	PerformerFacets    *bool       `json:"performer_facets,omitempty"`
 	FunscriptIndexPath *string     `json:"funscript_index_path,omitempty"`
 	LogLevel           *string     `json:"log_level,omitempty"`
 	Filters            []Filter    `json:"filters"`
@@ -260,6 +261,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.DeovrAutoload != nil {
 		base.DeovrAutoload = *fc.DeovrAutoload
 	}
+	if fc.PerformerFacets != nil {
+		base.PerformerFacets = *fc.PerformerFacets
+	}
 	if fc.FunscriptIndexPath != nil {
 		base.FunscriptIndexPath = *fc.FunscriptIndexPath
 	}
@@ -360,6 +364,7 @@ func write(path string, c ApplicationConfig) error {
 		ForceHTTPS:         &c.ForceHTTPS,
 		BasePath:           &c.BasePath,
 		DeovrAutoload:      &c.DeovrAutoload,
+		PerformerFacets:    &c.PerformerFacets,
 		FunscriptIndexPath: &c.FunscriptIndexPath,
 		LogLevel:           &c.LogLevel,
 		Filters:            c.Filters,

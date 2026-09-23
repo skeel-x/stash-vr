@@ -58,7 +58,8 @@ func classifyIncomingTags(ctx context.Context, tags []tagDto) incomingTags {
 			continue
 		}
 		switch key {
-		case internal.LegendPerformer, internal.LegendSceneStudio, internal.LegendSceneGroup,
+		case internal.LegendPerformer, internal.LegendPerformerCountry, internal.LegendPerformerAge,
+			internal.LegendSceneStudio, internal.LegendSceneGroup,
 			internal.LegendMetaResolution, internal.LegendSummary, internal.LegendSummaryId,
 			internal.LegendMetaInteractive:
 			continue

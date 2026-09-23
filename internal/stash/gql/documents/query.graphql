@@ -204,6 +204,8 @@ fragment SceneParts on Scene {
     name
     image_path
     alias_list
+    birthdate
+    country
   }
   groups {
     group {

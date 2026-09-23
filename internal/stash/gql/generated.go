@@ -3822,6 +3822,8 @@ type ScenePartsPerformersPerformer struct {
 	Name       string   `json:"name"`
 	Image_path *string  `json:"image_path"`
 	Alias_list []string `json:"alias_list"`
+	Birthdate  *string  `json:"birthdate"`
+	Country    *string  `json:"country"`
 }
 
 // GetId returns ScenePartsPerformersPerformer.Id, and is useful for accessing the field via an interface.
@@ -3835,6 +3837,12 @@ func (v *ScenePartsPerformersPerformer) GetImage_path() *string { return v.Image
 
 // GetAlias_list returns ScenePartsPerformersPerformer.Alias_list, and is useful for accessing the field via an interface.
 func (v *ScenePartsPerformersPerformer) GetAlias_list() []string { return v.Alias_list }
+
+// GetBirthdate returns ScenePartsPerformersPerformer.Birthdate, and is useful for accessing the field via an interface.
+func (v *ScenePartsPerformersPerformer) GetBirthdate() *string { return v.Birthdate }
+
+// GetCountry returns ScenePartsPerformersPerformer.Country, and is useful for accessing the field via an interface.
+func (v *ScenePartsPerformersPerformer) GetCountry() *string { return v.Country }
 
 // ScenePartsSceneStreamsSceneStreamEndpoint includes the requested fields of the GraphQL type SceneStreamEndpoint.
 type ScenePartsSceneStreamsSceneStreamEndpoint struct {
@@ -5543,6 +5551,8 @@ fragment SceneParts on Scene {
 		name
 		image_path
 		alias_list
+		birthdate
+		country
 	}
 	groups {
 		group {

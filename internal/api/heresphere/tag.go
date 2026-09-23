@@ -11,6 +11,7 @@ import (
 	"stash-vr/internal/util"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type tagDto struct {
@@ -95,6 +96,9 @@ func getTags(vd *library.VideoData) []tagDto {
 	trackIndex = addMultiTracks(&tags, getStashTags(vd), trackIndex)
 	trackIndex = addMultiTracks(&tags, getStudio(vd), trackIndex)
 	trackIndex = addMultiTracks(&tags, getPerformers(vd), trackIndex)
+	if config.Application().PerformerFacets {
+		trackIndex = addMultiTracks(&tags, performerFacets(vd, time.Now()), trackIndex)
+	}
 	trackIndex = addMultiTracks(&tags, getGroups(vd), trackIndex)
 
 	addHiddenToTrack(&tags, getAncestorTags(vd), 2)

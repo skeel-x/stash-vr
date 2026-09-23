@@ -4,6 +4,9 @@ var (
 	LegendTag       = "#"
 	LegendPerformer = "@"
 
+	LegendPerformerCountry = "Country"
+	LegendPerformerAge     = "Age"
+
 	LegendSceneStudio = "Studio"
 	LegendSceneGroup  = "%"
 
