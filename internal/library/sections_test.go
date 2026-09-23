@@ -399,3 +399,53 @@ func TestGetSavedFilterSceneSets_SharesIndexWithGetSections(t *testing.T) {
 		t.Fatalf("expected GetSavedFilterSceneSets to reuse the index GetSections already built, got %d queries after %d", got, before)
 	}
 }
+
+func TestGetSectionsFor_DropsHiddenPlayers(t *testing.T) {
+	// The fake has no saved filters, so two smart sections stand in for
+	// "A" and "B": Recently added is hidden in Playa only.
+	loadConfig(t, []config.Filter{
+		{ID: "smart:continue"},
+		{ID: "smart:recent", HiddenIn: []string{"playa"}},
+		{ID: "smart:random", Disabled: true},
+	})
+	svc := NewService(&routingStash{})
+
+	all, err := svc.GetSections(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	hs, err := svc.GetSectionsFor(context.Background(), "heresphere")
+	if err != nil {
+		t.Fatal(err)
+	}
+	playa, err := svc.GetSavedFilterSceneSetsFor(context.Background(), "playa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	playaSections, err := svc.GetSectionsFor(context.Background(), "playa")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(all) != 2 || len(hs) != 2 {
+		t.Fatalf("all=%d heresphere=%d, want 2 and 2", len(all), len(hs))
+	}
+	if all[1].ID != "smart:recent" || fmt.Sprint(all[1].HiddenIn) != fmt.Sprint([]string{"playa"}) {
+		t.Fatalf("GetSections should carry the id and hidden_in, got %+v", all[1])
+	}
+	if len(playa) != 1 || playa[0].ID != "smart:continue" {
+		t.Fatalf("playa should only see Continue watching, got %+v", playa)
+	}
+	if len(playaSections) != 1 || playaSections[0].ID != "smart:continue" {
+		t.Fatalf("playa sections should only hold Continue watching, got %+v", playaSections)
+	}
+}
+
+func TestHiddenFor(t *testing.T) {
+	if HiddenFor(nil, "playa") || HiddenFor([]string{"deovr"}, "playa") {
+		t.Fatal("a player not listed must not be hidden")
+	}
+	if !HiddenFor([]string{"deovr", "playa"}, "playa") {
+		t.Fatal("a listed player must be hidden")
+	}
+}

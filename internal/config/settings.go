@@ -7,17 +7,34 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
 
 // Filter is a per-saved-filter override: display order, optional rename,
-// and whether the section is hidden from players.
+// whether the section is hidden from every player, and which players it
+// is hidden from while staying on for the others.
 type Filter struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Disabled bool   `json:"disabled"`
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Disabled bool     `json:"disabled"`
+	HiddenIn []string `json:"hidden_in,omitempty"`
+}
+
+// Players lists the player names a Filter.HiddenIn entry may name.
+var Players = []string{"heresphere", "deovr", "playa"}
+
+func validateFilters(filters []Filter) error {
+	for i, f := range filters {
+		for _, v := range f.HiddenIn {
+			if !slices.Contains(Players, v) {
+				return fmt.Errorf("%w: filters[%d].hidden_in contains unknown player %q", ErrInvalid, i, v)
+			}
+		}
+	}
+	return nil
 }
 
 // VideoRule maps a Stash tag to player format settings. Rules apply in
@@ -153,6 +170,9 @@ func cloneConfig(c ApplicationConfig) ApplicationConfig {
 	out := c
 	out.Filters = make([]Filter, len(c.Filters))
 	copy(out.Filters, c.Filters)
+	for i := range out.Filters {
+		out.Filters[i].HiddenIn = slices.Clone(out.Filters[i].HiddenIn)
+	}
 	out.VideoRules = make([]VideoRule, len(c.VideoRules))
 	copy(out.VideoRules, c.VideoRules)
 	return out
@@ -344,6 +364,9 @@ func Validate(c ApplicationConfig) error {
 	}
 	if c.FunscriptIndexPath != "" && !filepath.IsAbs(c.FunscriptIndexPath) {
 		return fmt.Errorf("%w: funscript_index_path must be empty or an absolute path, got %q", ErrInvalid, c.FunscriptIndexPath)
+	}
+	if err := validateFilters(c.Filters); err != nil {
+		return err
 	}
 	return validateVideoRules(c.VideoRules)
 }

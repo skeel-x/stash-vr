@@ -19,8 +19,11 @@ import (
 const sectionCacheTTL = 60 * time.Second
 
 type Section struct {
+	ID   string
 	Name string
 	Ids  []string
+	// HiddenIn names the players this section is left out of.
+	HiddenIn []string
 }
 
 type SavedFilterSceneSet struct {
@@ -28,6 +31,8 @@ type SavedFilterSceneSet struct {
 	Name string
 	// SceneIDs is shared with the section cache and must be treated as read-only.
 	SceneIDs []string
+	// HiddenIn names the players this set is left out of.
+	HiddenIn []string
 }
 
 // SectionRow is one entry on the Sections page and one candidate section
@@ -38,6 +43,13 @@ type SectionRow struct {
 	Name       string // name after the user's override
 	Disabled   bool
 	Smart      bool
+	HiddenIn   []string // players the section is hidden from while enabled
+}
+
+// HiddenFor reports whether a section whose override lists hidden should be
+// left out of player's index.
+func HiddenFor(hidden []string, player string) bool {
+	return slices.Contains(hidden, player)
 }
 
 // indexResult is the outcome of one buildIndex rebuild: the resolved section
@@ -84,7 +96,7 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 			}
 			sections = make([]Section, len(sets))
 			for i, set := range sets {
-				sections[i] = Section{Name: set.Name, Ids: slices.Clone(set.SceneIDs)}
+				sections[i] = Section{ID: set.ID, Name: set.Name, Ids: slices.Clone(set.SceneIDs), HiddenIn: set.HiddenIn}
 			}
 		}
 
@@ -152,9 +164,19 @@ func (libraryService *Service) GetSections(ctx context.Context) ([]Section, erro
 	}
 	out := make([]Section, len(sections))
 	for i, s := range sections {
-		out[i] = Section{Name: s.Name, Ids: slices.Clone(s.Ids)}
+		out[i] = Section{ID: s.ID, Name: s.Name, Ids: slices.Clone(s.Ids), HiddenIn: slices.Clone(s.HiddenIn)}
 	}
 	return out, nil
+}
+
+// GetSectionsFor returns the sections a player should list: the index
+// minus the sections hidden for it on the Sections page.
+func (libraryService *Service) GetSectionsFor(ctx context.Context, player string) ([]Section, error) {
+	sections, err := libraryService.GetSections(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(sections, func(s Section) bool { return HiddenFor(s.HiddenIn, player) }), nil
 }
 
 func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Section, error) {
@@ -193,6 +215,16 @@ func (libraryService *Service) GetSavedFilterSceneSets(ctx context.Context) ([]S
 	return sets, nil
 }
 
+// GetSavedFilterSceneSetsFor is GetSavedFilterSceneSets minus the sets
+// hidden for player.
+func (libraryService *Service) GetSavedFilterSceneSetsFor(ctx context.Context, player string) ([]SavedFilterSceneSet, error) {
+	sets, err := libraryService.GetSavedFilterSceneSets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(sets, func(s SavedFilterSceneSet) bool { return HiddenFor(s.HiddenIn, player) }), nil
+}
+
 // sectionRows applies the ordering rule: smart sections without an override
 // first (default state), then overrides in saved order, then remaining saved
 // filters in the given order.
@@ -225,7 +257,7 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, overrides [
 			if name == "" {
 				name = s.Name
 			}
-			rows = append(rows, SectionRow{ID: o.ID, SourceName: s.Name, Name: name, Disabled: o.Disabled, Smart: true})
+			rows = append(rows, SectionRow{ID: o.ID, SourceName: s.Name, Name: name, Disabled: o.Disabled, Smart: true, HiddenIn: o.HiddenIn})
 			continue
 		}
 		if sf, ok := savedByID[o.ID]; ok {
@@ -233,7 +265,7 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, overrides [
 			if name == "" {
 				name = sf.Name
 			}
-			rows = append(rows, SectionRow{ID: o.ID, SourceName: sf.Name, Name: name, Disabled: o.Disabled})
+			rows = append(rows, SectionRow{ID: o.ID, SourceName: sf.Name, Name: name, Disabled: o.Disabled, HiddenIn: o.HiddenIn})
 		}
 	}
 	for _, sf := range saved {
@@ -343,7 +375,7 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 				flog.Debug().Msg("Section skipped: 0 scenes")
 				return
 			}
-			sections[i] = SavedFilterSceneSet{ID: src.row.ID, Name: src.row.Name, SceneIDs: make([]string, len(resp.FindScenes.Scenes))}
+			sections[i] = SavedFilterSceneSet{ID: src.row.ID, Name: src.row.Name, SceneIDs: make([]string, len(resp.FindScenes.Scenes)), HiddenIn: src.row.HiddenIn}
 			for j, v := range resp.FindScenes.Scenes {
 				sections[i].SceneIDs[j] = v.Id
 			}

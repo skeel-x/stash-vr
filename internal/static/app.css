@@ -117,7 +117,7 @@ table.sections{width:100%;border-collapse:collapse;margin:0 0 16px;background:va
 table.sections th{text-align:left;color:var(--muted);font-weight:500;font-size:16px;padding:8px;border-bottom:1px solid var(--line)}
 table.sections td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle;min-height:56px}
 table.sections td input.name{margin:0;min-height:48px}
-table.sections td input.enabled{width:26px;height:26px}
+table.sections td input[type=checkbox]{width:26px;height:26px}
 .rules{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}
 .rule{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}
 .rule.dragging{opacity:.5}
@@ -137,7 +137,7 @@ tr.dragging{opacity:.5}
 @media (max-width:560px){
   .bar{flex-wrap:wrap}
   .launch .action{font-size:28px}
-  table.sections th:nth-child(3),table.sections td:nth-child(3){display:none}
+  table.sections th:nth-child(5),table.sections td:nth-child(5){display:none}
   .rule-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}

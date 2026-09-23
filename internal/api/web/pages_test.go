@@ -121,6 +121,11 @@ func TestSections_RendersPage(t *testing.T) {
 	if !strings.Contains(body, ">smart<") {
 		t.Fatal("expected the smart badge")
 	}
+	for _, want := range []string{`class="show-heresphere"`, `class="show-deovr"`, `class="show-playa"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected a per-player checkbox %s", want)
+		}
+	}
 }
 
 func TestPlayers_ShowsRejectedKeyWhenUnauthorized(t *testing.T) {

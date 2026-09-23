@@ -36,7 +36,7 @@ func (h httpHandler) configHandler(w http.ResponseWriter, req *http.Request) {
 
 func (h httpHandler) categoriesHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	savedFilters, err := h.libraryService.GetSavedFilterSceneSets(ctx)
+	savedFilters, err := h.libraryService.GetSavedFilterSceneSetsFor(ctx, "playa")
 	if err != nil {
 		h.writeInternalError(ctx, w, err, "failed to load saved filters")
 		return
@@ -51,7 +51,7 @@ func (h httpHandler) categoriesHandler(w http.ResponseWriter, req *http.Request)
 
 func (h httpHandler) categoryGroupsHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	savedFilters, err := h.libraryService.GetSavedFilterSceneSets(ctx)
+	savedFilters, err := h.libraryService.GetSavedFilterSceneSetsFor(ctx, "playa")
 	if err != nil {
 		h.writeInternalError(ctx, w, err, "failed to load saved filters")
 		return
@@ -134,7 +134,7 @@ func (h httpHandler) videoHandler(w http.ResponseWriter, req *http.Request) {
 	}()
 	go func() {
 		defer wg.Done()
-		savedFilters, filterErr = h.libraryService.GetSavedFilterSceneSets(ctx)
+		savedFilters, filterErr = h.libraryService.GetSavedFilterSceneSetsFor(ctx, "playa")
 	}()
 	wg.Wait()
 

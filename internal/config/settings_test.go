@@ -333,3 +333,22 @@ func TestSet_ValidatesVideoRules(t *testing.T) {
 		t.Fatalf("expected the tag trimmed, got %q", saved.VideoRules[0].Tag)
 	}
 }
+
+func TestSet_ValidatesHiddenIn(t *testing.T) {
+	if err := Load(seedFor(t)); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Application()
+	cfg.Filters = []Filter{{ID: "42", HiddenIn: []string{"playa", "vlc"}}}
+	if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("expected ErrInvalid for an unknown player, got %v", err)
+	}
+	cfg.Filters = []Filter{{ID: "42", HiddenIn: []string{"playa"}}}
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(FilePath(Application()))
+	if !strings.Contains(string(data), `"hidden_in"`) {
+		t.Fatalf("expected hidden_in persisted, got %s", data)
+	}
+}
