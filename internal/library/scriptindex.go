@@ -35,13 +35,13 @@ func indexScripts(ctx context.Context, dbPath, sceneId string) ([]indexRow, erro
 	if err != nil {
 		return nil, fmt.Errorf("open index: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows, err := db.QueryContext(ctx, `SELECT filename, metadata FROM script_index WHERE scene_id = ? ORDER BY filename`, sceneId)
 	if err != nil {
 		return nil, fmt.Errorf("query index: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []indexRow{}
 	for rows.Next() {
@@ -107,7 +107,7 @@ func fileMD5(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err

@@ -503,10 +503,3 @@ func qualityOrder(resolution int) int {
 		return 5
 	}
 }
-
-func derefString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}

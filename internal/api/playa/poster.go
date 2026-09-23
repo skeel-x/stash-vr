@@ -55,7 +55,7 @@ func fetchPosterImage(ctx context.Context, fileURL string) (image.Image, error) 
 	if err != nil {
 		return nil, fmt.Errorf("fetch %s: %w", stash.Redacted(fileURL), heatmap.UnwrapURLError(err))
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, errPosterNotFound
 	}

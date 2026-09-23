@@ -613,7 +613,7 @@ func TestPutVideoRules_RoundTripAndValidation(t *testing.T) {
 func TestGetLog_ReturnsTailWithClamp(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	for i := 0; i < 3; i++ {
-		fmt.Fprintf(logger.Tail, "tail line %d\n", i)
+		_, _ = fmt.Fprintf(logger.Tail, "tail line %d\n", i)
 	}
 
 	_, out := do(t, h, http.MethodGet, "/log?lines=2", nil)

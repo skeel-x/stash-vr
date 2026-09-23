@@ -20,16 +20,16 @@ func GetMinPlayPercent(ctx context.Context, client graphql.Client) float64 {
 		return 0
 	}
 
-	switch minPlayPercent.(type) {
+	switch v := minPlayPercent.(type) {
 	case float64:
-		return minPlayPercent.(float64)
+		return v
 	case string:
-		v, err := strconv.Atoi(minPlayPercent.(string))
+		parsed, err := strconv.Atoi(v)
 		if err != nil {
 			log.Ctx(ctx).Warn().Err(err).Interface("config.minimumPlayPercent", minPlayPercent).Msg("Failed to parse Stash config.minimumPlayPercent")
 			return 0
 		}
-		return float64(v)
+		return float64(parsed)
 	default:
 		log.Ctx(ctx).Warn().Interface("config.minimumPlayPercent", minPlayPercent).Msg("Failed to parse Stash config.minimumPlayPercent: Unsupported format")
 		return 0

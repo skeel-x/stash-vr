@@ -85,7 +85,7 @@ func (h *httpHandler) scanHandler(w http.ResponseWriter, req *http.Request) {
 const maxVideoDataBody = library.MaxProfileBytes*4/3 + 64*1024
 
 func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request) {
-	defer req.Body.Close()
+	defer func() { _ = req.Body.Close() }()
 	req.Body = http.MaxBytesReader(w, req.Body, maxVideoDataBody)
 
 	ctx := req.Context()

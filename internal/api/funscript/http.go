@@ -33,7 +33,7 @@ func Handler(libraryService *library.Service) http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		info, err := f.Stat()
 		if err != nil || info.IsDir() {
 			http.NotFound(w, r)

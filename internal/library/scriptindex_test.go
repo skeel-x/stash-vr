@@ -16,7 +16,7 @@ func writeIndex(t *testing.T, dbPath string, rows [][3]string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if _, err := db.Exec(`CREATE TABLE script_index (id INTEGER PRIMARY KEY, filename text, metadata text, scene_id text, md5 text)`); err != nil {
 		t.Fatal(err)
 	}

@@ -131,15 +131,6 @@ func subtractSet(base map[string]struct{}, excluded map[string]struct{}) map[str
 	return base
 }
 
-func setToSortedSlice(values map[string]struct{}) []string {
-	out := make([]string, 0, len(values))
-	for value := range values {
-		out = append(out, value)
-	}
-	slices.Sort(out)
-	return out
-}
-
 func savedFilterLookup(filters []library.SavedFilterSceneSet) map[string]library.SavedFilterSceneSet {
 	lookup := make(map[string]library.SavedFilterSceneSet, len(filters))
 	for _, filter := range filters {
