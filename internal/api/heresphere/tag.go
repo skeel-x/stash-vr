@@ -99,7 +99,7 @@ func getTags(vd *library.VideoData) []tagDto {
 	if config.Application().PerformerFacets {
 		trackIndex = addMultiTracks(&tags, performerFacets(vd, time.Now()), trackIndex)
 	}
-	trackIndex = addMultiTracks(&tags, getGroups(vd), trackIndex)
+	addMultiTracks(&tags, getGroups(vd), trackIndex)
 
 	addHiddenToTrack(&tags, getAncestorTags(vd), 2)
 	if config.Application().GenerateSummaryIds {
@@ -229,6 +229,7 @@ func getFields(vd *library.VideoData) []tagDto {
 		playCount = *vd.SceneParts.Play_count
 	}
 	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%d", internal.LegendMetaPlayCount, seperator, playCount)})
+	tags = append(tags, watchedTags(vd)...)
 
 	oCount := 0
 	if vd.SceneParts.O_counter != nil {
@@ -253,6 +254,35 @@ func getFields(vd *library.VideoData) []tagDto {
 	}
 
 	return tags
+}
+
+// minResumeSeconds is the resume position below which Stash's resume_time is
+// noise (a scene opened and closed) rather than a place worth returning to.
+const minResumeSeconds = 5
+
+// watchedTags reports whether a scene has been played and, when Stash holds a
+// meaningful resume position, where playback stopped.
+func watchedTags(vd *library.VideoData) []tagDto {
+	watched := "no"
+	if vd.SceneParts.Play_count != nil && *vd.SceneParts.Play_count > 0 {
+		watched = "yes"
+	}
+	tags := []tagDto{{Name: fmt.Sprintf("%s%s%s", internal.LegendMetaWatched, seperator, watched)}}
+
+	if vd.SceneParts.Resume_time != nil && *vd.SceneParts.Resume_time >= minResumeSeconds {
+		tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%s", internal.LegendMetaResume, seperator, formatResume(*vd.SceneParts.Resume_time))})
+	}
+	return tags
+}
+
+// formatResume renders a position in seconds as m:ss, or h:mm:ss from one hour.
+func formatResume(seconds float64) string {
+	total := int(seconds)
+	h, m, s := total/3600, total%3600/60, total%60
+	if h > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", h, m, s)
+	}
+	return fmt.Sprintf("%d:%02d", m, s)
 }
 
 func getMarkers(vd *library.VideoData) []tagDto {

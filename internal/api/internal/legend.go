@@ -16,6 +16,8 @@ var (
 	LegendMetaResolution  = "Resolution"
 	LegendMetaRating      = "Rating"
 	LegendMetaInteractive = "Interactive"
+	LegendMetaWatched     = "Watched"
+	LegendMetaResume      = "Resume"
 
 	LegendSummary   = "Summary"
 	LegendSummaryId = "SummaryId"

@@ -76,6 +76,8 @@ func TestClassify_HiddenAndKnownLegendsAreNotMarkers(t *testing.T) {
 		{Name: "/o"},
 		{Name: "Country:Sweden"},
 		{Name: "Age:29"},
+		{Name: "Watched:yes"},
+		{Name: "Resume:12:34"},
 	})
 
 	if len(in.markers) != 0 {

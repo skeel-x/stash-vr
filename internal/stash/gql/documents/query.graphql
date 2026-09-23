@@ -213,6 +213,7 @@ fragment SceneParts on Scene {
     }
   }
   play_count
+  resume_time
   o_counter
   organized
   paths {
