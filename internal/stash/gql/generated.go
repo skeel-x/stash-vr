@@ -1249,6 +1249,11 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetPlay_count() *i
 	return v.SceneParts.Play_count
 }
 
+// GetResume_time returns FindScenesFindScenesFindScenesResultTypeScenesScene.Resume_time, and is useful for accessing the field via an interface.
+func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetResume_time() *float64 {
+	return v.SceneParts.Resume_time
+}
+
 // GetO_counter returns FindScenesFindScenesFindScenesResultTypeScenesScene.O_counter, and is useful for accessing the field via an interface.
 func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetO_counter() *int {
 	return v.SceneParts.O_counter
@@ -1332,6 +1337,8 @@ type __premarshalFindScenesFindScenesFindScenesResultTypeScenesScene struct {
 
 	Play_count *int `json:"play_count"`
 
+	Resume_time *float64 `json:"resume_time"`
+
 	O_counter *int `json:"o_counter"`
 
 	Organized bool `json:"organized"`
@@ -1369,6 +1376,7 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) __premarshalJSON()
 	retval.Performers = v.SceneParts.Performers
 	retval.Groups = v.SceneParts.Groups
 	retval.Play_count = v.SceneParts.Play_count
+	retval.Resume_time = v.SceneParts.Resume_time
 	retval.O_counter = v.SceneParts.O_counter
 	retval.Organized = v.SceneParts.Organized
 	retval.Paths = v.SceneParts.Paths
@@ -3572,10 +3580,12 @@ type SceneParts struct {
 	Performers    []*ScenePartsPerformersPerformer      `json:"performers"`
 	Groups        []*ScenePartsGroupsSceneGroup         `json:"groups"`
 	// The number ot times a scene has been played
-	Play_count *int                           `json:"play_count"`
-	O_counter  *int                           `json:"o_counter"`
-	Organized  bool                           `json:"organized"`
-	Paths      *ScenePartsPathsScenePathsType `json:"paths"`
+	Play_count *int `json:"play_count"`
+	// The time index a scene was left at
+	Resume_time *float64                       `json:"resume_time"`
+	O_counter   *int                           `json:"o_counter"`
+	Organized   bool                           `json:"organized"`
+	Paths       *ScenePartsPathsScenePathsType `json:"paths"`
 	// Return valid stream paths
 	SceneStreams  []*ScenePartsSceneStreamsSceneStreamEndpoint `json:"sceneStreams"`
 	Captions      []*ScenePartsCaptionsVideoCaption            `json:"captions"`
@@ -3615,6 +3625,9 @@ func (v *SceneParts) GetGroups() []*ScenePartsGroupsSceneGroup { return v.Groups
 
 // GetPlay_count returns SceneParts.Play_count, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetPlay_count() *int { return v.Play_count }
+
+// GetResume_time returns SceneParts.Resume_time, and is useful for accessing the field via an interface.
+func (v *SceneParts) GetResume_time() *float64 { return v.Resume_time }
 
 // GetO_counter returns SceneParts.O_counter, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetO_counter() *int { return v.O_counter }
@@ -3687,6 +3700,8 @@ type __premarshalSceneParts struct {
 
 	Play_count *int `json:"play_count"`
 
+	Resume_time *float64 `json:"resume_time"`
+
 	O_counter *int `json:"o_counter"`
 
 	Organized bool `json:"organized"`
@@ -3724,6 +3739,7 @@ func (v *SceneParts) __premarshalJSON() (*__premarshalSceneParts, error) {
 	retval.Performers = v.Performers
 	retval.Groups = v.Groups
 	retval.Play_count = v.Play_count
+	retval.Resume_time = v.Resume_time
 	retval.O_counter = v.O_counter
 	retval.Organized = v.Organized
 	retval.Paths = v.Paths
@@ -5560,6 +5576,7 @@ fragment SceneParts on Scene {
 		}
 	}
 	play_count
+	resume_time
 	o_counter
 	organized
 	paths {
