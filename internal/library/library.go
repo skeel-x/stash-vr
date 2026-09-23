@@ -14,7 +14,8 @@ type Service struct {
 	single      singleflight.Group
 	Stats       Stats
 
-	tagCache map[string]*Tag
+	tagCache   map[string]*Tag
+	muTagCache sync.RWMutex
 }
 
 func (libraryService *Service) snapshot() map[string]*VideoData {

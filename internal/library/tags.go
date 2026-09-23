@@ -16,12 +16,15 @@ type Tag struct {
 	ParentIds []string
 }
 
+// LoadTags fetches all tags from Stash and replaces the tag cache. It is
+// called on every index build so tag hierarchy changes in Stash show up
+// without a restart.
 func (libraryService *Service) LoadTags(ctx context.Context) error {
 	resp, err := gql.FindAllTags(ctx, libraryService.StashClient)
 	if err != nil {
 		return err
 	}
-	libraryService.tagCache = make(map[string]*Tag)
+	tagCache := make(map[string]*Tag, len(resp.FindTags.Tags))
 	for _, st := range resp.FindTags.Tags {
 		t := Tag{
 			Id:       st.Id,
@@ -32,12 +35,19 @@ func (libraryService *Service) LoadTags(ctx context.Context) error {
 		for _, p := range st.Parents {
 			t.ParentIds = append(t.ParentIds, p.Id)
 		}
-		libraryService.tagCache[st.Id] = &t
+		tagCache[st.Id] = &t
 	}
+
+	libraryService.muTagCache.Lock()
+	libraryService.tagCache = tagCache
+	libraryService.muTagCache.Unlock()
 	return nil
 }
 
 func (libraryService *Service) ancestors(tagId string) []Tag {
+	libraryService.muTagCache.RLock()
+	defer libraryService.muTagCache.RUnlock()
+
 	visited := map[string]struct{}{tagId: {}}
 	queue := []string{tagId}
 	out := []Tag{}
@@ -56,6 +66,9 @@ func (libraryService *Service) ancestors(tagId string) []Tag {
 			}
 			visited[pid] = struct{}{}
 			p := libraryService.tagCache[pid]
+			if p == nil {
+				continue
+			}
 			queue = append(queue, pid)
 
 			out = append(out, *p)
