@@ -64,7 +64,7 @@ type subtitleDto struct {
 	Url      string `json:"url,omitempty"`
 }
 
-func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string) (*videoDataDto, error) {
+func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, variants []library.ScriptVariant) (*videoDataDto, error) {
 	videoId := vd.Id()
 	if len(vd.SceneParts.Files) == 0 {
 		return nil, fmt.Errorf("scene %s has no files", videoId)
@@ -116,7 +116,7 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string) 
 
 	set3DFormat(vd, &dto)
 
-	setScripts(vd, &dto)
+	setScripts(vd, &dto, baseUrl, variants)
 
 	setSubtitles(vd, &dto)
 
@@ -160,14 +160,27 @@ func isFavorite(vd *library.VideoData) bool {
 	return false
 }
 
-func setScripts(vd *library.VideoData, dto *videoDataDto) {
-	if !vd.SceneParts.Interactive {
+// setScripts lists every funscript for the scene. Standard keeps the URL
+// Stash serves (API-keyed) when Stash knows it; every other variant is
+// served by stash-vr from disk by its index in the variant list.
+func setScripts(vd *library.VideoData, dto *videoDataDto, baseUrl string, variants []library.ScriptVariant) {
+	stashUrl := ""
+	if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Funscript != nil && *vd.SceneParts.Paths.Funscript != "" {
+		stashUrl = stash.ApiKeyed(*vd.SceneParts.Paths.Funscript)
+	}
+	if len(variants) == 0 {
+		if vd.SceneParts.Interactive && stashUrl != "" {
+			dto.Scripts = append(dto.Scripts, scriptDto{Name: "Standard", Url: stashUrl})
+		}
 		return
 	}
-	dto.Scripts = append(dto.Scripts, scriptDto{
-		Name: "Script-" + vd.Title(),
-		Url:  stash.ApiKeyed(*vd.SceneParts.Paths.Funscript),
-	})
+	for i, v := range variants {
+		u := fmt.Sprintf("%s/funscript/%s/%d", baseUrl, vd.Id(), i)
+		if v.Label == "Standard" && stashUrl != "" {
+			u = stashUrl
+		}
+		dto.Scripts = append(dto.Scripts, scriptDto{Name: v.Label, Url: u})
+	}
 }
 
 func set3DFormat(vd *library.VideoData, dto *videoDataDto) {
