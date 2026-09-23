@@ -137,6 +137,9 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 		}
 		libraryService.muSets.Unlock()
 
+		// Undated scenes may have joined the index: walk it for release dates.
+		libraryService.kickDateSweeper()
+
 		return indexResult{sets: sets, sections: sections}, nil
 	})
 	if err != nil {

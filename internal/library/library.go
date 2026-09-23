@@ -40,6 +40,12 @@ type Service struct {
 	// indexWarned is set once the funscript index has been logged as
 	// unavailable, so a broken path warns once rather than per scene.
 	indexWarned atomic.Bool
+
+	// dateStore holds release dates looked up on stash-boxes; loaded on
+	// first use through dates().
+	dateStore *dateStore
+	datesOnce sync.Once
+	sweeper   *dateSweeper
 }
 
 // clientBox wraps the client so different concrete client types can be
@@ -100,6 +106,7 @@ func NewService(client graphql.Client) *Service {
 	s := &Service{
 		vdCache:     make(map[string]*VideoData),
 		scriptCache: make(map[string]scriptEntry),
+		sweeper:     newDateSweeper(),
 	}
 	s.client.Store(&clientBox{c: client})
 	return s

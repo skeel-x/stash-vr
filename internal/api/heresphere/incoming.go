@@ -61,7 +61,7 @@ func classifyIncomingTags(ctx context.Context, tags []tagDto) incomingTags {
 		case internal.LegendPerformer, internal.LegendPerformerCountry, internal.LegendPerformerAge,
 			internal.LegendSceneStudio, internal.LegendSceneGroup,
 			internal.LegendMetaResolution, internal.LegendSummary, internal.LegendSummaryId,
-			internal.LegendMetaInteractive, internal.LegendMetaWatched, internal.LegendMetaResume:
+			internal.LegendMetaInteractive, internal.LegendMetaWatched, internal.LegendMetaResume, internal.LegendMetaReleased:
 			continue
 		case internal.LegendMetaOCount:
 			in.hasOCount = true

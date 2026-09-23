@@ -107,6 +107,20 @@ func TestSetup_RendersFormWithoutApiKey(t *testing.T) {
 	}
 }
 
+func TestSetup_RendersDateSettingsAndStats(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	rec := getPage(t, h, "/setup", nil)
+
+	body := rec.Body.String()
+	for _, want := range []string{`name="date_lookup"`, `name="date_writeback"`, "Release dates: 0 found, 0 missing, 0 unchecked"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("setup missing %q", want)
+		}
+	}
+}
+
 func TestSections_RendersPage(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)

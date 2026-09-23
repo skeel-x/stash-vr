@@ -73,6 +73,8 @@ type ConfigView struct {
 	BasePath           string             `json:"base_path"`
 	DeovrAutoload      bool               `json:"deovr_autoload"`
 	PerformerFacets    bool               `json:"performer_facets"`
+	DateLookup         bool               `json:"date_lookup"`
+	DateWriteback      bool               `json:"date_writeback"`
 	FunscriptIndexPath string             `json:"funscript_index_path"`
 	LogLevel           string             `json:"log_level"`
 	SmartSectionSize   int                `json:"smart_section_size"`
@@ -95,6 +97,8 @@ type configInput struct {
 	BasePath           *string `json:"base_path"`
 	DeovrAutoload      *bool   `json:"deovr_autoload"`
 	PerformerFacets    *bool   `json:"performer_facets"`
+	DateLookup         *bool   `json:"date_lookup"`
+	DateWriteback      *bool   `json:"date_writeback"`
 	FunscriptIndexPath *string `json:"funscript_index_path"`
 	LogLevel           string  `json:"log_level"`
 	SmartSectionSize   *int    `json:"smart_section_size"`
@@ -123,6 +127,8 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		BasePath:           cfg.BasePath,
 		DeovrAutoload:      cfg.DeovrAutoload,
 		PerformerFacets:    cfg.PerformerFacets,
+		DateLookup:         cfg.DateLookup,
+		DateWriteback:      cfg.DateWriteback,
 		FunscriptIndexPath: cfg.FunscriptIndexPath,
 		LogLevel:           cfg.LogLevel,
 		SmartSectionSize:   cfg.SmartSectionSize,
@@ -275,6 +281,12 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.PerformerFacets != nil {
 		next.PerformerFacets = *in.PerformerFacets
+	}
+	if in.DateLookup != nil {
+		next.DateLookup = *in.DateLookup
+	}
+	if in.DateWriteback != nil {
+		next.DateWriteback = *in.DateWriteback
 	}
 	if in.FunscriptIndexPath != nil {
 		next.FunscriptIndexPath = *in.FunscriptIndexPath

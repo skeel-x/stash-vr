@@ -3990,6 +3990,24 @@ type SceneSaveResumeTimeResponse struct {
 // GetSceneSaveActivity returns SceneSaveResumeTimeResponse.SceneSaveActivity, and is useful for accessing the field via an interface.
 func (v *SceneSaveResumeTimeResponse) GetSceneSaveActivity() bool { return v.SceneSaveActivity }
 
+// SceneUpdateDateResponse is returned by SceneUpdateDate on success.
+type SceneUpdateDateResponse struct {
+	SceneUpdate *SceneUpdateDateSceneUpdateScene `json:"sceneUpdate"`
+}
+
+// GetSceneUpdate returns SceneUpdateDateResponse.SceneUpdate, and is useful for accessing the field via an interface.
+func (v *SceneUpdateDateResponse) GetSceneUpdate() *SceneUpdateDateSceneUpdateScene {
+	return v.SceneUpdate
+}
+
+// SceneUpdateDateSceneUpdateScene includes the requested fields of the GraphQL type Scene.
+type SceneUpdateDateSceneUpdateScene struct {
+	Id string `json:"id"`
+}
+
+// GetId returns SceneUpdateDateSceneUpdateScene.Id, and is useful for accessing the field via an interface.
+func (v *SceneUpdateDateSceneUpdateScene) GetId() string { return v.Id }
+
 // SceneUpdateOrganizedResponse is returned by SceneUpdateOrganized on success.
 type SceneUpdateOrganizedResponse struct {
 	SceneUpdate *SceneUpdateOrganizedSceneUpdateScene `json:"sceneUpdate"`
@@ -4048,6 +4066,29 @@ type SceneUpdateTagsSceneUpdateScene struct {
 // GetId returns SceneUpdateTagsSceneUpdateScene.Id, and is useful for accessing the field via an interface.
 func (v *SceneUpdateTagsSceneUpdateScene) GetId() string { return v.Id }
 
+// ScrapeSceneDateResponse is returned by ScrapeSceneDate on success.
+type ScrapeSceneDateResponse struct {
+	// Scrape for a single scene
+	ScrapeSingleScene []*ScrapeSceneDateScrapeSingleSceneScrapedScene `json:"scrapeSingleScene"`
+}
+
+// GetScrapeSingleScene returns ScrapeSceneDateResponse.ScrapeSingleScene, and is useful for accessing the field via an interface.
+func (v *ScrapeSceneDateResponse) GetScrapeSingleScene() []*ScrapeSceneDateScrapeSingleSceneScrapedScene {
+	return v.ScrapeSingleScene
+}
+
+// ScrapeSceneDateScrapeSingleSceneScrapedScene includes the requested fields of the GraphQL type ScrapedScene.
+type ScrapeSceneDateScrapeSingleSceneScrapedScene struct {
+	Title *string `json:"title"`
+	Date  *string `json:"date"`
+}
+
+// GetTitle returns ScrapeSceneDateScrapeSingleSceneScrapedScene.Title, and is useful for accessing the field via an interface.
+func (v *ScrapeSceneDateScrapeSingleSceneScrapedScene) GetTitle() *string { return v.Title }
+
+// GetDate returns ScrapeSceneDateScrapeSingleSceneScrapedScene.Date, and is useful for accessing the field via an interface.
+func (v *ScrapeSceneDateScrapeSingleSceneScrapedScene) GetDate() *string { return v.Date }
+
 type SortDirectionEnum string
 
 const (
@@ -4058,6 +4099,57 @@ const (
 var AllSortDirectionEnum = []SortDirectionEnum{
 	SortDirectionEnumAsc,
 	SortDirectionEnumDesc,
+}
+
+// StashBoxesConfigurationConfigResult includes the requested fields of the GraphQL type ConfigResult.
+// The GraphQL type's documentation follows.
+//
+// All configuration settings
+type StashBoxesConfigurationConfigResult struct {
+	General *StashBoxesConfigurationConfigResultGeneralConfigGeneralResult `json:"general"`
+}
+
+// GetGeneral returns StashBoxesConfigurationConfigResult.General, and is useful for accessing the field via an interface.
+func (v *StashBoxesConfigurationConfigResult) GetGeneral() *StashBoxesConfigurationConfigResultGeneralConfigGeneralResult {
+	return v.General
+}
+
+// StashBoxesConfigurationConfigResultGeneralConfigGeneralResult includes the requested fields of the GraphQL type ConfigGeneralResult.
+type StashBoxesConfigurationConfigResultGeneralConfigGeneralResult struct {
+	// Stash-box instances used for tagging
+	StashBoxes []*StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox `json:"stashBoxes"`
+}
+
+// GetStashBoxes returns StashBoxesConfigurationConfigResultGeneralConfigGeneralResult.StashBoxes, and is useful for accessing the field via an interface.
+func (v *StashBoxesConfigurationConfigResultGeneralConfigGeneralResult) GetStashBoxes() []*StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox {
+	return v.StashBoxes
+}
+
+// StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox includes the requested fields of the GraphQL type StashBox.
+type StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox struct {
+	Name     string `json:"name"`
+	Endpoint string `json:"endpoint"`
+}
+
+// GetName returns StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox.Name, and is useful for accessing the field via an interface.
+func (v *StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox) GetName() string {
+	return v.Name
+}
+
+// GetEndpoint returns StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox.Endpoint, and is useful for accessing the field via an interface.
+func (v *StashBoxesConfigurationConfigResultGeneralConfigGeneralResultStashBoxesStashBox) GetEndpoint() string {
+	return v.Endpoint
+}
+
+// StashBoxesResponse is returned by StashBoxes on success.
+type StashBoxesResponse struct {
+	// Returns the current, complete configuration
+	Configuration *StashBoxesConfigurationConfigResult `json:"configuration"`
+}
+
+// GetConfiguration returns StashBoxesResponse.Configuration, and is useful for accessing the field via an interface.
+func (v *StashBoxesResponse) GetConfiguration() *StashBoxesConfigurationConfigResult {
+	return v.Configuration
 }
 
 type StashIDCriterionInput struct {
@@ -5003,6 +5095,18 @@ func (v *__SceneSaveResumeTimeInput) GetId() string { return v.Id }
 // GetResume returns __SceneSaveResumeTimeInput.Resume, and is useful for accessing the field via an interface.
 func (v *__SceneSaveResumeTimeInput) GetResume() *float64 { return v.Resume }
 
+// __SceneUpdateDateInput is used internally by genqlient
+type __SceneUpdateDateInput struct {
+	Id   string  `json:"id"`
+	Date *string `json:"date"`
+}
+
+// GetId returns __SceneUpdateDateInput.Id, and is useful for accessing the field via an interface.
+func (v *__SceneUpdateDateInput) GetId() string { return v.Id }
+
+// GetDate returns __SceneUpdateDateInput.Date, and is useful for accessing the field via an interface.
+func (v *__SceneUpdateDateInput) GetDate() *string { return v.Date }
+
 // __SceneUpdateOrganizedInput is used internally by genqlient
 type __SceneUpdateOrganizedInput struct {
 	Id          string `json:"id"`
@@ -5038,6 +5142,18 @@ func (v *__SceneUpdateTagsInput) GetId() string { return v.Id }
 
 // GetTag_ids returns __SceneUpdateTagsInput.Tag_ids, and is useful for accessing the field via an interface.
 func (v *__SceneUpdateTagsInput) GetTag_ids() []string { return v.Tag_ids }
+
+// __ScrapeSceneDateInput is used internally by genqlient
+type __ScrapeSceneDateInput struct {
+	Index int    `json:"index"`
+	Id    string `json:"id"`
+}
+
+// GetIndex returns __ScrapeSceneDateInput.Index, and is useful for accessing the field via an interface.
+func (v *__ScrapeSceneDateInput) GetIndex() int { return v.Index }
+
+// GetId returns __ScrapeSceneDateInput.Id, and is useful for accessing the field via an interface.
+func (v *__ScrapeSceneDateInput) GetId() string { return v.Id }
 
 // __TagCreateInput is used internally by genqlient
 type __TagCreateInput struct {
@@ -6243,6 +6359,42 @@ func SceneSaveResumeTime(
 	return data_, err_
 }
 
+// The mutation executed by SceneUpdateDate.
+const SceneUpdateDate_Operation = `
+mutation SceneUpdateDate ($id: ID!, $date: String) {
+	sceneUpdate(input: {id:$id,date:$date}) {
+		id
+	}
+}
+`
+
+func SceneUpdateDate(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+	date *string,
+) (data_ *SceneUpdateDateResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "SceneUpdateDate",
+		Query:  SceneUpdateDate_Operation,
+		Variables: &__SceneUpdateDateInput{
+			Id:   id,
+			Date: date,
+		},
+	}
+
+	data_ = &SceneUpdateDateResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
 // The mutation executed by SceneUpdateOrganized.
 const SceneUpdateOrganized_Operation = `
 mutation SceneUpdateOrganized ($id: ID!, $isOrganized: Boolean) {
@@ -6341,6 +6493,78 @@ func SceneUpdateTags(
 	}
 
 	data_ = &SceneUpdateTagsResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by ScrapeSceneDate.
+const ScrapeSceneDate_Operation = `
+query ScrapeSceneDate ($index: Int!, $id: ID!) {
+	scrapeSingleScene(source: {stash_box_index:$index}, input: {scene_id:$id}) {
+		title
+		date
+	}
+}
+`
+
+func ScrapeSceneDate(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	index int,
+	id string,
+) (data_ *ScrapeSceneDateResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "ScrapeSceneDate",
+		Query:  ScrapeSceneDate_Operation,
+		Variables: &__ScrapeSceneDateInput{
+			Index: index,
+			Id:    id,
+		},
+	}
+
+	data_ = &ScrapeSceneDateResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by StashBoxes.
+const StashBoxes_Operation = `
+query StashBoxes {
+	configuration {
+		general {
+			stashBoxes {
+				name
+				endpoint
+			}
+		}
+	}
+}
+`
+
+func StashBoxes(
+	ctx_ context.Context,
+	client_ graphql.Client,
+) (data_ *StashBoxesResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "StashBoxes",
+		Query:  StashBoxes_Operation,
+	}
+
+	data_ = &StashBoxesResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

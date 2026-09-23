@@ -34,14 +34,13 @@ func ageAt(birthdate string, at time.Time) (int, bool) {
 }
 
 // performerFacets derives Country and Age tags from the scene's performers.
-// Ages are taken at the scene's date when it has one, else at now. Repeated
+// Ages are taken at the scene's release date (Stash's, else one looked up on
+// a stash-box) when it has one, else at now. Repeated
 // values (two performers from one country, or of one age) give one tag.
 func performerFacets(vd *library.VideoData, now time.Time) []tagDto {
 	at := now
-	if vd.SceneParts.Date != nil {
-		if d, err := time.Parse(dateLayout, *vd.SceneParts.Date); err == nil {
-			at = d
-		}
+	if d, err := time.Parse(dateLayout, vd.ReleaseDate()); err == nil {
+		at = d
 	}
 	var tags []tagDto
 	seen := map[string]struct{}{}

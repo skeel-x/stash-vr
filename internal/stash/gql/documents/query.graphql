@@ -167,6 +167,24 @@ query FindSampleSceneCover {
   }
 }
 
+query StashBoxes {
+  configuration {
+    general {
+      stashBoxes {
+        name
+        endpoint
+      }
+    }
+  }
+}
+
+query ScrapeSceneDate($index: Int!, $id: ID!) {
+  scrapeSingleScene(source: {stash_box_index: $index}, input: {scene_id: $id}) {
+    title
+    date
+  }
+}
+
 fragment SavedFilterParts on SavedFilter {
   id
   name

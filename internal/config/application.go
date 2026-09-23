@@ -19,6 +19,8 @@ const (
 	envKeyBasePath           = "BASE_PATH"
 	envKeyDeovrAutoload      = "DEOVR_AUTOLOAD"
 	envKeyPerformerFacets    = "PERFORMER_FACETS"
+	envKeyDateLookup         = "DATE_LOOKUP"
+	envKeyDateWriteback      = "DATE_WRITEBACK"
 	envKeyFunscriptIndexPath = "FUNSCRIPT_INDEX_PATH"
 	envKeyHeatmapHeightPx    = "HEATMAP_HEIGHT_PX"
 	envKeyExcludeSortName    = "EXCLUDE_SORT_NAME"
@@ -39,6 +41,8 @@ type ApplicationConfig struct {
 	BasePath           string
 	DeovrAutoload      bool
 	PerformerFacets    bool
+	DateLookup         bool
+	DateWriteback      bool
 	FunscriptIndexPath string
 	HeatmapHeightPx    int
 	SmartSectionSize   int
@@ -83,6 +87,12 @@ func Init() error {
 	pflag.Bool(envKeyPerformerFacets, true, "Add Country and Age tags derived from a scene's performers in HereSphere")
 	_ = viper.BindPFlag(envKeyPerformerFacets, pflag.Lookup(envKeyPerformerFacets))
 
+	pflag.Bool(envKeyDateLookup, true, "Look up missing release dates from the stash-boxes configured in Stash")
+	_ = viper.BindPFlag(envKeyDateLookup, pflag.Lookup(envKeyDateLookup))
+
+	pflag.Bool(envKeyDateWriteback, false, "Write release dates found on stash-boxes back to Stash")
+	_ = viper.BindPFlag(envKeyDateWriteback, pflag.Lookup(envKeyDateWriteback))
+
 	pflag.String(envKeyFunscriptIndexPath, "", "Path to the timestampTrade plugin's funscript_index.sqlite; its scripts are offered as alternates")
 	_ = viper.BindPFlag(envKeyFunscriptIndexPath, pflag.Lookup(envKeyFunscriptIndexPath))
 
@@ -125,6 +135,8 @@ func Init() error {
 		BasePath:           viper.GetString(envKeyBasePath),
 		DeovrAutoload:      viper.GetBool(envKeyDeovrAutoload),
 		PerformerFacets:    viper.GetBool(envKeyPerformerFacets),
+		DateLookup:         viper.GetBool(envKeyDateLookup),
+		DateWriteback:      viper.GetBool(envKeyDateWriteback),
 		FunscriptIndexPath: viper.GetString(envKeyFunscriptIndexPath),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),

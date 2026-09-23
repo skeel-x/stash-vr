@@ -41,6 +41,9 @@
   <label class="check"><input name="force_https" type="checkbox" {{if .Config.ForceHTTPS}}checked{{end}}> Always build https links (only if your proxy does not send X-Forwarded-Proto)</label>
   <label class="check"><input name="deovr_autoload" type="checkbox" {{if .Config.DeovrAutoload}}checked{{end}}> Send the DeoVR library when DeoVR's browser opens the front page</label>
   <label class="check"><input name="performer_facets" type="checkbox" {{if .Config.PerformerFacets}}checked{{end}}> Performer facets (Country and Age tags in HereSphere)</label>
+  <label class="check"><input name="date_lookup" type="checkbox" {{if .Config.DateLookup}}checked{{end}}> Look up missing release dates from your stash-boxes</label>
+  <label class="check"><input name="date_writeback" type="checkbox" {{if .Config.DateWriteback}}checked{{end}}> Write found dates back to Stash</label>
+  <p class="lead">Release dates: {{.DateStats.Found}} found, {{.DateStats.Missing}} missing, {{.DateStats.Unchecked}} unchecked. Scenes without a date in Stash are matched on the stash-boxes configured in Stash, one every few seconds; found dates feed the Age facet and the Released tag and are kept in dates.json next to the settings.</p>
 
   <h2>Video rules</h2>
   <p class="lead">Tags decide how a scene is shown. Rules apply top to bottom; a later rule overrides an earlier one. Profiles stored: {{len .Profiles}}. Tune a scene in HereSphere and save it there; it then shows up here and can back a rule.</p>

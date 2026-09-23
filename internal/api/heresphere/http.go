@@ -121,6 +121,10 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	if vd.ReleaseDate() == "" {
+		// Look the date up ahead of the sweep so the next open shows it.
+		h.libraryService.RequestDate(videoId)
+	}
 	dto, err := buildVideoData(ctx, vd, baseUrl, h.libraryService.ScriptVariants(ctx, videoId), h.libraryService)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("failed to build video data")

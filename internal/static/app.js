@@ -94,6 +94,8 @@
       force_https: form.force_https.checked,
       deovr_autoload: form.deovr_autoload.checked,
       performer_facets: form.performer_facets.checked,
+      date_lookup: form.date_lookup.checked,
+      date_writeback: form.date_writeback.checked,
       funscript_index_path: form.funscript_index_path.value.trim(),
       base_path: form.base_path.value.trim(),
       log_level: form.log_level.value,

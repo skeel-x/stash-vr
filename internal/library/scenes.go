@@ -145,6 +145,9 @@ func (libraryService *Service) fetchVideoData(ctx context.Context, sceneIds []in
 	vds := make([]*VideoData, len(resp.FindScenes.Scenes))
 	for i, s := range resp.FindScenes.Scenes {
 		vd := VideoData{SceneParts: &s.SceneParts}
+		if vd.stashDate() == "" {
+			vd.releaseDate = libraryService.LookedUpDate(s.Id)
+		}
 		libraryService.decorateTags(&vd)
 		vds[i] = &vd
 	}

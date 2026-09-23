@@ -43,6 +43,9 @@ func Run(ctx context.Context) error {
 		// must not turn into a restart loop. The first request will retry.
 		log.Ctx(ctx).Warn().Err(err).Msg("library warmup failed, continuing without prebuilt index")
 	}
+	// Started either way: it idles until an index exists and walks it after
+	// every build.
+	libraryService.StartDateSweeper(ctx)
 
 	err := server.Listen(ctx, config.Application().ListenAddress, libraryService)
 	if err != nil {

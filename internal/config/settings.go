@@ -137,6 +137,8 @@ type fileConfig struct {
 	BasePath           *string     `json:"base_path,omitempty"`
 	DeovrAutoload      *bool       `json:"deovr_autoload,omitempty"`
 	PerformerFacets    *bool       `json:"performer_facets,omitempty"`
+	DateLookup         *bool       `json:"date_lookup,omitempty"`
+	DateWriteback      *bool       `json:"date_writeback,omitempty"`
 	FunscriptIndexPath *string     `json:"funscript_index_path,omitempty"`
 	LogLevel           *string     `json:"log_level,omitempty"`
 	Filters            []Filter    `json:"filters"`
@@ -284,6 +286,12 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.PerformerFacets != nil {
 		base.PerformerFacets = *fc.PerformerFacets
 	}
+	if fc.DateLookup != nil {
+		base.DateLookup = *fc.DateLookup
+	}
+	if fc.DateWriteback != nil {
+		base.DateWriteback = *fc.DateWriteback
+	}
 	if fc.FunscriptIndexPath != nil {
 		base.FunscriptIndexPath = *fc.FunscriptIndexPath
 	}
@@ -388,6 +396,8 @@ func write(path string, c ApplicationConfig) error {
 		BasePath:           &c.BasePath,
 		DeovrAutoload:      &c.DeovrAutoload,
 		PerformerFacets:    &c.PerformerFacets,
+		DateLookup:         &c.DateLookup,
+		DateWriteback:      &c.DateWriteback,
 		FunscriptIndexPath: &c.FunscriptIndexPath,
 		LogLevel:           &c.LogLevel,
 		Filters:            c.Filters,

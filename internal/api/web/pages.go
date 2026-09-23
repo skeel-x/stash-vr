@@ -77,6 +77,7 @@ type pageData struct {
 	Lenses      []string
 	LogLines    []string
 	Random      []RandomScene
+	DateStats   library.DateStats
 }
 
 // ruleRow is what the rule-row template renders: one rule with the option
@@ -171,6 +172,7 @@ func (h pageHandler) setup(w http.ResponseWriter, r *http.Request) {
 	cfg := config.Application()
 	data.Config = MaskedConfig(cfg)
 	data.VideoRules = cfg.VideoRules
+	data.DateStats = h.lib.DateStats()
 	data.Projections = []string{"equirectangular", "equirectangular360", "fisheye", "cubemap", "equiangularCubemap", "perspective"}
 	data.Stereos = []string{"mono", "sbs", "tb"}
 	data.Lenses = []string{"MKX200", "MKX220", "VRCA220"}

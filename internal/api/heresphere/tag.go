@@ -231,6 +231,10 @@ func getFields(vd *library.VideoData) []tagDto {
 	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%d", internal.LegendMetaPlayCount, seperator, playCount)})
 	tags = append(tags, watchedTags(vd)...)
 
+	if released := vd.ReleaseDate(); released != "" {
+		tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%s", internal.LegendMetaReleased, seperator, released)})
+	}
+
 	oCount := 0
 	if vd.SceneParts.O_counter != nil {
 		oCount = *vd.SceneParts.O_counter

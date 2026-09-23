@@ -381,3 +381,32 @@ func TestSet_ValidatesHiddenIn(t *testing.T) {
 		t.Fatalf("expected hidden_in persisted, got %s", data)
 	}
 }
+
+func TestLoad_DateSettingsSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+	seed.DateLookup = true
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !Application().DateLookup || Application().DateWriteback {
+		t.Fatal("expected lookup on and write-back off from the seed")
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"date_lookup": true`) || !strings.Contains(string(data), `"date_writeback": false`) {
+		t.Fatalf("expected both date settings persisted, got %s", data)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"date_lookup":false,"date_writeback":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if Application().DateLookup || !Application().DateWriteback {
+		t.Fatal("expected the file to turn lookup off and write-back on")
+	}
+}

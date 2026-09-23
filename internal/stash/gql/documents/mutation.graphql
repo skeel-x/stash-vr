@@ -12,6 +12,13 @@ mutation SceneUpdateTags($id: ID!, $tag_ids: [ID!]) {
     }){id}
 }
 
+mutation SceneUpdateDate($id: ID!, $date: String) {
+    sceneUpdate(input: {
+        id: $id,
+        date: $date
+    }){id}
+}
+
 mutation TagCreate($name: String!){
     tagCreate(input: {name: $name}){id}
 }

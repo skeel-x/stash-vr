@@ -272,6 +272,40 @@ func TestPutConfig_PersistsPerformerFacets(t *testing.T) {
 	}
 }
 
+func TestPutConfig_PersistsDateSettings(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"date_lookup": false, "date_writeback": true,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["date_lookup"] != false || out["date_writeback"] != true {
+		t.Fatalf("expected 200 with date_lookup false and date_writeback true, got %d %v", rec.Code, out)
+	}
+	if config.Application().DateLookup || !config.Application().DateWriteback {
+		t.Fatal("expected the date settings stored")
+	}
+	data, _ := os.ReadFile(config.FilePath(config.Application()))
+	if !strings.Contains(string(data), `"date_lookup": false`) || !strings.Contains(string(data), `"date_writeback": true`) {
+		t.Fatalf("expected the date settings persisted to config.json, got %s", data)
+	}
+
+	delete(body, "date_lookup")
+	delete(body, "date_writeback")
+	rec, _ = do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200 without the fields, got %d %s", rec.Code, rec.Body.String())
+	}
+	if config.Application().DateLookup || !config.Application().DateWriteback {
+		t.Fatal("expected the date settings kept when the fields are missing")
+	}
+}
+
 func TestPutConfig_MissingSmartSectionSizeKeepsCurrent(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
