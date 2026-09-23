@@ -2,6 +2,7 @@ package heresphere
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -106,6 +107,10 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 
 	vd, err := h.libraryService.GetScene(ctx, videoId, false)
 	if err != nil {
+		if errors.Is(err, library.ErrSceneNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		log.Ctx(ctx).Error().Err(err).Msg("failed to get scene")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -264,6 +269,10 @@ func (h *httpHandler) eventsHandler(w http.ResponseWriter, req *http.Request) {
 	videoId := parts[len(parts)-1]
 	vd, err := h.libraryService.GetScene(ctx, videoId, false)
 	if err != nil {
+		if errors.Is(err, library.ErrSceneNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to get scene from event")
 		w.WriteHeader(http.StatusInternalServerError)
 		return

@@ -1,6 +1,7 @@
 package deovr
 
 import (
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 	"net/http"
@@ -51,6 +52,10 @@ func (h httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request) 
 
 	vd, err := h.LibraryService.GetScene(ctx, sceneId, false)
 	if err != nil {
+		if errors.Is(err, library.ErrSceneNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		log.Ctx(ctx).Error().Err(err).Msg("failed to get scene data")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
