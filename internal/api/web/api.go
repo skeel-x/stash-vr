@@ -18,6 +18,7 @@ import (
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
+	"stash-vr/internal/logger"
 	"stash-vr/internal/stash"
 )
 
@@ -119,6 +120,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Put("/filters", h.putFilters)
 	r.Put("/video-rules", h.putVideoRules)
 	r.Post("/reindex", h.reindex)
+	r.Get("/log", h.getLog)
 	return r
 }
 
@@ -363,4 +365,23 @@ func (h *apiHandler) reindex(w http.ResponseWriter, r *http.Request) {
 		"links":    stats.Links,
 		"scenes":   stats.Scenes,
 	})
+}
+
+// getLog returns the last lines of the process log: 200 by default, at most
+// the 500 the ring keeps.
+func (h *apiHandler) getLog(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	n := 200
+	if q := r.URL.Query().Get("lines"); q != "" {
+		v, err := strconv.Atoi(q)
+		if err != nil || v < 1 {
+			writeError(ctx, w, http.StatusBadRequest, "lines must be a positive number")
+			return
+		}
+		n = v
+	}
+	if n > 500 {
+		n = 500
+	}
+	writeJson(ctx, w, map[string]any{"lines": logger.Tail.Lines(n)})
 }

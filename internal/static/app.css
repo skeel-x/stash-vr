@@ -112,6 +112,9 @@ input:disabled{color:var(--muted)}
 .msg.ok{color:var(--ok)}
 .msg.err{color:var(--err)}
 
+/* log page */
+pre.log{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin:16px 0 0;max-height:70vh;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.4;white-space:pre-wrap;word-break:break-all}
+
 /* sections table */
 table.sections{width:100%;border-collapse:collapse;margin:0 0 16px;background:var(--surface)}
 table.sections th{text-align:left;color:var(--muted);font-weight:500;font-size:16px;padding:8px;border-bottom:1px solid var(--line)}

@@ -12,6 +12,7 @@ import (
 	"stash-vr/internal/build"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
+	"stash-vr/internal/logger"
 	"stash-vr/internal/static"
 )
 
@@ -19,7 +20,11 @@ var (
 	launchTmpl   = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "launch.gohtml"))
 	setupTmpl    = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "setup.gohtml"))
 	sectionsTmpl = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "sections.gohtml"))
+	logTmpl      = template.Must(template.ParseFS(static.Fs, "layout.gohtml", "log.gohtml"))
 )
+
+// logPageLines is how many lines the Log page shows on load and on refresh.
+const logPageLines = 300
 
 var logLevels = []string{"trace", "debug", "info", "warn", "error"}
 
@@ -55,6 +60,7 @@ type pageData struct {
 	Projections []string
 	Stereos     []string
 	Lenses      []string
+	LogLines    []string
 }
 
 // ruleRow is what the rule-row template renders: one rule with the option
@@ -91,6 +97,7 @@ func Register(r chi.Router, lib *library.Service, deovrIndex http.HandlerFunc) {
 	r.Get("/", h.players)
 	r.Get("/setup", h.setup)
 	r.Get("/sections", h.sections)
+	r.Get("/log", h.logPage)
 	r.Get("/settings", redirectTo("/setup"))
 	r.Get("/filters", redirectTo("/sections"))
 }
@@ -164,4 +171,10 @@ func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
 		data.FilterRows = append(data.FilterRows, FilterRow{ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled, Smart: row.Smart})
 	}
 	render(w, r, sectionsTmpl, data)
+}
+
+func (h pageHandler) logPage(w http.ResponseWriter, r *http.Request) {
+	data := h.base(r, "Log", "log")
+	data.LogLines = logger.Tail.Lines(logPageLines)
+	render(w, r, logTmpl, data)
 }

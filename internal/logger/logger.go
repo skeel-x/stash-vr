@@ -18,11 +18,20 @@ func New(level string, disableColor bool) zerolog.Logger {
 	}
 	zerolog.SetGlobalLevel(lvl)
 
-	l := log.Output(zerolog.ConsoleWriter{
+	const timeFormat = "Jan 02, 15:04:05"
+	console := zerolog.ConsoleWriter{
 		Out:        os.Stderr,
-		TimeFormat: "Jan 02, 15:04:05",
+		TimeFormat: timeFormat,
 		NoColor:    disableColor,
-	}).With().Str("mod", "default").Logger().Level(zerolog.TraceLevel) //.With().Caller().Logger()
+	}
+	// The same lines also go to the in-memory tail the Log page shows, as
+	// plain text so the page never renders colour escape codes.
+	ring := zerolog.ConsoleWriter{
+		Out:        Tail,
+		TimeFormat: timeFormat,
+		NoColor:    true,
+	}
+	l := log.Output(zerolog.MultiLevelWriter(console, ring)).With().Str("mod", "default").Logger().Level(zerolog.TraceLevel) //.With().Caller().Logger()
 
 	return l
 }

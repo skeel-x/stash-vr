@@ -193,4 +193,23 @@
       catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
     });
   }
+
+  // Log page: refresh and auto-refresh the tail.
+  const logPre = $('#log-lines');
+  if (logPre) {
+    const load = async () => {
+      try {
+        const r = await api('GET', '/log?lines=300');
+        logPre.textContent = r.lines.join('\n') + '\n';
+        logPre.scrollTop = logPre.scrollHeight;
+        setMsg($('#log-msg'), '', 'ok');
+      } catch (e) { setMsg($('#log-msg'), e.message, 'err'); }
+    };
+    $('#log-refresh').addEventListener('click', load);
+    let timer = null;
+    $('#log-auto').addEventListener('change', (e) => {
+      if (e.target.checked) { load(); timer = setInterval(load, 5000); } else { clearInterval(timer); timer = null; }
+    });
+    logPre.scrollTop = logPre.scrollHeight;
+  }
 })();

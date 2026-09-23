@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
+	"stash-vr/internal/logger"
 )
 
 // fakeStash answers generated queries by operation name.
@@ -571,5 +573,26 @@ func TestPutVideoRules_RoundTripAndValidation(t *testing.T) {
 	rec, out = do(t, h, http.MethodPut, "/video-rules", []any{})
 	if rec.Code != 200 || len(config.Application().VideoRules) != 13 {
 		t.Fatalf("expected an empty PUT to restore the %d defaults, got %d %v", 13, rec.Code, out)
+	}
+}
+
+func TestGetLog_ReturnsTailWithClamp(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	for i := 0; i < 3; i++ {
+		fmt.Fprintf(logger.Tail, "tail line %d\n", i)
+	}
+
+	_, out := do(t, h, http.MethodGet, "/log?lines=2", nil)
+	lines, _ := out["lines"].([]any)
+	if len(lines) != 2 || lines[1] != "tail line 2" {
+		t.Fatalf("got %v", out)
+	}
+	rec, out := do(t, h, http.MethodGet, "/log?lines=9999", nil)
+	if rec.Code != 200 || len(out["lines"].([]any)) > 500 {
+		t.Fatalf("expected clamp to 500, got %d %v", rec.Code, out)
+	}
+	rec, _ = do(t, h, http.MethodGet, "/log?lines=abc", nil)
+	if rec.Code != 400 {
+		t.Fatalf("expected 400 for a bad count, got %d", rec.Code)
 	}
 }

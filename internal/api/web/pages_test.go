@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Khan/genqlient/graphql"
 	"stash-vr/internal/config"
+	"stash-vr/internal/logger"
 )
 
 func getPage(t *testing.T, h http.Handler, path string, headers map[string]string) *httptest.ResponseRecorder {
@@ -225,6 +227,19 @@ func TestSetup_RendersVideoRulesAndProfiles(t *testing.T) {
 	body := getPage(t, h, "/setup", nil).Body.String()
 
 	for _, want := range []string{"Video rules", `data-rule`, `value="DOME"`, `value="Augmented Reality"`, `<option value="11649"`, "Profiles stored: 1", `id="save-rules"`, `id="reset-rules"`, `id="add-rule"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+}
+
+func TestLog_RendersPage(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	fmt.Fprintln(logger.Tail, "hello from the log")
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/log", nil).Body.String()
+	for _, want := range []string{"hello from the log", `id="log-lines"`, `id="log-refresh"`, `id="log-auto"`, `href="/log"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
 		}
