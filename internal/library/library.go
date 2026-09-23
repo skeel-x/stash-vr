@@ -34,6 +34,9 @@ type Service struct {
 	// checks it again before storing its result, so a reset that lands
 	// mid-build is not overwritten by that build's now-stale result.
 	setsGen uint64
+
+	muScripts   sync.Mutex
+	scriptCache map[string]scriptEntry
 }
 
 // clientBox wraps the client so different concrete client types can be
@@ -66,6 +69,10 @@ func (libraryService *Service) ResetCaches() {
 	libraryService.tagCache = nil
 	libraryService.muTagCache.Unlock()
 
+	libraryService.muScripts.Lock()
+	libraryService.scriptCache = make(map[string]scriptEntry)
+	libraryService.muScripts.Unlock()
+
 	libraryService.ResetSections()
 }
 
@@ -88,7 +95,8 @@ func (libraryService *Service) snapshot() map[string]*VideoData {
 
 func NewService(client graphql.Client) *Service {
 	s := &Service{
-		vdCache: make(map[string]*VideoData),
+		vdCache:     make(map[string]*VideoData),
+		scriptCache: make(map[string]scriptEntry),
 	}
 	s.client.Store(&clientBox{c: client})
 	return s
