@@ -121,6 +121,42 @@ func TestSetup_RendersDateSettingsAndStats(t *testing.T) {
 	}
 }
 
+func TestSetup_RendersAutoSectionInputs(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/setup", nil).Body.String()
+
+	for _, want := range []string{`name="auto_studio_min"`, `name="auto_performer_min"`, "Studio sections from N scenes", "Performer sections from N scenes", "0 turns it off. Up to 50 of each, largest first."} {
+		if !strings.Contains(body, want) {
+			t.Errorf("setup missing %q", want)
+		}
+	}
+}
+
+func TestSections_ShowsAutoBadge(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.AutoStudioMin = 2
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/sections", nil).Body.String()
+
+	if !strings.Contains(body, `data-id="studio:7"`) || !strings.Contains(body, "Studio Seven") {
+		t.Fatal("expected the generated studio row")
+	}
+	if !strings.Contains(body, ">auto<") {
+		t.Fatal("expected the auto badge")
+	}
+	// The generated row is the only one shown in HereSphere, so it is the landing row.
+	if strings.Count(body, `class="badge landing" title="HereSphere opens on this section">Opens first`) != 1 {
+		t.Fatal("expected exactly one visible landing badge")
+	}
+}
+
 func TestSections_RendersPage(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)

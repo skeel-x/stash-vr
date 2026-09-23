@@ -984,6 +984,79 @@ func (v *FindSavedSceneFiltersResponse) GetFindSavedFilters() []*FindSavedSceneF
 	return v.FindSavedFilters
 }
 
+// FindSceneGroupingsFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
+type FindSceneGroupingsFindScenesFindScenesResultType struct {
+	Scenes []*FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
+}
+
+// GetScenes returns FindSceneGroupingsFindScenesFindScenesResultType.Scenes, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultType) GetScenes() []*FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene {
+	return v.Scenes
+}
+
+// FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene includes the requested fields of the GraphQL type Scene.
+type FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene struct {
+	Id         string                                                                            `json:"id"`
+	Studio     *FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio                `json:"studio"`
+	Performers []*FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer `json:"performers"`
+}
+
+// GetId returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene.Id, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene) GetId() string { return v.Id }
+
+// GetStudio returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene.Studio, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene) GetStudio() *FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio {
+	return v.Studio
+}
+
+// GetPerformers returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene.Performers, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene) GetPerformers() []*FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer {
+	return v.Performers
+}
+
+// FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer includes the requested fields of the GraphQL type Performer.
+type FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// GetId returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Id, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetId() string {
+	return v.Id
+}
+
+// GetName returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Name, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetName() string {
+	return v.Name
+}
+
+// FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio includes the requested fields of the GraphQL type Studio.
+type FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// GetId returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio.Id, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio) GetId() string {
+	return v.Id
+}
+
+// GetName returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio.Name, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio) GetName() string {
+	return v.Name
+}
+
+// FindSceneGroupingsResponse is returned by FindSceneGroupings on success.
+type FindSceneGroupingsResponse struct {
+	// A function which queries Scene objects
+	FindScenes *FindSceneGroupingsFindScenesFindScenesResultType `json:"findScenes"`
+}
+
+// GetFindScenes returns FindSceneGroupingsResponse.FindScenes, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsResponse) GetFindScenes() *FindSceneGroupingsFindScenesFindScenesResultType {
+	return v.FindScenes
+}
+
 // FindSceneIdsByFilterFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
 type FindSceneIdsByFilterFindScenesFindScenesResultType struct {
 	Scenes []*FindSceneIdsByFilterFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
@@ -5503,6 +5576,46 @@ func FindSavedSceneFilters(
 	}
 
 	data_ = &FindSavedSceneFiltersResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindSceneGroupings.
+const FindSceneGroupings_Operation = `
+query FindSceneGroupings {
+	findScenes(filter: {per_page:-1,sort:"created_at",direction:DESC}) {
+		scenes {
+			id
+			studio {
+				id
+				name
+			}
+			performers {
+				id
+				name
+			}
+		}
+	}
+}
+`
+
+func FindSceneGroupings(
+	ctx_ context.Context,
+	client_ graphql.Client,
+) (data_ *FindSceneGroupingsResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindSceneGroupings",
+		Query:  FindSceneGroupings_Operation,
+	}
+
+	data_ = &FindSceneGroupingsResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

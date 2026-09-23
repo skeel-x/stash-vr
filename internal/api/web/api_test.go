@@ -48,6 +48,8 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 		payload = `{"findTags":{"tags":[]}}`
 	case "FindScenes":
 		payload = `{"findScenes":{"scenes":[{"id":"1","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"one.mp4","duration":100,"path":"/one.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/1/screenshot","stream":"http://stash:9999/scene/1/stream"},"tags":[]},{"id":"2","title":"Two","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"two.mp4","duration":100,"path":"/two.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/2/screenshot","stream":"http://stash:9999/scene/2/stream"},"tags":[]}]}}`
+	case "FindSceneGroupings":
+		payload = `{"findScenes":{"scenes":[{"id":"1","studio":{"id":"7","name":"Studio Seven"},"performers":[]},{"id":"2","studio":{"id":"7","name":"Studio Seven"},"performers":[]}]}}`
 	case "FindSampleSceneCover":
 		payload = `{"findScenes":{"scenes":[{"paths":{"screenshot":"http://stash:9999/scene/1/screenshot"}}]}}`
 	default:
@@ -303,6 +305,66 @@ func TestPutConfig_PersistsDateSettings(t *testing.T) {
 	}
 	if config.Application().DateLookup || !config.Application().DateWriteback {
 		t.Fatal("expected the date settings kept when the fields are missing")
+	}
+}
+
+func (f *fakeStash) callCount(op string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls[op]
+}
+
+func TestPutConfig_PersistsAutoSectionMinsAndRebuildsIndex(t *testing.T) {
+	stash := &fakeStash{}
+	lib, h := newEnv(t, stash)
+	if _, err := lib.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if n := stash.callCount("FindSceneGroupings"); n != 0 {
+		t.Fatalf("thresholds default to 0: expected no grouping query, got %d", n)
+	}
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"auto_studio_min": 2, "auto_performer_min": 30,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["auto_studio_min"] != float64(2) || out["auto_performer_min"] != float64(30) {
+		t.Fatalf("expected 200 with both thresholds, got %d %v", rec.Code, out)
+	}
+	if cfg := config.Application(); cfg.AutoStudioMin != 2 || cfg.AutoPerformerMin != 30 {
+		t.Fatal("expected the thresholds stored")
+	}
+	sections, err := lib.GetSections(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := stash.callCount("FindSceneGroupings"); n != 1 {
+		t.Fatalf("changing a threshold must rebuild the index: expected one grouping query, got %d", n)
+	}
+	found := false
+	for _, s := range sections {
+		found = found || (s.ID == "studio:7" && s.Name == "Studio Seven")
+	}
+	if !found {
+		t.Fatalf("expected the studio section after the change, got %+v", sections)
+	}
+
+	delete(body, "auto_studio_min")
+	delete(body, "auto_performer_min")
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 {
+		t.Fatalf("expected 200 without the fields, got %d %s", rec.Code, rec.Body.String())
+	}
+	if cfg := config.Application(); cfg.AutoStudioMin != 2 || cfg.AutoPerformerMin != 30 {
+		t.Fatal("expected the thresholds kept when the fields are missing")
+	}
+
+	body["auto_studio_min"] = -1
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a negative threshold, got %d", rec.Code)
 	}
 }
 

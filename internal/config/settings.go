@@ -110,6 +110,10 @@ func normalizeVideoRules(rules []VideoRule) {
 
 const configFileName = "config.json"
 
+// MaxAutoSectionMin is the largest accepted auto_studio_min and
+// auto_performer_min.
+const MaxAutoSectionMin = 10000
+
 // ErrInvalid marks a settings value rejected by Validate, so API callers can
 // tell a bad request from a failed write.
 var ErrInvalid = errors.New("invalid settings")
@@ -133,6 +137,8 @@ type fileConfig struct {
 	GenerateSummaryIds *bool       `json:"generate_summary_ids,omitempty"`
 	HeatmapHeightPx    *int        `json:"heatmap_height_px,omitempty"`
 	SmartSectionSize   *int        `json:"smart_section_size,omitempty"`
+	AutoStudioMin      *int        `json:"auto_studio_min,omitempty"`
+	AutoPerformerMin   *int        `json:"auto_performer_min,omitempty"`
 	ForceHTTPS         *bool       `json:"force_https,omitempty"`
 	BasePath           *string     `json:"base_path,omitempty"`
 	DeovrAutoload      *bool       `json:"deovr_autoload,omitempty"`
@@ -274,6 +280,12 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.SmartSectionSize != nil {
 		base.SmartSectionSize = *fc.SmartSectionSize
 	}
+	if fc.AutoStudioMin != nil {
+		base.AutoStudioMin = *fc.AutoStudioMin
+	}
+	if fc.AutoPerformerMin != nil {
+		base.AutoPerformerMin = *fc.AutoPerformerMin
+	}
 	if fc.ForceHTTPS != nil {
 		base.ForceHTTPS = *fc.ForceHTTPS
 	}
@@ -369,6 +381,12 @@ func Validate(c ApplicationConfig) error {
 	if c.SmartSectionSize < 10 || c.SmartSectionSize > 500 {
 		return fmt.Errorf("%w: smart_section_size must be between 10 and 500, got %d", ErrInvalid, c.SmartSectionSize)
 	}
+	if c.AutoStudioMin < 0 || c.AutoStudioMin > MaxAutoSectionMin {
+		return fmt.Errorf("%w: auto_studio_min must be between 0 and %d, got %d", ErrInvalid, MaxAutoSectionMin, c.AutoStudioMin)
+	}
+	if c.AutoPerformerMin < 0 || c.AutoPerformerMin > MaxAutoSectionMin {
+		return fmt.Errorf("%w: auto_performer_min must be between 0 and %d, got %d", ErrInvalid, MaxAutoSectionMin, c.AutoPerformerMin)
+	}
 	// An empty favorite tag is allowed: it disables favorite sync
 	// (see library.Service.UpdateFavorite).
 	if c.ExcludeSortName == "" {
@@ -392,6 +410,8 @@ func write(path string, c ApplicationConfig) error {
 		GenerateSummaryIds: &c.GenerateSummaryIds,
 		HeatmapHeightPx:    &c.HeatmapHeightPx,
 		SmartSectionSize:   &c.SmartSectionSize,
+		AutoStudioMin:      &c.AutoStudioMin,
+		AutoPerformerMin:   &c.AutoPerformerMin,
 		ForceHTTPS:         &c.ForceHTTPS,
 		BasePath:           &c.BasePath,
 		DeovrAutoload:      &c.DeovrAutoload,

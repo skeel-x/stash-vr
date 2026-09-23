@@ -116,6 +116,22 @@ query FindAllSceneIds {
   }
 }
 
+query FindSceneGroupings {
+  findScenes(filter: { per_page: -1, sort: "created_at", direction: DESC }) {
+    scenes {
+      id
+      studio {
+        id
+        name
+      }
+      performers {
+        id
+        name
+      }
+    }
+  }
+}
+
 query FindScenes($scene_ids: [Int!]) {
   findScenes(scene_ids: $scene_ids) {
     scenes {

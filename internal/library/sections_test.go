@@ -27,6 +27,11 @@ type routingStash struct {
 	allIds   int
 	tagLoads int
 
+	// groupings is the FindSceneGroupings answer (scenes array JSON);
+	// groupingLoads counts how often it was asked.
+	groupings     string
+	groupingLoads int
+
 	// gate and started let a test pause a build in flight: when gate is
 	// non-nil, a FindSceneIdsByFilter query closes started (once, on the
 	// first such query) and then blocks until gate is closed. Both are nil
@@ -47,6 +52,15 @@ func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp
 		r.tagLoads++
 		r.mu.Unlock()
 		payload = `{"findTags":{"tags":[]}}`
+	case "FindSceneGroupings":
+		r.mu.Lock()
+		r.groupingLoads++
+		scenes := r.groupings
+		r.mu.Unlock()
+		if scenes == "" {
+			scenes = "[]"
+		}
+		payload = `{"findScenes":{"scenes":` + scenes + `}}`
 	case "FindAllSceneIds":
 		r.mu.Lock()
 		r.allIds++
@@ -91,6 +105,12 @@ func (r *routingStash) sceneIdQueries() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.queries)
+}
+
+func (r *routingStash) groupingQueries() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.groupingLoads
 }
 
 func (r *routingStash) allIdQueries() int {
@@ -193,7 +213,7 @@ func TestSectionRows_MixesSavedFiltersAndSmartSections(t *testing.T) {
 		{ID: "smart:recent", Disabled: true},
 	}
 
-	rows := sectionRows(saved, smartSections(), overrides)
+	rows := sectionRows(saved, smartSections(), nil, overrides)
 
 	got := make([]string, len(rows))
 	for i, r := range rows {

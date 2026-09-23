@@ -9,12 +9,16 @@ import (
 )
 
 // ApplyChanges performs the side effects of a settings change: a new Stash
-// client when the connection changed, a new effective log level when the
-// level changed.
+// client when the connection changed, a rebuilt index when an auto section
+// threshold changed, a new effective log level when the level changed.
 func ApplyChanges(prev, next config.ApplicationConfig, lib *library.Service) {
 	if prev.StashGraphQLUrl != next.StashGraphQLUrl || prev.StashApiKey != next.StashApiKey {
 		lib.SetStashClient(stash.NewClient(next.StashGraphQLUrl, next.StashApiKey))
 		log.Info().Msg("Stash connection settings changed, caches cleared")
+	}
+	if prev.AutoStudioMin != next.AutoStudioMin || prev.AutoPerformerMin != next.AutoPerformerMin {
+		lib.ResetSections()
+		log.Info().Int("studio_min", next.AutoStudioMin).Int("performer_min", next.AutoPerformerMin).Msg("Auto section thresholds changed, index will be rebuilt")
 	}
 	if prev.LogLevel != next.LogLevel {
 		// Reassigning the global logger would race with requests that are

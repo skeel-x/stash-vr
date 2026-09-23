@@ -78,6 +78,8 @@ type ConfigView struct {
 	FunscriptIndexPath string             `json:"funscript_index_path"`
 	LogLevel           string             `json:"log_level"`
 	SmartSectionSize   int                `json:"smart_section_size"`
+	AutoStudioMin      int                `json:"auto_studio_min"`
+	AutoPerformerMin   int                `json:"auto_performer_min"`
 	ListenAddress      string             `json:"listen_address"`
 	ConfigPath         string             `json:"config_path"`
 	Filters            []config.Filter    `json:"filters"`
@@ -102,6 +104,8 @@ type configInput struct {
 	FunscriptIndexPath *string `json:"funscript_index_path"`
 	LogLevel           string  `json:"log_level"`
 	SmartSectionSize   *int    `json:"smart_section_size"`
+	AutoStudioMin      *int    `json:"auto_studio_min"`
+	AutoPerformerMin   *int    `json:"auto_performer_min"`
 }
 
 type testInput struct {
@@ -132,6 +136,8 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		FunscriptIndexPath: cfg.FunscriptIndexPath,
 		LogLevel:           cfg.LogLevel,
 		SmartSectionSize:   cfg.SmartSectionSize,
+		AutoStudioMin:      cfg.AutoStudioMin,
+		AutoPerformerMin:   cfg.AutoPerformerMin,
 		ListenAddress:      cfg.ListenAddress,
 		ConfigPath:         config.FilePath(cfg),
 		Filters:            cfg.Filters,
@@ -294,6 +300,12 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	next.LogLevel = in.LogLevel
 	if in.SmartSectionSize != nil {
 		next.SmartSectionSize = *in.SmartSectionSize
+	}
+	if in.AutoStudioMin != nil {
+		next.AutoStudioMin = *in.AutoStudioMin
+	}
+	if in.AutoPerformerMin != nil {
+		next.AutoPerformerMin = *in.AutoPerformerMin
 	}
 
 	// Validate before the host rule so an unusable URL is reported as such

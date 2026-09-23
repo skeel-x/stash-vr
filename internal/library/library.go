@@ -29,7 +29,9 @@ type Service struct {
 	muSets   sync.Mutex
 	sets     []SavedFilterSceneSet
 	sections []Section
-	setsAt   time.Time
+	// auto is the auto sections of the cached index, grouped once per build.
+	auto   []AutoSection
+	setsAt time.Time
 	// setsGen counts ResetSections calls. A build started before a reset
 	// checks it again before storing its result, so a reset that lands
 	// mid-build is not overwritten by that build's now-stale result.
@@ -92,6 +94,7 @@ func (libraryService *Service) ResetSections() {
 	libraryService.muSets.Lock()
 	libraryService.sets = nil
 	libraryService.sections = nil
+	libraryService.auto = nil
 	libraryService.setsGen++
 	libraryService.muSets.Unlock()
 }

@@ -43,6 +43,7 @@ type SectionRow struct {
 	Name       string // name after the user's override
 	Disabled   bool
 	Smart      bool
+	Auto       bool     // generated for a studio or performer with enough scenes
 	HiddenIn   []string // players the section is hidden from while enabled
 }
 
@@ -54,30 +55,47 @@ func HiddenFor(hidden []string, player string) bool {
 
 // indexResult is the outcome of one buildIndex rebuild: the resolved section
 // sets and the sections derived from them (including the "All" fallback
-// when nothing is enabled).
+// when nothing is enabled), plus the auto sections grouped for it.
 type indexResult struct {
 	sets     []SavedFilterSceneSet
 	sections []Section
+	auto     []AutoSection
 }
 
-// buildIndex returns the cached section sets and sections, rebuilding the
-// whole index - sets, sections, the reseeded scene cache, Stats and the tag
-// hierarchy - at most once per sectionCacheTTL. Concurrent callers share one
-// rebuild and its side effects run exactly once per rebuild, never once per
-// caller.
+// buildIndex returns the cached section sets and sections; see index.
 func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilterSceneSet, sections []Section, err error) {
-	if s, sec, ok := libraryService.freshIndex(); ok {
-		return s, sec, nil
+	res, err := libraryService.index(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return res.sets, res.sections, nil
+}
+
+// index returns the cached index, rebuilding the whole of it - auto
+// sections, sets, sections, the reseeded scene cache, Stats and the tag
+// hierarchy - at most once per sectionCacheTTL. Concurrent callers share
+// one rebuild and its side effects run exactly once per rebuild, never once
+// per caller.
+func (libraryService *Service) index(ctx context.Context) (indexResult, error) {
+	if r, ok := libraryService.freshIndex(); ok {
+		return r, nil
 	}
 	res, err, _ := libraryService.single.Do("sets", func() (interface{}, error) {
-		if s, sec, ok := libraryService.freshIndex(); ok {
-			return indexResult{sets: s, sections: sec}, nil
+		if r, ok := libraryService.freshIndex(); ok {
+			return r, nil
 		}
 		libraryService.muSets.Lock()
 		gen := libraryService.setsGen
 		libraryService.muSets.Unlock()
 
-		sources, err := libraryService.getSources(ctx)
+		// A failed grouping query costs the auto sections, not the index.
+		auto, err := libraryService.fetchAutoSections(ctx)
+		if err != nil {
+			log.Ctx(ctx).Warn().Err(err).Msg("Failed to group scenes by studio and performer, skipping auto sections")
+			auto = nil
+		}
+
+		sources, err := libraryService.getSources(ctx, auto)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +137,7 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 		libraryService.muVdCache.Unlock()
 
 		log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", links).
-			Int("scenes", scenesCount).
+			Int("scenes", scenesCount).Int("auto", len(auto)).
 			Msg("Index built")
 
 		_ = libraryService.LoadTags(ctx)
@@ -133,6 +151,7 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 		if libraryService.setsGen == gen {
 			libraryService.sets = sets
 			libraryService.sections = sections
+			libraryService.auto = auto
 			libraryService.setsAt = time.Now()
 		}
 		libraryService.muSets.Unlock()
@@ -140,24 +159,23 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 		// Undated scenes may have joined the index: walk it for release dates.
 		libraryService.kickDateSweeper()
 
-		return indexResult{sets: sets, sections: sections}, nil
+		return indexResult{sets: sets, sections: sections, auto: auto}, nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return indexResult{}, err
 	}
-	r := res.(indexResult)
-	return r.sets, r.sections, nil
+	return res.(indexResult), nil
 }
 
-// freshIndex returns the cached sets and sections if they exist and are
-// still within sectionCacheTTL.
-func (libraryService *Service) freshIndex() ([]SavedFilterSceneSet, []Section, bool) {
+// freshIndex returns the cached index if it exists and is still within
+// sectionCacheTTL.
+func (libraryService *Service) freshIndex() (indexResult, bool) {
 	libraryService.muSets.Lock()
 	defer libraryService.muSets.Unlock()
 	if libraryService.sets == nil || time.Since(libraryService.setsAt) >= sectionCacheTTL {
-		return nil, nil, false
+		return indexResult{}, false
 	}
-	return libraryService.sets, libraryService.sections, true
+	return indexResult{sets: libraryService.sets, sections: libraryService.sections, auto: libraryService.auto}, true
 }
 
 func (libraryService *Service) GetSections(ctx context.Context) ([]Section, error) {
@@ -240,8 +258,9 @@ func (libraryService *Service) GetSavedFilterSceneSetsFor(ctx context.Context, p
 
 // sectionRows applies the ordering rule: smart sections without an override
 // first (default state), then overrides in saved order, then remaining saved
-// filters in the given order.
-func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, overrides []config.Filter) []SectionRow {
+// filters in the given order, then auto sections without an override
+// (enabled).
+func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []AutoSection, overrides []config.Filter) []SectionRow {
 	overridden := make(map[string]config.Filter, len(overrides))
 	for _, o := range overrides {
 		overridden[o.ID] = o
@@ -254,8 +273,12 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, overrides [
 	for _, sf := range saved {
 		savedByID[sf.Id] = sf
 	}
+	autoByID := make(map[string]AutoSection, len(auto))
+	for _, a := range auto {
+		autoByID[a.ID] = a
+	}
 
-	rows := make([]SectionRow, 0, len(smart)+len(saved))
+	rows := make([]SectionRow, 0, len(smart)+len(saved)+len(auto))
 	for _, s := range smart {
 		if _, ok := overridden[s.ID()]; ok {
 			continue
@@ -279,6 +302,14 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, overrides [
 				name = sf.Name
 			}
 			rows = append(rows, SectionRow{ID: o.ID, SourceName: sf.Name, Name: name, Disabled: o.Disabled, HiddenIn: o.HiddenIn})
+			continue
+		}
+		if a, ok := autoByID[o.ID]; ok {
+			name := o.Name
+			if name == "" {
+				name = a.Name
+			}
+			rows = append(rows, SectionRow{ID: o.ID, SourceName: a.Name, Name: name, Disabled: o.Disabled, Auto: true, HiddenIn: o.HiddenIn})
 		}
 	}
 	for _, sf := range saved {
@@ -286,6 +317,12 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, overrides [
 			continue
 		}
 		rows = append(rows, SectionRow{ID: sf.Id, SourceName: sf.Name, Name: sf.Name})
+	}
+	for _, a := range auto {
+		if _, ok := seen[a.ID]; ok {
+			continue
+		}
+		rows = append(rows, SectionRow{ID: a.ID, SourceName: a.Name, Name: a.Name, Auto: true})
 	}
 	return rows
 }
@@ -295,6 +332,7 @@ type sectionSource struct {
 	row   SectionRow
 	saved *gql.SavedFilterParts
 	smart *SmartSection
+	auto  *AutoSection
 }
 
 // savedFilters returns Stash's saved scene filters in the order they should
@@ -317,17 +355,21 @@ func (libraryService *Service) savedFilters(ctx context.Context) ([]gql.SavedFil
 	return out, nil
 }
 
-// SectionRows lists every smart section and saved filter in display order,
-// including disabled ones, for the Sections page.
+// SectionRows lists every smart section, saved filter and auto section in
+// display order, including disabled ones, for the Sections page.
 func (libraryService *Service) SectionRows(ctx context.Context) ([]SectionRow, error) {
 	saved, err := libraryService.savedFilters(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return sectionRows(saved, smartSections(), config.Application().Filters), nil
+	auto, err := libraryService.autoSections(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return sectionRows(saved, smartSections(), auto, config.Application().Filters), nil
 }
 
-func (libraryService *Service) getSources(ctx context.Context) ([]sectionSource, error) {
+func (libraryService *Service) getSources(ctx context.Context, auto []AutoSection) ([]sectionSource, error) {
 	saved, err := libraryService.savedFilters(ctx)
 	if err != nil {
 		return nil, err
@@ -341,8 +383,12 @@ func (libraryService *Service) getSources(ctx context.Context) ([]sectionSource,
 	for i := range saved {
 		savedByID[saved[i].Id] = &saved[i]
 	}
+	autoByID := make(map[string]*AutoSection, len(auto))
+	for i := range auto {
+		autoByID[auto[i].ID] = &auto[i]
+	}
 	var sources []sectionSource
-	for _, row := range sectionRows(saved, smart, config.Application().Filters) {
+	for _, row := range sectionRows(saved, smart, auto, config.Application().Filters) {
 		if row.Disabled {
 			continue
 		}
@@ -350,6 +396,8 @@ func (libraryService *Service) getSources(ctx context.Context) ([]sectionSource,
 			sources = append(sources, sectionSource{row: row, smart: s})
 		} else if sf, ok := savedByID[row.ID]; ok {
 			sources = append(sources, sectionSource{row: row, saved: sf})
+		} else if a, ok := autoByID[row.ID]; ok {
+			sources = append(sources, sectionSource{row: row, auto: a})
 		}
 	}
 	return sources, nil
@@ -360,8 +408,13 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 	sections := make([]SavedFilterSceneSet, len(sources))
 
 	wg := sync.WaitGroup{}
-	wg.Add(len(sources))
 	for i, src := range sources {
+		// Auto sections already know their scenes from the grouping query.
+		if src.auto != nil {
+			sections[i] = SavedFilterSceneSet{ID: src.row.ID, Name: src.row.Name, SceneIDs: slices.Clone(src.auto.Ids), HiddenIn: src.row.HiddenIn}
+			continue
+		}
+		wg.Add(1)
 		go func(i int, src sectionSource) {
 			defer wg.Done()
 			flog := log.Ctx(ctx).With().Str("sectionId", src.row.ID).Str("name", src.row.Name).Logger()

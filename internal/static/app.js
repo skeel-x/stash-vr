@@ -100,6 +100,8 @@
       base_path: form.base_path.value.trim(),
       log_level: form.log_level.value,
       smart_section_size: Number(form.smart_section_size.value || 50),
+      auto_studio_min: Number(form.auto_studio_min.value || 0),
+      auto_performer_min: Number(form.auto_performer_min.value || 0),
     });
     $('#test').addEventListener('click', async () => {
       setMsg($('#test-msg'), 'Testing');

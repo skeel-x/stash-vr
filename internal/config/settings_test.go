@@ -410,3 +410,67 @@ func TestLoad_DateSettingsSeedAndFile(t *testing.T) {
 		t.Fatal("expected the file to turn lookup off and write-back on")
 	}
 }
+
+func TestSet_AutoSectionMinBounds(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []int{-1, 10001} {
+		cfg := Application()
+		cfg.AutoStudioMin = bad
+		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
+			t.Errorf("expected auto_studio_min %d to be rejected as invalid, got %v", bad, err)
+		}
+		cfg = Application()
+		cfg.AutoPerformerMin = bad
+		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
+			t.Errorf("expected auto_performer_min %d to be rejected as invalid, got %v", bad, err)
+		}
+	}
+	cfg := Application()
+	cfg.AutoStudioMin = 20
+	cfg.AutoPerformerMin = 10000
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application(); got.AutoStudioMin != 20 || got.AutoPerformerMin != 10000 {
+		t.Fatalf("expected persisted 20 and 10000, got %d and %d", got.AutoStudioMin, got.AutoPerformerMin)
+	}
+}
+
+func TestLoad_AutoSectionMinsSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+	seed.AutoStudioMin = 5
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"auto_studio_min": 5`) || !strings.Contains(string(data), `"auto_performer_min": 0`) {
+		t.Fatalf("expected both thresholds persisted, got %s", data)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"auto_studio_min":0,"auto_performer_min":7}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := Application(); got.AutoStudioMin != 0 || got.AutoPerformerMin != 7 {
+		t.Fatalf("expected the file values 0 and 7, got %d and %d", got.AutoStudioMin, got.AutoPerformerMin)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"auto_performer_min":-3}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("expected a negative threshold in the file to be rejected, got %v", err)
+	}
+}

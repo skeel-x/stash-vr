@@ -27,6 +27,8 @@ const (
 	envKeyUserConfigPath     = "CONFIG_PATH"
 	envKeyGenerateSummaryIds = "GENERATE_SUMMARY_IDS"
 	envKeySmartSectionSize   = "SMART_SECTION_SIZE"
+	envKeyAutoStudioMin      = "AUTO_STUDIO_MIN"
+	envKeyAutoPerformerMin   = "AUTO_PERFORMER_MIN"
 )
 
 type ApplicationConfig struct {
@@ -46,6 +48,8 @@ type ApplicationConfig struct {
 	FunscriptIndexPath string
 	HeatmapHeightPx    int
 	SmartSectionSize   int
+	AutoStudioMin      int
+	AutoPerformerMin   int
 	ExcludeSortName    string
 	ConfigPath         string
 	GenerateSummaryIds bool
@@ -102,6 +106,12 @@ func Init() error {
 	pflag.Int(envKeySmartSectionSize, 50, "Number of scenes in each smart section")
 	_ = viper.BindPFlag(envKeySmartSectionSize, pflag.Lookup(envKeySmartSectionSize))
 
+	pflag.Int(envKeyAutoStudioMin, 0, "Generate a section for every studio with at least this many scenes (0 turns it off)")
+	_ = viper.BindPFlag(envKeyAutoStudioMin, pflag.Lookup(envKeyAutoStudioMin))
+
+	pflag.Int(envKeyAutoPerformerMin, 0, "Generate a section for every performer with at least this many scenes (0 turns it off)")
+	_ = viper.BindPFlag(envKeyAutoPerformerMin, pflag.Lookup(envKeyAutoPerformerMin))
+
 	pflag.String(envKeyExcludeSortName, "hidden", "Exclude tags with this sort name")
 	_ = viper.BindPFlag(envKeyExcludeSortName, pflag.Lookup(envKeyExcludeSortName))
 
@@ -140,6 +150,8 @@ func Init() error {
 		FunscriptIndexPath: viper.GetString(envKeyFunscriptIndexPath),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
+		AutoStudioMin:      viper.GetInt(envKeyAutoStudioMin),
+		AutoPerformerMin:   viper.GetInt(envKeyAutoPerformerMin),
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),
 		ConfigPath:         viper.GetString(envKeyUserConfigPath),
 		GenerateSummaryIds: viper.GetBool(envKeyGenerateSummaryIds),

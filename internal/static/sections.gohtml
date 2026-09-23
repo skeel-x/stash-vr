@@ -12,7 +12,7 @@
         <td><input type="checkbox" class="show-heresphere" aria-label="Show {{.SourceName}} in HereSphere" {{if .ShowIn "heresphere"}}checked{{end}}></td>
         <td><input type="checkbox" class="show-deovr" aria-label="Show {{.SourceName}} in DeoVR" {{if .ShowIn "deovr"}}checked{{end}}></td>
         <td><input type="checkbox" class="show-playa" aria-label="Show {{.SourceName}} in Playa" {{if .ShowIn "playa"}}checked{{end}}></td>
-        <td><span class="src">{{.SourceName}}</span>{{if .Smart}}<span class="badge">smart</span>{{else}}<code class="id">{{.ID}}</code>{{end}}<span class="badge landing" title="HereSphere opens on this section"{{if not .Landing}} hidden{{end}}>Opens first in HereSphere</span></td>
+        <td><span class="src">{{.SourceName}}</span>{{if .Auto}}<span class="badge">auto</span>{{else if .Smart}}<span class="badge">smart</span>{{else}}<code class="id">{{.ID}}</code>{{end}}<span class="badge landing" title="HereSphere opens on this section"{{if not .Landing}} hidden{{end}}>Opens first in HereSphere</span></td>
         <td><input class="name" placeholder="{{.SourceName}}" value="{{if ne .Name .SourceName}}{{.Name}}{{end}}"></td>
       </tr>
     {{end}}

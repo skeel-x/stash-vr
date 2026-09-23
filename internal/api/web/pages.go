@@ -36,6 +36,7 @@ type FilterRow struct {
 	Name       string
 	Disabled   bool
 	Smart      bool
+	Auto       bool
 	// Landing marks the first row shown in HereSphere: the section the
 	// player opens on.
 	Landing  bool
@@ -194,7 +195,7 @@ func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
 		data.FilterError = err.Error()
 	}
 	for _, row := range rows {
-		data.FilterRows = append(data.FilterRows, FilterRow{ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled, Smart: row.Smart, HiddenIn: row.HiddenIn})
+		data.FilterRows = append(data.FilterRows, FilterRow{ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled, Smart: row.Smart, Auto: row.Auto, HiddenIn: row.HiddenIn})
 	}
 	for i := range data.FilterRows {
 		if data.FilterRows[i].ShowIn("heresphere") {

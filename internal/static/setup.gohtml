@@ -38,6 +38,14 @@
     <input name="smart_section_size" type="number" min="10" max="500" value="{{.Config.SmartSectionSize}}">
     <small>Continue watching, Recently added, Random and the other computed sections show this many scenes.</small>
   </label>
+  <label>Studio sections from N scenes
+    <input name="auto_studio_min" type="number" min="0" max="10000" value="{{.Config.AutoStudioMin}}">
+    <small>0 turns it off. Up to 50 of each, largest first.</small>
+  </label>
+  <label>Performer sections from N scenes
+    <input name="auto_performer_min" type="number" min="0" max="10000" value="{{.Config.AutoPerformerMin}}">
+    <small>0 turns it off. Up to 50 of each, largest first.</small>
+  </label>
   <label class="check"><input name="force_https" type="checkbox" {{if .Config.ForceHTTPS}}checked{{end}}> Always build https links (only if your proxy does not send X-Forwarded-Proto)</label>
   <label class="check"><input name="deovr_autoload" type="checkbox" {{if .Config.DeovrAutoload}}checked{{end}}> Send the DeoVR library when DeoVR's browser opens the front page</label>
   <label class="check"><input name="performer_facets" type="checkbox" {{if .Config.PerformerFacets}}checked{{end}}> Performer facets (Country and Age tags in HereSphere)</label>
