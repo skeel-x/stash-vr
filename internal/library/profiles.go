@@ -1,6 +1,7 @@
 package library
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"stash-vr/internal/config"
 )
@@ -72,11 +74,50 @@ func (libraryService *Service) SaveProfile(id string, data []byte) error {
 		_ = os.Remove(tmp.Name())
 		return err
 	}
+	keepPreviousProfile(dir, libraryService.ProfilePath(id), id, data)
 	if err := os.Rename(tmp.Name(), libraryService.ProfilePath(id)); err != nil {
 		_ = os.Remove(tmp.Name())
 		return err
 	}
 	return nil
+}
+
+// profileHistoryKeep is how many earlier versions of a scene's profile are
+// kept under hsp/history when HereSphere saves a new one.
+const profileHistoryKeep = 10
+
+// keepPreviousProfile moves the profile about to be replaced into
+// hsp/history (unless the new one is identical) and prunes old versions,
+// so a save in the headset never loses the previous settings. Failures only
+// cost the history entry, never the save.
+func keepPreviousProfile(dir, current, id string, next []byte) {
+	prev, err := os.ReadFile(current)
+	if err != nil || bytes.Equal(prev, next) {
+		return
+	}
+	histDir := filepath.Join(dir, "history")
+	if err := os.MkdirAll(histDir, 0o755); err != nil {
+		return
+	}
+	name := fmt.Sprintf("scene-%s-%d.hsp", id, time.Now().UnixNano())
+	if err := os.WriteFile(filepath.Join(histDir, name), prev, 0o600); err != nil {
+		return
+	}
+	entries, err := os.ReadDir(histDir)
+	if err != nil {
+		return
+	}
+	var mine []string
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "scene-"+id+"-") && strings.HasSuffix(e.Name(), ".hsp") {
+			mine = append(mine, e.Name())
+		}
+	}
+	sort.Strings(mine)
+	for len(mine) > profileHistoryKeep {
+		_ = os.Remove(filepath.Join(histDir, mine[0]))
+		mine = mine[1:]
+	}
 }
 
 // ListProfiles returns the scene ids with a stored profile, numerically

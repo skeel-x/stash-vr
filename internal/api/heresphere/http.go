@@ -169,6 +169,7 @@ func (h *httpHandler) processUpdates(videoId string, vdReq videoDataRequestDto) 
 
 // saveProfile stores the profile HereSphere sent back for the scene.
 func (h *httpHandler) saveProfile(ctx context.Context, videoId, encoded string) {
+	log.Ctx(ctx).Info().Str("scene", videoId).Int("encodedBytes", len(encoded)).Msg("Received HereSphere profile")
 	if len(encoded) > library.MaxProfileBytes*4/3+4 {
 		log.Ctx(ctx).Warn().Str("scene", videoId).Msg("Ignoring oversized HereSphere profile")
 		return
