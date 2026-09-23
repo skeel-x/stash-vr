@@ -661,3 +661,51 @@ func TestPutFilters_PersistsHiddenIn(t *testing.T) {
 		t.Fatalf("expected 400 for an unknown player, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestGetRandom_ReturnsScenesFromIndex(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodGet, "/random?n=2", nil)
+
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	scenes, _ := out["scenes"].([]any)
+	if len(scenes) != 2 {
+		t.Fatalf("expected 2 scenes, got %v", out)
+	}
+	for _, s := range scenes {
+		m, _ := s.(map[string]any)
+		cover, _ := m["cover"].(string)
+		if !strings.HasSuffix(cover, "/cover/1") && !strings.HasSuffix(cover, "/cover/2") {
+			t.Errorf("unexpected cover %q", cover)
+		}
+		if !strings.HasPrefix(cover, "http://example.com/") {
+			t.Errorf("cover should be absolute under the request base, got %q", cover)
+		}
+		if stash, _ := m["stash"].(string); !strings.HasPrefix(stash, "http://stash:9999/scenes/") {
+			t.Errorf("unexpected stash link %q", stash)
+		}
+		if title, _ := m["title"].(string); title == "" {
+			t.Errorf("expected a title, got %v", m)
+		}
+		if id, _ := m["id"].(string); id == "" {
+			t.Errorf("expected an id, got %v", m)
+		}
+	}
+
+	rec, out = do(t, h, http.MethodGet, "/random", nil)
+	if rec.Code != 200 || len(out["scenes"].([]any)) != 2 {
+		t.Fatalf("expected the default count to return every indexed scene, got %d %v", rec.Code, out)
+	}
+	rec, out = do(t, h, http.MethodGet, "/random?n=999", nil)
+	if rec.Code != 200 || len(out["scenes"].([]any)) != 2 {
+		t.Fatalf("expected a large count to be clamped, got %d %v", rec.Code, out)
+	}
+	for _, bad := range []string{"abc", "0", "-1"} {
+		rec, _ = do(t, h, http.MethodGet, "/random?n="+bad, nil)
+		if rec.Code != 400 {
+			t.Fatalf("expected 400 for n=%s, got %d", bad, rec.Code)
+		}
+	}
+}

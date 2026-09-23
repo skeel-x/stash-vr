@@ -69,6 +69,7 @@ type pageData struct {
 	Stereos     []string
 	Lenses      []string
 	LogLines    []string
+	Random      []RandomScene
 }
 
 // ruleRow is what the rule-row template renders: one rule with the option
@@ -147,6 +148,14 @@ func (h pageHandler) players(w http.ResponseWriter, r *http.Request) {
 	data := h.base(r, "Players", "launch")
 	data.Status = BuildStatus(r.Context(), h.lib)
 	data.Links = LinksFor(r)
+	if data.Status.Connection == "ok" {
+		// A failed draw only leaves the strip empty; the page still renders.
+		random, err := randomScenes(r.Context(), h.lib, internal.GetBaseUrl(r), randomStripSize)
+		if err != nil {
+			log.Ctx(r.Context()).Debug().Err(err).Msg("Random strip: no scenes")
+		}
+		data.Random = random
+	}
 	render(w, r, launchTmpl, data)
 }
 

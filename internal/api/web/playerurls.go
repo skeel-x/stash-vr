@@ -18,6 +18,12 @@ type PlayerLinks struct {
 	PlainHTTP  bool   `json:"plain_http"`
 }
 
+// StashSceneUrl turns the configured GraphQL endpoint into the Stash web
+// UI page for a scene.
+func StashSceneUrl(graphqlUrl, id string) string {
+	return strings.TrimSuffix(strings.TrimSuffix(graphqlUrl, "/graphql"), "/") + "/scenes/" + id
+}
+
 func LinksFor(req *http.Request) PlayerLinks {
 	base := internal.GetBaseUrl(req)
 	return PlayerLinks{

@@ -145,6 +145,25 @@ func TestPlayers_ShowsRejectedKeyWhenUnauthorized(t *testing.T) {
 	}
 }
 
+func TestPlayers_ShowsRandomStrip(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/", map[string]string{"Host": "vr.example", "X-Forwarded-Proto": "https"}).Body.String()
+
+	for _, want := range []string{`id="random-strip"`, `id="shuffle"`, `src="https://vr.example/cover/`, `href="http://stash:9999/scenes/`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("players page missing %q", want)
+		}
+	}
+
+	lib, _ = newEnv(t, &fakeStash{versionErr: errors.New("down")})
+	body = getPage(t, PagesRouter(lib), "/", nil).Body.String()
+	if strings.Contains(body, `id="random-strip"`) {
+		t.Fatal("the random strip must be hidden when Stash is unreachable")
+	}
+}
+
 func TestPlayers_PlayaBandIsNotALink(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)

@@ -19,6 +19,16 @@
 </section>
 
 {{if eq .Status.Connection "ok"}}
+<section class="random">
+  <div class="row between">
+    <h2>Something random</h2>
+    <button type="button" id="shuffle" class="small">Shuffle</button>
+  </div>
+  <div class="strip" id="random-strip">
+    {{range .Random}}<a class="card" href="{{.Stash}}" target="_blank" rel="noopener"><img src="{{.Cover}}" alt="" loading="lazy"><span>{{.Title}}</span></a>{{end}}
+  </div>
+</section>
+
 <section class="players">
   <article class="player heresphere">
     <a class="launch" href="{{.Links.HereSphere}}">

@@ -59,6 +59,25 @@
     });
   }
 
+  // Players page: random strip.
+  const strip = $('#random-strip');
+  if (strip) {
+    const shuffle = $('#shuffle');
+    shuffle.addEventListener('click', async () => {
+      shuffle.disabled = true;
+      try {
+        const r = await api('GET', '/random?n=6');
+        strip.replaceChildren(...r.scenes.map((s) => {
+          const a = document.createElement('a'); a.className = 'card'; a.href = s.stash; a.target = '_blank'; a.rel = 'noopener';
+          const img = document.createElement('img'); img.src = s.cover; img.alt = ''; img.loading = 'lazy';
+          const t = document.createElement('span'); t.textContent = s.title;
+          a.append(img, t); return a;
+        }));
+      } catch (e) { /* keep the current strip */ }
+      shuffle.disabled = false;
+    });
+  }
+
   // Setup form.
   const form = $('#setup');
   if (form) {

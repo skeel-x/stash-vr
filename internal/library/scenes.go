@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
+	"slices"
 	"stash-vr/internal/stash/gql"
 	"strconv"
 	"time"
@@ -12,6 +14,51 @@ import (
 )
 
 var ErrSceneNotFound = errors.New("scene not found")
+
+// smartRandomID is the section id of the built-in Random smart section.
+const smartRandomID = "smart:random"
+
+// RandomScenes returns up to n distinct scenes drawn from the smart Random
+// section when it is enabled, else from every section in the index.
+func (libraryService *Service) RandomScenes(ctx context.Context, n int) ([]*VideoData, error) {
+	sections, err := libraryService.GetSections(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var pool []string
+	for i := range sections {
+		if sections[i].ID == smartRandomID {
+			pool = sections[i].Ids
+			break
+		}
+	}
+	if len(pool) == 0 {
+		seen := map[string]struct{}{}
+		for i := range sections {
+			for _, id := range sections[i].Ids {
+				if _, dup := seen[id]; !dup {
+					seen[id] = struct{}{}
+					pool = append(pool, id)
+				}
+			}
+		}
+	}
+	pool = slices.Clone(pool)
+	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
+	out := make([]*VideoData, 0, min(n, len(pool)))
+	for _, id := range pool {
+		if len(out) == n {
+			break
+		}
+		vd, err := libraryService.GetScene(ctx, id, false)
+		if err != nil {
+			log.Ctx(ctx).Debug().Err(err).Str("scene", id).Msg("Random strip: scene skipped")
+			continue
+		}
+		out = append(out, vd)
+	}
+	return out, nil
+}
 
 func (libraryService *Service) GetScenes(ctx context.Context) (map[string]*VideoData, error) {
 	// Nothing has built the index yet (for example Playa's first request

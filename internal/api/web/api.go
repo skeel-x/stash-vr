@@ -29,7 +29,36 @@ const (
 	stashProbeTimeout = 10 * time.Second
 	// maxStashErrorLen caps a message coming from the Stash client.
 	maxStashErrorLen = 200
+	// randomStripSize is how many scenes the Players page strip shows.
+	randomStripSize = 6
+	// maxRandomScenes caps one /random request.
+	maxRandomScenes = 24
 )
+
+// RandomScene is one card on the Players page strip: its cover served by
+// this service and a link to the scene in Stash.
+type RandomScene struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Cover string `json:"cover"`
+	Stash string `json:"stash"`
+}
+
+// randomScenes draws n scenes from the library and shapes them for the
+// strip, with covers under baseUrl.
+func randomScenes(ctx context.Context, lib *library.Service, baseUrl string, n int) ([]RandomScene, error) {
+	vds, err := lib.RandomScenes(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+	stashUrl := config.Application().StashGraphQLUrl
+	out := make([]RandomScene, len(vds))
+	for i, vd := range vds {
+		id := vd.Id()
+		out[i] = RandomScene{ID: id, Title: vd.Title(), Cover: baseUrl + "/cover/" + id, Stash: StashSceneUrl(stashUrl, id)}
+	}
+	return out, nil
+}
 
 // ConfigView is the settings as sent to the browser: the API key is replaced
 // by a flag.
@@ -124,6 +153,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Put("/video-rules", h.putVideoRules)
 	r.Post("/reindex", h.reindex)
 	r.Get("/log", h.getLog)
+	r.Get("/random", h.getRandom)
 	return r
 }
 
@@ -390,4 +420,28 @@ func (h *apiHandler) getLog(w http.ResponseWriter, r *http.Request) {
 		n = 500
 	}
 	writeJson(ctx, w, map[string]any{"lines": logger.Tail.Lines(n)})
+}
+
+// getRandom returns a fresh set of random scenes for the strip: 6 by
+// default, at most 24.
+func (h *apiHandler) getRandom(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	n := randomStripSize
+	if q := r.URL.Query().Get("n"); q != "" {
+		v, err := strconv.Atoi(q)
+		if err != nil || v < 1 {
+			writeError(ctx, w, http.StatusBadRequest, "n must be a positive number")
+			return
+		}
+		n = v
+	}
+	if n > maxRandomScenes {
+		n = maxRandomScenes
+	}
+	scenes, err := randomScenes(ctx, h.lib, internal.GetBaseUrl(r), n)
+	if err != nil {
+		writeError(ctx, w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJson(ctx, w, map[string]any{"scenes": scenes})
 }
