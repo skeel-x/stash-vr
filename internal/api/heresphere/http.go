@@ -12,6 +12,7 @@ import (
 	"stash-vr/internal/stash"
 	"stash-vr/internal/util"
 	"strings"
+	"time"
 )
 
 type httpHandler struct {
@@ -276,17 +277,47 @@ func (h *httpHandler) eventsHandler(w http.ResponseWriter, req *http.Request) {
 		if h.ps == nil {
 			h.ps = newPlayback(vd)
 		} else if h.ps.videoId != videoId {
-			h.ps.handleStop(ctx, h.libraryService, minPlayFraction)
+			// Another scene started: report what was played of the previous
+			// one; its resume position is unknown here, so leave it as is.
+			played := h.ps.handleStop(ctx, h.libraryService, minPlayFraction)
+			h.saveActivity(h.ps.videoId, playedPtr(played), nil)
 			h.ps = newPlayback(vd)
 		} else {
 			h.ps.handleResume()
 		}
 	case evPause, evClose:
+		var played *float64
 		if h.ps != nil {
-			h.ps.handleStop(ctx, h.libraryService, minPlayFraction)
+			played = playedPtr(h.ps.handleStop(ctx, h.libraryService, minPlayFraction))
 		}
+		if len(vd.SceneParts.Files) == 0 || vd.SceneParts.Files[0] == nil {
+			return
+		}
+		resume := resumePosition(vd.SceneParts.Files[0].Duration, float64(ev.Time))
+		h.saveActivity(vd.Id(), played, &resume)
 	default:
 	}
+}
+
+// saveActivity reports a playback stop to Stash on a detached context so a
+// player quitting mid-request cannot cancel the write. played is the seconds
+// played since the last report (nil when nothing was played); resume is the
+// position to resume from (nil leaves Stash's stored position unchanged).
+func (h *httpHandler) saveActivity(id string, played *float64, resume *float64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := h.libraryService.SaveActivity(ctx, id, played, resume); err != nil {
+		log.Warn().Err(err).Str("id", id).Msg("Failed to save playback activity")
+		return
+	}
+	log.Debug().Str("id", id).Msg("Saved playback activity")
+}
+
+func playedPtr(seconds float64) *float64 {
+	if seconds <= 0 {
+		return nil
+	}
+	return &seconds
 }
 
 type videoDataRequestDto struct {

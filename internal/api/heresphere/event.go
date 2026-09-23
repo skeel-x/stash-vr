@@ -24,10 +24,11 @@ func (e event) String() string {
 }
 
 type playbackEvent struct {
-	Username      string  `json:"username,omitempty"`
-	Id            string  `json:"id,omitempty"`
-	Title         string  `json:"title,omitempty"`
-	Event         event   `json:"event,omitempty"`
+	Username string `json:"username,omitempty"`
+	Id       string `json:"id,omitempty"`
+	Title    string `json:"title,omitempty"`
+	Event    event  `json:"event,omitempty"`
+	// Time is the playback position in seconds, as HereSphere reports it.
 	Time          float32 `json:"time,omitempty"`
 	Speed         float32 `json:"speed,omitempty"`
 	Utc           float64 `json:"utc,omitempty"`
