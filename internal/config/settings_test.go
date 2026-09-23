@@ -274,3 +274,62 @@ func TestSet_FunscriptIndexPathMustBeAbsolute(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLoad_SeedsDefaultVideoRulesWhenAbsent(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	rules := Application().VideoRules
+	if len(rules) != 13 || rules[0].Tag != "DOME" || rules[0].Projection != "equirectangular" || rules[12].Tag != "Augmented Reality" || !rules[12].Passthrough {
+		t.Fatalf("expected the 13 default rules, got %+v", rules)
+	}
+	data, _ := os.ReadFile(FilePath(Application()))
+	if !strings.Contains(string(data), `"video_rules"`) {
+		t.Fatalf("expected video_rules persisted, got %s", data)
+	}
+}
+
+func TestLoad_KeepsEmptyVideoRulesFromFile(t *testing.T) {
+	seed := seedFor(t)
+	path := filepath.Join(seed.ConfigPath, "config.json")
+	if err := os.WriteFile(path, []byte(`{"stash_graphql_url":"http://stash:9999/graphql","video_rules":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().VideoRules; len(got) != 0 {
+		t.Fatalf("expected the file's empty rules to win, got %+v", got)
+	}
+}
+
+func TestSet_ValidatesVideoRules(t *testing.T) {
+	if err := Load(seedFor(t)); err != nil {
+		t.Fatal(err)
+	}
+	bad := []VideoRule{
+		{Tag: "X", Projection: "dome"},
+		{Tag: "X", Fov: 400},
+		{Tag: "X", Profile: "abc"},
+		{Tag: "  ", Stereo: "sbs"},
+		{Tag: "X", Stereo: "cuv"},
+		{Tag: "X", Lens: "GoPro"},
+	}
+	for _, r := range bad {
+		cfg := Application()
+		cfg.VideoRules = []VideoRule{r}
+		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
+			t.Errorf("rule %+v: expected ErrInvalid, got %v", r, err)
+		}
+	}
+	cfg := Application()
+	cfg.VideoRules = []VideoRule{{Tag: " Passthrough ", Passthrough: true, Profile: "11649", Fov: 200, Lens: "MKX200"}}
+	saved, err := Set(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.VideoRules[0].Tag != "Passthrough" {
+		t.Fatalf("expected the tag trimmed, got %q", saved.VideoRules[0].Tag)
+	}
+}

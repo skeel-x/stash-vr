@@ -20,6 +20,77 @@ type Filter struct {
 	Disabled bool   `json:"disabled"`
 }
 
+// VideoRule maps a Stash tag to player format settings. Rules apply in
+// order; every non-empty field overrides what earlier rules set.
+type VideoRule struct {
+	Tag         string  `json:"tag"`
+	Projection  string  `json:"projection,omitempty"`
+	Stereo      string  `json:"stereo,omitempty"`
+	Fov         float32 `json:"fov,omitempty"`
+	Lens        string  `json:"lens,omitempty"`
+	Passthrough bool    `json:"passthrough,omitempty"`
+	Profile     string  `json:"profile,omitempty"`
+}
+
+var (
+	validProjections = map[string]struct{}{"equirectangular": {}, "equirectangular360": {}, "fisheye": {}, "cubemap": {}, "equiangularCubemap": {}, "perspective": {}}
+	validStereo      = map[string]struct{}{"mono": {}, "sbs": {}, "tb": {}}
+	validLenses      = map[string]struct{}{"MKX200": {}, "MKX220": {}, "VRCA220": {}}
+)
+
+// DefaultVideoRules reproduces the mapping earlier releases had in code,
+// plus passthrough for the tags that mark alpha-packed videos.
+func DefaultVideoRules() []VideoRule {
+	return []VideoRule{
+		{Tag: "DOME", Projection: "equirectangular", Stereo: "sbs"},
+		{Tag: "SPHERE", Projection: "equirectangular360", Stereo: "sbs"},
+		{Tag: "FISHEYE", Projection: "fisheye", Stereo: "sbs"},
+		{Tag: "MKX200", Projection: "fisheye", Stereo: "sbs", Lens: "MKX200", Fov: 200},
+		{Tag: "RF52", Projection: "fisheye", Stereo: "sbs", Fov: 190},
+		{Tag: "CUBEMAP", Projection: "cubemap", Stereo: "sbs"},
+		{Tag: "EAC", Projection: "equiangularCubemap", Stereo: "sbs"},
+		{Tag: "FLAT", Projection: "perspective", Stereo: "mono"},
+		{Tag: "SBS", Stereo: "sbs"},
+		{Tag: "TB", Stereo: "tb"},
+		{Tag: "Passthrough", Passthrough: true},
+		{Tag: "Alpha", Passthrough: true},
+		{Tag: "Augmented Reality", Passthrough: true},
+	}
+}
+
+func validateVideoRules(rules []VideoRule) error {
+	for i, r := range rules {
+		if strings.TrimSpace(r.Tag) == "" {
+			return fmt.Errorf("%w: video_rules[%d].tag must not be empty", ErrInvalid, i)
+		}
+		if _, ok := validProjections[r.Projection]; r.Projection != "" && !ok {
+			return fmt.Errorf("%w: video_rules[%d].projection %q is not supported", ErrInvalid, i, r.Projection)
+		}
+		if _, ok := validStereo[r.Stereo]; r.Stereo != "" && !ok {
+			return fmt.Errorf("%w: video_rules[%d].stereo %q is not supported", ErrInvalid, i, r.Stereo)
+		}
+		if _, ok := validLenses[r.Lens]; r.Lens != "" && !ok {
+			return fmt.Errorf("%w: video_rules[%d].lens %q is not supported", ErrInvalid, i, r.Lens)
+		}
+		if r.Fov != 0 && (r.Fov < 1 || r.Fov > 360) {
+			return fmt.Errorf("%w: video_rules[%d].fov must be 0 or between 1 and 360", ErrInvalid, i)
+		}
+		for _, c := range r.Profile {
+			if c < '0' || c > '9' {
+				return fmt.Errorf("%w: video_rules[%d].profile must be a scene id", ErrInvalid, i)
+			}
+		}
+	}
+	return nil
+}
+
+// normalizeVideoRules trims tags in place.
+func normalizeVideoRules(rules []VideoRule) {
+	for i := range rules {
+		rules[i].Tag = strings.TrimSpace(rules[i].Tag)
+	}
+}
+
 const configFileName = "config.json"
 
 // ErrInvalid marks a settings value rejected by Validate, so API callers can
@@ -38,19 +109,20 @@ var validLogLevels = map[string]struct{}{
 // fileConfig is the persisted subset of ApplicationConfig. Pointer fields let
 // a file that lacks a key fall back to the seed (flags/env/defaults).
 type fileConfig struct {
-	StashGraphQLUrl    *string  `json:"stash_graphql_url,omitempty"`
-	StashApiKey        *string  `json:"stash_api_key,omitempty"`
-	FavoriteTag        *string  `json:"favorite_tag,omitempty"`
-	ExcludeSortName    *string  `json:"exclude_sort_name,omitempty"`
-	GenerateSummaryIds *bool    `json:"generate_summary_ids,omitempty"`
-	HeatmapHeightPx    *int     `json:"heatmap_height_px,omitempty"`
-	SmartSectionSize   *int     `json:"smart_section_size,omitempty"`
-	ForceHTTPS         *bool    `json:"force_https,omitempty"`
-	BasePath           *string  `json:"base_path,omitempty"`
-	DeovrAutoload      *bool    `json:"deovr_autoload,omitempty"`
-	FunscriptIndexPath *string  `json:"funscript_index_path,omitempty"`
-	LogLevel           *string  `json:"log_level,omitempty"`
-	Filters            []Filter `json:"filters"`
+	StashGraphQLUrl    *string     `json:"stash_graphql_url,omitempty"`
+	StashApiKey        *string     `json:"stash_api_key,omitempty"`
+	FavoriteTag        *string     `json:"favorite_tag,omitempty"`
+	ExcludeSortName    *string     `json:"exclude_sort_name,omitempty"`
+	GenerateSummaryIds *bool       `json:"generate_summary_ids,omitempty"`
+	HeatmapHeightPx    *int        `json:"heatmap_height_px,omitempty"`
+	SmartSectionSize   *int        `json:"smart_section_size,omitempty"`
+	ForceHTTPS         *bool       `json:"force_https,omitempty"`
+	BasePath           *string     `json:"base_path,omitempty"`
+	DeovrAutoload      *bool       `json:"deovr_autoload,omitempty"`
+	FunscriptIndexPath *string     `json:"funscript_index_path,omitempty"`
+	LogLevel           *string     `json:"log_level,omitempty"`
+	Filters            []Filter    `json:"filters"`
+	VideoRules         []VideoRule `json:"video_rules"`
 }
 
 var (
@@ -81,6 +153,8 @@ func cloneConfig(c ApplicationConfig) ApplicationConfig {
 	out := c
 	out.Filters = make([]Filter, len(c.Filters))
 	copy(out.Filters, c.Filters)
+	out.VideoRules = make([]VideoRule, len(c.VideoRules))
+	copy(out.VideoRules, c.VideoRules)
 	return out
 }
 
@@ -112,6 +186,9 @@ func Load(seed ApplicationConfig) error {
 	seed.ConfigPath = dir
 	if seed.Filters == nil {
 		seed.Filters = []Filter{}
+	}
+	if seed.VideoRules == nil {
+		seed.VideoRules = DefaultVideoRules()
 	}
 	if seed.BasePath, err = NormalizeBasePath(seed.BasePath); err != nil {
 		return err
@@ -192,6 +269,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.Filters != nil {
 		base.Filters = fc.Filters
 	}
+	if fc.VideoRules != nil {
+		base.VideoRules = fc.VideoRules
+	}
 	return base
 }
 
@@ -210,6 +290,10 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	if next.Filters == nil {
 		next.Filters = []Filter{}
 	}
+	if next.VideoRules == nil {
+		next.VideoRules = []VideoRule{}
+	}
+	normalizeVideoRules(next.VideoRules)
 	var err error
 	if next.BasePath, err = NormalizeBasePath(next.BasePath); err != nil {
 		return ApplicationConfig{}, err
@@ -261,7 +345,7 @@ func Validate(c ApplicationConfig) error {
 	if c.FunscriptIndexPath != "" && !filepath.IsAbs(c.FunscriptIndexPath) {
 		return fmt.Errorf("%w: funscript_index_path must be empty or an absolute path, got %q", ErrInvalid, c.FunscriptIndexPath)
 	}
-	return nil
+	return validateVideoRules(c.VideoRules)
 }
 
 func write(path string, c ApplicationConfig) error {
@@ -279,9 +363,13 @@ func write(path string, c ApplicationConfig) error {
 		FunscriptIndexPath: &c.FunscriptIndexPath,
 		LogLevel:           &c.LogLevel,
 		Filters:            c.Filters,
+		VideoRules:         c.VideoRules,
 	}
 	if fc.Filters == nil {
 		fc.Filters = []Filter{}
+	}
+	if fc.VideoRules == nil {
+		fc.VideoRules = []VideoRule{}
 	}
 	data, err := json.MarshalIndent(fc, "", "  ")
 	if err != nil {

@@ -44,6 +44,7 @@ type ApplicationConfig struct {
 	ConfigPath         string
 	GenerateSummaryIds bool
 	Filters            []Filter
+	VideoRules         []VideoRule
 }
 
 func Init() error {
