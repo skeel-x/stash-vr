@@ -449,3 +449,27 @@ func TestHiddenFor(t *testing.T) {
 		t.Fatal("a listed player must be hidden")
 	}
 }
+
+func TestGetSectionsFor_FallsBackWhenEverythingIsHidden(t *testing.T) {
+	loadConfig(t, []config.Filter{
+		{ID: "smart:continue", HiddenIn: []string{"deovr"}},
+		{ID: "smart:recent", HiddenIn: []string{"deovr"}},
+		{ID: "smart:random", Disabled: true},
+	})
+	svc := NewService(&routingStash{})
+
+	deovr, err := svc.GetSectionsFor(context.Background(), "deovr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deovr) != 2 {
+		t.Fatalf("expected the full index when every section is hidden for a player, got %d", len(deovr))
+	}
+	sets, err := svc.GetSavedFilterSceneSetsFor(context.Background(), "deovr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sets) != 2 {
+		t.Fatalf("expected all sets for the same reason, got %d", len(sets))
+	}
+}

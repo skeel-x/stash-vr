@@ -176,7 +176,12 @@ func (libraryService *Service) GetSectionsFor(ctx context.Context, player string
 	if err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(sections, func(s Section) bool { return HiddenFor(s.HiddenIn, player) }), nil
+	visible := slices.DeleteFunc(slices.Clone(sections), func(s Section) bool { return HiddenFor(s.HiddenIn, player) })
+	if len(visible) == 0 && len(sections) > 0 {
+		log.Ctx(ctx).Warn().Str("player", player).Msg("Every section is hidden for this player; showing all sections instead of an empty library")
+		return sections, nil
+	}
+	return visible, nil
 }
 
 func (libraryService *Service) getDefaultSections(ctx context.Context) ([]Section, error) {
@@ -222,7 +227,12 @@ func (libraryService *Service) GetSavedFilterSceneSetsFor(ctx context.Context, p
 	if err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(sets, func(s SavedFilterSceneSet) bool { return HiddenFor(s.HiddenIn, player) }), nil
+	visible := slices.DeleteFunc(slices.Clone(sets), func(s SavedFilterSceneSet) bool { return HiddenFor(s.HiddenIn, player) })
+	if len(visible) == 0 && len(sets) > 0 {
+		log.Ctx(ctx).Warn().Str("player", player).Msg("Every section is hidden for this player; listing all sections instead")
+		return sets, nil
+	}
+	return visible, nil
 }
 
 // sectionRows applies the ordering rule: smart sections without an override
