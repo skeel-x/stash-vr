@@ -112,3 +112,12 @@ func names(tags []tagDto) []string {
 	}
 	return out
 }
+
+func TestCountryName(t *testing.T) {
+	cases := map[string]string{"US": "United States", "SE": "Sweden", "UA": "Ukraine", "GB": "United Kingdom", "se": "Sweden", "": "", "ZZ": "ZZ", "Sweden": "Sweden"}
+	for code, want := range cases {
+		if got := countryName(code); got != want {
+			t.Errorf("countryName(%q) = %q want %q", code, got, want)
+		}
+	}
+}

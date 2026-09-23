@@ -103,7 +103,7 @@ If your proxy cannot send the header, set the prefix as `base_path` on the Setup
 
 ### Settings and the web UI
 
-Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. The page also shows a strip of six random scenes with a Shuffle button; each links to the scene in Stash. Smart sections (Continue watching, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, with optional auto-refresh.
+Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash. Smart sections (Continue watching, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, with optional auto-refresh.
 
 `config.json` lives in the directory given by `CONFIG_PATH` (default: a `config` directory next to the binary). In Docker the image sets `CONFIG_PATH=/config`; mount a directory that is writable by uid 65532 (the image's non-root user). The environment variables and flags below only seed the file on first start; after that the file is the source of truth. `LISTEN_ADDRESS`, `DISABLE_LOG_COLOR` and `DISABLE_REDACT` are process settings and stay flags.
 
@@ -216,8 +216,8 @@ When the favorite-feature of HereSphere is first used Stash-VR will create a tag
 
 #### Performer facets
 
-Each performer's country and age appear as `Country:` and `Age:` tags in
-HereSphere, so scenes can be filtered by them. The age is taken at the
+Each performer's country (as its English name) and age appear as `Country:`
+and `Age:` tags in HereSphere, so scenes can be filtered by them. The age is taken at the
 scene's date when Stash knows it, else today. Switch the facets off with
 `performer_facets` on the Setup page.
 

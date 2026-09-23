@@ -3,7 +3,11 @@ package heresphere
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
+
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/library"
@@ -53,7 +57,7 @@ func performerFacets(vd *library.VideoData, now time.Time) []tagDto {
 			continue
 		}
 		if p.Country != nil && *p.Country != "" {
-			add(fmt.Sprintf("%s%s%s", internal.LegendPerformerCountry, seperator, *p.Country))
+			add(fmt.Sprintf("%s%s%s", internal.LegendPerformerCountry, seperator, countryName(*p.Country)))
 		}
 		if p.Birthdate != nil {
 			if age, ok := ageAt(*p.Birthdate, at); ok {
@@ -62,4 +66,21 @@ func performerFacets(vd *library.VideoData, now time.Time) []tagDto {
 		}
 	}
 	return tags
+}
+
+// countryName turns the ISO 3166-1 code Stash stores into its English name.
+// Anything that is not a known code is returned unchanged.
+func countryName(code string) string {
+	code = strings.TrimSpace(code)
+	if len(code) != 2 {
+		return code
+	}
+	region, err := language.ParseRegion(code)
+	if err != nil || !region.IsCountry() {
+		return code
+	}
+	if name := display.English.Regions().Name(region); name != "" {
+		return name
+	}
+	return code
 }
