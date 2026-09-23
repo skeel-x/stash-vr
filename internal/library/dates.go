@@ -28,6 +28,13 @@ const (
 	// dateMissExpiry is how long a scene no stash-box knew is left alone
 	// before it is asked again.
 	dateMissExpiry = 30 * 24 * time.Hour
+	// dateFailExpiry is how long a scene whose lookup failed on every
+	// stash-box is left alone before it is asked again.
+	dateFailExpiry = 6 * time.Hour
+	// dateWritebackMinTitle is the shortest normalised title a date may be
+	// written back to Stash for, so generic names such as "scene1" or
+	// "intro" never qualify.
+	dateWritebackMinTitle = 7
 	// dateFlushDebounce bounds how often dates.json is rewritten while the
 	// sweeper is busy.
 	dateFlushDebounce = 5 * time.Second
@@ -36,17 +43,28 @@ const (
 	datesFileName = "dates.json"
 )
 
-// dateEntry is what dates.json holds per scene id. A miss has an empty Date.
+// dateEntry is what dates.json holds per scene id. A miss has an empty Date;
+// a lookup every stash-box failed on has an empty Date and Failed set.
+// Matched records whether a hit matched the scene by title rather than being
+// the lone result of a box.
 type dateEntry struct {
 	Date    string    `json:"date"`
 	Source  string    `json:"source,omitempty"`
 	Checked time.Time `json:"checked"`
+	Matched bool      `json:"matched,omitempty"`
+	Failed  bool      `json:"failed,omitempty"`
 }
 
-// settled reports whether the scene needs no lookup: it has a date, or it
-// was a miss within dateMissExpiry.
+// settled reports whether the scene needs no lookup: it has a date, it was a
+// miss within dateMissExpiry, or it failed within dateFailExpiry.
 func (e dateEntry) settled(now time.Time) bool {
-	return e.Date != "" || now.Sub(e.Checked) < dateMissExpiry
+	if e.Date != "" {
+		return true
+	}
+	if e.Failed {
+		return now.Sub(e.Checked) < dateFailExpiry
+	}
+	return now.Sub(e.Checked) < dateMissExpiry
 }
 
 // dateStore is the persisted set of looked-up release dates.
@@ -183,7 +201,7 @@ func (libraryService *Service) DateStats() DateStats {
 		switch {
 		case ok && e.Date != "":
 			stats.Found++
-		case ok && e.settled(now):
+		case ok && !e.Failed && e.settled(now):
 			stats.Missing++
 		default:
 			stats.Unchecked++
@@ -218,8 +236,10 @@ func validReleaseDate(date string) bool {
 
 // acceptScrapedDate picks the first result that is either the only result or
 // whose normalised title equals the scene's normalised title or file stem,
-// provided its date is a full date.
-func acceptScrapedDate(sceneTitle, fileStem string, results []scraped) (date string, ok bool) {
+// provided its date is a full date. matched reports a title match; a lone
+// result accepted without one is a guess. writable reports a title match of
+// at least dateWritebackMinTitle characters, the only kind safe to write back.
+func acceptScrapedDate(sceneTitle, fileStem string, results []scraped) (date string, matched, writable, ok bool) {
 	wanted := map[string]struct{}{}
 	for _, s := range []string{sceneTitle, fileStem} {
 		if n := normalizeTitle(s); n != "" {
@@ -227,12 +247,13 @@ func acceptScrapedDate(sceneTitle, fileStem string, results []scraped) (date str
 		}
 	}
 	for _, r := range results {
-		_, match := wanted[normalizeTitle(r.Title)]
+		n := normalizeTitle(r.Title)
+		_, match := wanted[n]
 		if (len(results) == 1 || match) && validReleaseDate(r.Date) {
-			return r.Date, true
+			return r.Date, match, match && len(n) >= dateWritebackMinTitle, true
 		}
 	}
-	return "", false
+	return "", false, false, false
 }
 
 // stashBox is one entry of Stash's stash-box list; its position in the list
@@ -400,8 +421,10 @@ func (libraryService *Service) setReleaseDate(id, date string) {
 
 // lookupDate asks each stash-box in order for scene id's release date and
 // stores the first accepted date, or a miss when every box answered without
-// one. A box error leaves the scene unchecked. It reports false when the run
-// should stop because no stash-box can be asked.
+// one. When every box errored it stores a failed entry so the scene backs off
+// for dateFailExpiry; when some boxes errored and the rest missed it leaves
+// the scene unchecked. Only title matches are written back to Stash. It
+// reports false when the run should stop because no stash-box can be asked.
 func (libraryService *Service) lookupDate(ctx context.Context, id string) bool {
 	vd, err := libraryService.GetScene(ctx, id, false)
 	if err != nil {
@@ -430,7 +453,7 @@ func (libraryService *Service) lookupDate(ctx context.Context, id string) bool {
 		stem = strings.TrimSuffix(base, filepath.Ext(base))
 	}
 
-	failed := false
+	failed, answered := false, false
 	for i, box := range boxes {
 		resp, err := gql.ScrapeSceneDate(ctx, libraryService.Client(), i, id)
 		if err != nil {
@@ -441,6 +464,7 @@ func (libraryService *Service) lookupDate(ctx context.Context, id string) bool {
 			failed = true
 			continue
 		}
+		answered = true
 		results := make([]scraped, 0, len(resp.ScrapeSingleScene))
 		for _, r := range resp.ScrapeSingleScene {
 			if r == nil {
@@ -455,16 +479,25 @@ func (libraryService *Service) lookupDate(ctx context.Context, id string) bool {
 			}
 			results = append(results, s)
 		}
-		date, ok := acceptScrapedDate(title, stem, results)
+		date, matched, writable, ok := acceptScrapedDate(title, stem, results)
 		if !ok {
 			continue
 		}
-		libraryService.dates().put(id, dateEntry{Date: date, Source: box.label(), Checked: time.Now().UTC()})
+		libraryService.dates().put(id, dateEntry{Date: date, Source: box.label(), Checked: time.Now().UTC(), Matched: matched})
 		libraryService.setReleaseDate(id, date)
-		log.Ctx(ctx).Info().Str("scene", id).Str("date", date).Str("source", box.label()).Msg("Release date found")
-		if config.Application().DateWriteback {
+		match := "single-result guess"
+		if matched {
+			match = "title match"
+		}
+		log.Ctx(ctx).Info().Str("scene", id).Str("date", date).Str("source", box.label()).Str("match", match).Msg("Release date found")
+		if writable && config.Application().DateWriteback {
 			libraryService.writeBackDate(ctx, id, date)
 		}
+		return true
+	}
+	if failed && !answered {
+		libraryService.dates().put(id, dateEntry{Checked: time.Now().UTC(), Failed: true})
+		log.Ctx(ctx).Debug().Str("scene", id).Msg("Release date lookup failed on every stash-box, backing off")
 		return true
 	}
 	if failed {

@@ -27,22 +27,26 @@ func TestAcceptScrapedDate(t *testing.T) {
 		stem    string
 		results []scraped
 		want    string
+		matched bool
+		write   bool
 		ok      bool
 	}{
-		{"single result with any title", "My Scene", "file", []scraped{r("Something Else", "2020-01-02")}, "2020-01-02", true},
-		{"exact title among many", "My Scene!", "file", []scraped{r("Other", "2019-01-01"), r("my scene", "2021-03-04"), r("Third", "2018-01-01")}, "2021-03-04", true},
-		{"stem match among many", "", "Studio - My_Scene [VR]", []scraped{r("Other", "2019-01-01"), r("Studio My Scene VR", "2022-05-06")}, "2022-05-06", true},
-		{"no match among many", "My Scene", "file", []scraped{r("Other", "2019-01-01"), r("Another", "2018-01-01")}, "", false},
-		{"matched but year only", "My Scene", "file", []scraped{r("Other", "2019-01-01"), r("My Scene", "2018")}, "", false},
-		{"single result with a year only", "My Scene", "file", []scraped{r("My Scene", "2018")}, "", false},
-		{"epoch date is junk", "My Scene", "file", []scraped{r("My Scene", "1970-01-01")}, "", false},
-		{"no results", "My Scene", "file", nil, "", false},
-		{"empty titles never match", "", "", []scraped{r("", "2019-01-01"), r("", "2018-01-01")}, "", false},
+		{"single result with any title", "My Scene", "file", []scraped{r("Something Else", "2020-01-02")}, "2020-01-02", false, false, true},
+		{"single matching result", "My Scene", "file", []scraped{r("My Scene", "2020-01-02")}, "2020-01-02", true, true, true},
+		{"single matching short title", "Scene1", "file", []scraped{r("scene 1", "2020-01-02")}, "2020-01-02", true, false, true},
+		{"exact title among many", "My Scene!", "file", []scraped{r("Other", "2019-01-01"), r("my scene", "2021-03-04"), r("Third", "2018-01-01")}, "2021-03-04", true, true, true},
+		{"stem match among many", "", "Studio - My_Scene [VR]", []scraped{r("Other", "2019-01-01"), r("Studio My Scene VR", "2022-05-06")}, "2022-05-06", true, true, true},
+		{"no match among many", "My Scene", "file", []scraped{r("Other", "2019-01-01"), r("Another", "2018-01-01")}, "", false, false, false},
+		{"matched but year only", "My Scene", "file", []scraped{r("Other", "2019-01-01"), r("My Scene", "2018")}, "", false, false, false},
+		{"single result with a year only", "My Scene", "file", []scraped{r("My Scene", "2018")}, "", false, false, false},
+		{"epoch date is junk", "My Scene", "file", []scraped{r("My Scene", "1970-01-01")}, "", false, false, false},
+		{"no results", "My Scene", "file", nil, "", false, false, false},
+		{"empty titles never match", "", "", []scraped{r("", "2019-01-01"), r("", "2018-01-01")}, "", false, false, false},
 	}
 	for _, c := range cases {
-		got, ok := acceptScrapedDate(c.title, c.stem, c.results)
-		if got != c.want || ok != c.ok {
-			t.Errorf("%s: got %q,%v want %q,%v", c.name, got, ok, c.want, c.ok)
+		got, matched, write, ok := acceptScrapedDate(c.title, c.stem, c.results)
+		if got != c.want || matched != c.matched || write != c.write || ok != c.ok {
+			t.Errorf("%s: got %q,%v,%v,%v want %q,%v,%v,%v", c.name, got, matched, write, ok, c.want, c.matched, c.write, c.ok)
 		}
 	}
 }
@@ -356,15 +360,119 @@ func TestLookupDate_MissAndErrors(t *testing.T) {
 		t.Fatalf("a dated scene must never be looked up, got %v", got)
 	}
 
-	// A failing box leaves the scene unchecked rather than a miss.
+	// When every box fails the scene is stored as failed, not as a miss.
 	stash.mu.Lock()
 	stash.scrapeErr = errors.New("box down")
 	stash.mu.Unlock()
 	loadDateConfig(t, true, false)
 	svc2 := NewService(stash)
 	svc2.lookupDate(context.Background(), "1")
-	if _, ok := svc2.dates().get("1"); ok {
-		t.Fatal("an errored lookup must not be stored")
+	e, ok = svc2.dates().get("1")
+	if !ok || !e.Failed || e.Date != "" || e.Checked.IsZero() {
+		t.Fatalf("expected a failed entry, got %+v %v", e, ok)
+	}
+}
+
+func TestLookupDate_UnmatchedSingleResultIsNotWrittenBack(t *testing.T) {
+	loadDateConfig(t, true, true)
+	stash := &dateStash{
+		scenes:  map[string]dateScene{"1": {title: "My Long Scene", basename: "one.mp4"}},
+		results: map[string]string{"1": `[{"title":"Something Else Entirely","date":"2020-01-02"}]`},
+	}
+	svc := NewService(stash)
+
+	svc.lookupDate(context.Background(), "1")
+
+	e, ok := svc.dates().get("1")
+	if !ok || e.Date != "2020-01-02" || e.Matched {
+		t.Fatalf("expected an unmatched hit stored, got %+v %v", e, ok)
+	}
+	if got := svc.LookedUpDate("1"); got != "2020-01-02" {
+		t.Fatalf("expected the date for display, got %q", got)
+	}
+	if got := stash.updateCalls(); len(got) != 0 {
+		t.Fatalf("an unmatched guess must not be written back, got %v", got)
+	}
+}
+
+func TestLookupDate_MatchedLongTitleIsWrittenBack(t *testing.T) {
+	loadDateConfig(t, true, true)
+	stash := &dateStash{
+		scenes:  map[string]dateScene{"1": {title: "", basename: "Studio - My_Scene [VR].mp4"}},
+		results: map[string]string{"1": `[{"title":"Other","date":"2019-01-01"},{"title":"Studio My Scene VR","date":"2022-05-06"}]`},
+	}
+	svc := NewService(stash)
+
+	svc.lookupDate(context.Background(), "1")
+
+	e, _ := svc.dates().get("1")
+	if !e.Matched || e.Date != "2022-05-06" {
+		t.Fatalf("expected a matched hit, got %+v", e)
+	}
+	if got := stash.updateCalls(); !slices.Equal(got, []string{"1=2022-05-06"}) {
+		t.Fatalf("expected one write-back, got %v", got)
+	}
+}
+
+func TestLookupDate_MatchedGenericTitleIsNotWrittenBack(t *testing.T) {
+	loadDateConfig(t, true, true)
+	stash := &dateStash{
+		scenes:  map[string]dateScene{"1": {title: "Intro", basename: "intro.mp4"}},
+		results: map[string]string{"1": `[{"title":"intro","date":"2020-01-02"}]`},
+	}
+	svc := NewService(stash)
+
+	svc.lookupDate(context.Background(), "1")
+
+	e, _ := svc.dates().get("1")
+	if !e.Matched || e.Date != "2020-01-02" {
+		t.Fatalf("expected a matched hit stored, got %+v", e)
+	}
+	if got := stash.updateCalls(); len(got) != 0 {
+		t.Fatalf("a short generic title must not be written back, got %v", got)
+	}
+}
+
+func TestDateEntry_FailedBackoff(t *testing.T) {
+	now := time.Now()
+	if !(dateEntry{Failed: true, Checked: now.Add(-5 * time.Hour)}).settled(now) {
+		t.Fatal("a failed entry must be settled within 6 hours")
+	}
+	if (dateEntry{Failed: true, Checked: now.Add(-7 * time.Hour)}).settled(now) {
+		t.Fatal("a failed entry must be retried after 6 hours")
+	}
+	if !(dateEntry{Checked: now.Add(-7 * time.Hour)}).settled(now) {
+		t.Fatal("a miss stays settled for 30 days")
+	}
+}
+
+func TestLookupDate_FailedEntryRetriedAfterBackoff(t *testing.T) {
+	loadDateConfig(t, true, false)
+	stash := &dateStash{
+		scenes:  map[string]dateScene{"1": {title: "My Scene", basename: "one.mp4"}},
+		results: map[string]string{"1": `[{"title":"My Scene","date":"2020-01-02"}]`},
+	}
+	svc := NewService(stash)
+	svc.dates().put("1", dateEntry{Failed: true, Checked: time.Now().Add(-time.Hour)})
+	if _, err := svc.GetScenes(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := svc.dateCandidates(context.Background()); len(got) != 0 {
+		t.Fatalf("a recent failure must not be retried, got %v", got)
+	}
+	svc.RequestDate("1")
+	if _, ok := svc.sweeper.popPriority(); ok {
+		t.Fatal("a recent failure must not be queued")
+	}
+
+	svc.dates().put("1", dateEntry{Failed: true, Checked: time.Now().Add(-7 * time.Hour)})
+	if got := svc.dateCandidates(context.Background()); !slices.Equal(got, []string{"1"}) {
+		t.Fatalf("an old failure must be retried, got %v", got)
+	}
+	svc.lookupDate(context.Background(), "1")
+	e, _ := svc.dates().get("1")
+	if e.Failed || e.Date != "2020-01-02" {
+		t.Fatalf("expected the retry to replace the failure, got %+v", e)
 	}
 }
 
@@ -372,7 +480,7 @@ func TestDateStats_CountsUndatedScenes(t *testing.T) {
 	loadDateConfig(t, true, false)
 	old := time.Now().Add(-40 * 24 * time.Hour).UTC().Format(time.RFC3339)
 	recent := time.Now().UTC().Format(time.RFC3339)
-	content := fmt.Sprintf(`{"1":{"date":"2020-01-01","checked":%q},"2":{"date":"","checked":%q},"3":{"date":"","checked":%q}}`, recent, recent, old)
+	content := fmt.Sprintf(`{"1":{"date":"2020-01-01","checked":%q},"2":{"date":"","checked":%q},"3":{"date":"","checked":%q},"6":{"date":"","checked":%q,"failed":true}}`, recent, recent, old, recent)
 	if err := os.WriteFile(datesPath(), []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -382,6 +490,7 @@ func TestDateStats_CountsUndatedScenes(t *testing.T) {
 		"3": {title: "expired miss", basename: "3.mp4"},
 		"4": {title: "never asked", basename: "4.mp4"},
 		"5": {title: "dated", date: "2019-01-01", basename: "5.mp4"},
+		"6": {title: "failed recently", basename: "6.mp4"},
 	}}
 	svc := NewService(stash)
 	if _, err := svc.GetScenes(context.Background()); err != nil {
@@ -390,7 +499,7 @@ func TestDateStats_CountsUndatedScenes(t *testing.T) {
 
 	got := svc.DateStats()
 
-	if got != (DateStats{Found: 1, Missing: 1, Unchecked: 2}) {
+	if got != (DateStats{Found: 1, Missing: 1, Unchecked: 3}) {
 		t.Fatalf("got %+v", got)
 	}
 }
