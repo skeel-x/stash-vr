@@ -87,3 +87,17 @@ func TestSetScripts_StandardWithoutStashUrlIsServedByStashVr(t *testing.T) {
 		t.Fatalf("got %+v", dto.Scripts)
 	}
 }
+
+func TestSetScripts_KeepsStashScriptWhenScanFindsOnlyVariants(t *testing.T) {
+	sp := &gql.SceneParts{
+		Id:          "9",
+		Interactive: true,
+		Paths:       &gql.ScenePartsPathsScenePathsType{Funscript: util.Ptr("http://stash/scene/9/funscript")},
+	}
+	var dto videoDataDto
+	setScripts(&library.VideoData{SceneParts: sp}, &dto, "https://vr.example", []library.ScriptVariant{{Label: "AI", Path: "/v/nine.ai.funscript"}})
+
+	if len(dto.Scripts) != 2 || dto.Scripts[0].Name != "Standard" || dto.Scripts[0].Url != "http://stash/scene/9/funscript" || dto.Scripts[1].Url != "https://vr.example/funscript/9/0" {
+		t.Fatalf("got %+v", dto.Scripts)
+	}
+}

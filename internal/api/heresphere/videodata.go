@@ -174,12 +174,21 @@ func setScripts(vd *library.VideoData, dto *videoDataDto, baseUrl string, varian
 		}
 		return
 	}
+	hasStandard := false
 	for i, v := range variants {
 		u := fmt.Sprintf("%s/funscript/%s/%d", baseUrl, vd.Id(), i)
-		if v.Label == "Standard" && stashUrl != "" {
-			u = stashUrl
+		if v.Label == "Standard" {
+			hasStandard = true
+			if stashUrl != "" {
+				u = stashUrl
+			}
 		}
 		dto.Scripts = append(dto.Scripts, scriptDto{Name: v.Label, Url: u})
+	}
+	// Stash still knows a script the scan did not find (renamed or moved
+	// since Stash last scanned): keep it in front rather than losing it.
+	if !hasStandard && stashUrl != "" {
+		dto.Scripts = append([]scriptDto{{Name: "Standard", Url: stashUrl}}, dto.Scripts...)
 	}
 }
 

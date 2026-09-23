@@ -10,9 +10,13 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
+
+// dsnPath escapes the characters that would end the path in a SQLite URI.
+var dsnPath = strings.NewReplacer("%", "%25", "?", "%3F", "#", "%23")
 
 // indexRow is one script the timestampTrade plugin index lists for a scene.
 type indexRow struct {
@@ -26,7 +30,8 @@ func indexScripts(ctx context.Context, dbPath, sceneId string) ([]indexRow, erro
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+	// Read-only, and wait briefly if the plugin happens to be writing.
+	db, err := sql.Open("sqlite", "file:"+dsnPath.Replace(dbPath)+"?mode=ro&_pragma=busy_timeout(2000)")
 	if err != nil {
 		return nil, fmt.Errorf("open index: %w", err)
 	}
@@ -66,6 +71,9 @@ func creatorFrom(metadata string) string {
 // skipping files that are missing or byte-identical to a script already
 // in the list.
 func mergeAlternates(existing []ScriptVariant, rows []indexRow) []ScriptVariant {
+	if len(rows) == 0 {
+		return existing
+	}
 	seen := map[string]struct{}{}
 	for _, v := range existing {
 		if sum, err := fileMD5(v.Path); err == nil {

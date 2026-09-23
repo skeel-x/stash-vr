@@ -101,3 +101,25 @@ func TestScriptVariants_UsesIndexWhenConfigured(t *testing.T) {
 		t.Fatalf("labels = %v", g)
 	}
 }
+
+func TestScriptVariants_UnreadableIndexKeepsSiblings(t *testing.T) {
+	dir := t.TempDir()
+	video := filepath.Join(dir, "clip.mp4")
+	touch(t, video, "video")
+	touch(t, filepath.Join(dir, "clip.funscript"), `{"actions":[1]}`)
+
+	loadConfig(t, nil)
+	cfg := config.Application()
+	cfg.FunscriptIndexPath = filepath.Join(dir, "missing.sqlite")
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	s := NewService(&scriptStash{path: video})
+
+	if g := labels(s.ScriptVariants(context.Background(), "7")); len(g) != 1 || g[0] != "Standard" {
+		t.Fatalf("expected the sibling scan to survive a missing index, got %v", g)
+	}
+	if !s.indexWarned.Load() {
+		t.Fatal("expected the missing index to be recorded as warned")
+	}
+}
