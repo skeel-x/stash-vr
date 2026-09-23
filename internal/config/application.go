@@ -18,6 +18,7 @@ const (
 	envKeyForceHTTPS         = "FORCE_HTTPS"
 	envKeyBasePath           = "BASE_PATH"
 	envKeyDeovrAutoload      = "DEOVR_AUTOLOAD"
+	envKeyPerformerFacets    = "PERFORMER_FACETS"
 	envKeyFunscriptIndexPath = "FUNSCRIPT_INDEX_PATH"
 	envKeyHeatmapHeightPx    = "HEATMAP_HEIGHT_PX"
 	envKeyExcludeSortName    = "EXCLUDE_SORT_NAME"
@@ -37,6 +38,7 @@ type ApplicationConfig struct {
 	ForceHTTPS         bool
 	BasePath           string
 	DeovrAutoload      bool
+	PerformerFacets    bool
 	FunscriptIndexPath string
 	HeatmapHeightPx    int
 	SmartSectionSize   int
@@ -77,6 +79,9 @@ func Init() error {
 
 	pflag.Bool(envKeyDeovrAutoload, true, "Send the DeoVR library when DeoVR's browser opens the front page")
 	_ = viper.BindPFlag(envKeyDeovrAutoload, pflag.Lookup(envKeyDeovrAutoload))
+
+	pflag.Bool(envKeyPerformerFacets, true, "Add Country and Age tags derived from a scene's performers in HereSphere")
+	_ = viper.BindPFlag(envKeyPerformerFacets, pflag.Lookup(envKeyPerformerFacets))
 
 	pflag.String(envKeyFunscriptIndexPath, "", "Path to the timestampTrade plugin's funscript_index.sqlite; its scripts are offered as alternates")
 	_ = viper.BindPFlag(envKeyFunscriptIndexPath, pflag.Lookup(envKeyFunscriptIndexPath))
@@ -119,6 +124,7 @@ func Init() error {
 		ForceHTTPS:         viper.GetBool(envKeyForceHTTPS),
 		BasePath:           viper.GetString(envKeyBasePath),
 		DeovrAutoload:      viper.GetBool(envKeyDeovrAutoload),
+		PerformerFacets:    viper.GetBool(envKeyPerformerFacets),
 		FunscriptIndexPath: viper.GetString(envKeyFunscriptIndexPath),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
