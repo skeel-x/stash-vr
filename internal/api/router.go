@@ -6,6 +6,7 @@ import (
 	"stash-vr/internal/api/funscript"
 	"stash-vr/internal/api/heatmap"
 	"stash-vr/internal/api/heresphere"
+	"stash-vr/internal/api/hsp"
 	"stash-vr/internal/api/playa"
 	"stash-vr/internal/api/web"
 	"stash-vr/internal/config"
@@ -34,6 +35,7 @@ func Router(libraryService *library.Service) *chi.Mux {
 
 	router.Get("/cover/{videoId}", logMod("heatmap", heatmap.CoverHandler(libraryService)).ServeHTTP)
 	router.Get("/funscript/{videoId}/{n}", logMod("funscript", funscript.Handler(libraryService)).ServeHTTP)
+	router.Get("/hsp/scene/{videoId}", logMod("hsp", hsp.Handler(libraryService)).ServeHTTP)
 
 	router.Mount("/api/ui", logMod("ui", web.ApiRouter(libraryService)))
 

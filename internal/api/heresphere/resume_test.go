@@ -3,13 +3,17 @@ package heresphere
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
+	"github.com/go-chi/chi/v5"
 	"stash-vr/internal/library"
 )
 
@@ -26,7 +30,7 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 	var payload string
 	switch req.OpName {
 	case "FindScenes":
-		payload = `{"findScenes":{"scenes":[{"id":"7","title":"Seven","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"seven.mp4","duration":1000,"path":"/seven.mp4","height":1080,"video_codec":"h264"}],"tags":[]}]}}`
+		payload = `{"findScenes":{"scenes":[{"id":"7","title":"Seven","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"seven.mp4","duration":1000,"path":"/seven.mp4","height":1080,"video_codec":"h264"}],"paths":{"stream":"http://stash/scene/7/stream"},"tags":[]}]}}`
 	case "SceneSaveActivity":
 		// req.Variables is *gql.__SceneSaveActivityInput, which is unexported
 		// and unreachable from this package, so decode it structurally instead.
@@ -125,4 +129,43 @@ func TestEvents_PlayThenPauseReportsDurationAndResumeTogether(t *testing.T) {
 	if stash.withSeconds != 1 {
 		t.Fatalf("expected the same call to carry the played seconds, got %d", stash.withSeconds)
 	}
+}
+
+func TestVideoData_StoresProfileFromRequest(t *testing.T) {
+	loadDefaultRules(t)
+	h := &httpHandler{libraryService: library.NewService(&fakeStash{})}
+	body, _ := json.Marshal(map[string]any{"hsp": base64.StdEncoding.EncodeToString([]byte("profile-bytes"))})
+	req := httptest.NewRequest(http.MethodPost, "/7", bytes.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"videoId"}, Values: []string{"7"}}}))
+	rec := httptest.NewRecorder()
+
+	h.videoDataHandler(rec, req)
+	waitFor(t, func() bool { return h.libraryService.HasProfile("7") })
+
+	data, _ := os.ReadFile(h.libraryService.ProfilePath("7"))
+	if rec.Code != 200 || string(data) != "profile-bytes" {
+		t.Fatalf("code %d, stored %q", rec.Code, data)
+	}
+
+	bad, _ := json.Marshal(map[string]any{"hsp": "%%%not-base64"})
+	req = httptest.NewRequest(http.MethodPost, "/7", bytes.NewReader(bad))
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"videoId"}, Values: []string{"7"}}}))
+	h.videoDataHandler(httptest.NewRecorder(), req)
+	time.Sleep(50 * time.Millisecond)
+	data, _ = os.ReadFile(h.libraryService.ProfilePath("7"))
+	if string(data) != "profile-bytes" {
+		t.Fatalf("malformed hsp must not overwrite the profile, got %q", data)
+	}
+}
+
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("condition not met in time")
 }

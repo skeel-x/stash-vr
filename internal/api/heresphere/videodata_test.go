@@ -30,7 +30,7 @@ func TestBuildVideoData_FormatFromRules(t *testing.T) {
 		Paths:         &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")},
 		TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "MKX200"}}, {TagParts: gql.TagParts{Id: "2", Name: "TB"}}, {TagParts: gql.TagParts{Id: "3", Name: "Passthrough"}}}},
 	}
-	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil)
+	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestBuildVideoData_NoAlphaWithoutPassthrough(t *testing.T) {
 	loadDefaultRules(t)
 	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		Files: []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4"}}, Paths: &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")}, TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "DOME"}}}}}
-	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil)
+	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestBuildVideoData_ThumbnailAlwaysUsesCoverEndpoint(t *testing.T) {
 	}
 	vd := &library.VideoData{SceneParts: sp}
 
-	dto, err := buildVideoData(context.Background(), vd, "https://vr.example", nil)
+	dto, err := buildVideoData(context.Background(), vd, "https://vr.example", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,5 +151,47 @@ func TestSetScripts_KeepsStashScriptWhenScanFindsOnlyVariants(t *testing.T) {
 
 	if len(dto.Scripts) != 2 || dto.Scripts[0].Name != "Standard" || dto.Scripts[0].Url != "http://stash/scene/9/funscript" || dto.Scripts[1].Url != "https://vr.example/funscript/9/0" {
 		t.Fatalf("got %+v", dto.Scripts)
+	}
+}
+
+type fakeProfiles map[string]bool
+
+func (f fakeProfiles) HasProfile(id string) bool { return f[id] }
+
+func TestBuildVideoData_ProfileLinkPrecedence(t *testing.T) {
+	loadDefaultRules(t)
+	cfg := config.Application()
+	cfg.VideoRules = append(cfg.VideoRules, config.VideoRule{Tag: "Passthrough", Profile: "11649"})
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	scene := func(id string) *library.VideoData {
+		return &library.VideoData{SceneParts: &gql.SceneParts{Id: id, Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			Files:         []*gql.ScenePartsFilesVideoFile{{Basename: "x.mp4"}},
+			Paths:         &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/" + id + "/stream")},
+			TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "Passthrough"}}}}}}
+	}
+	cases := []struct {
+		name     string
+		id       string
+		profiles fakeProfiles
+		want     string
+	}{
+		{"own profile wins", "9", fakeProfiles{"9": true, "11649": true}, "https://vr.example/hsp/scene/9"},
+		{"rule profile", "9", fakeProfiles{"11649": true}, "https://vr.example/hsp/scene/11649"},
+		{"none stored", "9", fakeProfiles{}, ""},
+	}
+	for _, c := range cases {
+		dto, err := buildVideoData(context.Background(), scene(c.id), "https://vr.example", nil, c.profiles)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := ""
+		if dto.Hsp != nil {
+			got = *dto.Hsp
+		}
+		if got != c.want {
+			t.Errorf("%s: hsp = %q want %q", c.name, got, c.want)
+		}
 	}
 }

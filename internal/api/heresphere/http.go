@@ -2,6 +2,7 @@ package heresphere
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -114,7 +115,7 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	dto, err := buildVideoData(ctx, vd, baseUrl, h.libraryService.ScriptVariants(ctx, videoId))
+	dto, err := buildVideoData(ctx, vd, baseUrl, h.libraryService.ScriptVariants(ctx, videoId), h.libraryService)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("failed to build video data")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -145,12 +146,33 @@ func (h *httpHandler) processUpdates(videoId string, vdReq videoDataRequestDto) 
 		h.processIncomingTags(ctx, videoId, vdReq)
 		needsRefetch = true
 	}
+	if vdReq.Hsp != nil && *vdReq.Hsp != "" {
+		h.saveProfile(ctx, videoId, *vdReq.Hsp)
+	}
 	if needsRefetch {
 		_, err := h.libraryService.GetScene(ctx, videoId, true)
 		if err != nil {
 			log.Ctx(ctx).Warn().Err(err).Msg("Failed to refetch scene")
 		}
 	}
+}
+
+// saveProfile stores the profile HereSphere sent back for the scene.
+func (h *httpHandler) saveProfile(ctx context.Context, videoId, encoded string) {
+	if len(encoded) > library.MaxProfileBytes*4/3+4 {
+		log.Ctx(ctx).Warn().Str("scene", videoId).Msg("Ignoring oversized HereSphere profile")
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		log.Ctx(ctx).Warn().Err(err).Str("scene", videoId).Msg("Ignoring malformed HereSphere profile")
+		return
+	}
+	if err := h.libraryService.SaveProfile(videoId, data); err != nil {
+		log.Ctx(ctx).Warn().Err(err).Str("scene", videoId).Msg("Failed to store HereSphere profile")
+		return
+	}
+	log.Ctx(ctx).Info().Str("scene", videoId).Int("bytes", len(data)).Msg("Stored HereSphere profile")
 }
 
 func (h *httpHandler) processIncomingTags(ctx context.Context, videoId string, vdReq videoDataRequestDto) {
@@ -281,4 +303,5 @@ type videoDataRequestDto struct {
 	Tags             *[]tagDto `json:"tags,omitempty"`
 	DeleteFile       *bool     `json:"deleteFile,omitempty"`
 	NeedsMediaSource *bool     `json:"needsMediaSource,omitempty"`
+	Hsp              *string   `json:"hsp,omitempty"`
 }

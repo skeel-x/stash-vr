@@ -70,7 +70,10 @@ type subtitleDto struct {
 	Url      string `json:"url,omitempty"`
 }
 
-func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, variants []library.ScriptVariant) (*videoDataDto, error) {
+// profileLookup answers whether a HereSphere profile is stored for a scene.
+type profileLookup interface{ HasProfile(id string) bool }
+
+func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, variants []library.ScriptVariant, profiles profileLookup) (*videoDataDto, error) {
 	videoId := vd.Id()
 	if len(vd.SceneParts.Files) == 0 {
 		return nil, fmt.Errorf("scene %s has no files", videoId)
@@ -121,7 +124,11 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 
 	setMediaSources(vd, &dto)
 
-	setFormat(vd, &dto, library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags))
+	f := library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
+	setFormat(vd, &dto, f)
+	if link := profileLink(baseUrl, videoId, f, profiles); link != "" {
+		dto.Hsp = util.Ptr(link)
+	}
 
 	setScripts(vd, &dto, baseUrl, variants)
 
@@ -208,6 +215,21 @@ func setFormat(vd *library.VideoData, dto *videoDataDto, f library.Format) {
 	if f.Passthrough {
 		dto.AlphaPackedSettings = &alphaPackedDto{DefaultSettings: true}
 	}
+}
+
+// profileLink picks the HereSphere profile for the scene: its own stored
+// profile first, else the profile scene named by the matching rule.
+func profileLink(baseUrl, id string, f library.Format, profiles profileLookup) string {
+	if profiles == nil {
+		return ""
+	}
+	switch {
+	case profiles.HasProfile(id):
+		return baseUrl + "/hsp/scene/" + id
+	case f.ProfileScene != "" && profiles.HasProfile(f.ProfileScene):
+		return baseUrl + "/hsp/scene/" + f.ProfileScene
+	}
+	return ""
 }
 
 func setMediaSources(vd *library.VideoData, dto *videoDataDto) {
