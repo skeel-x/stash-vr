@@ -59,21 +59,24 @@
     });
   }
 
-  // Players page: random strip.
-  const strip = $('#random-strip');
-  if (strip) {
+  // Players page: one random scene under Details.
+  const randomItem = $('#random-item');
+  if (randomItem) {
     const shuffle = $('#shuffle');
     shuffle.addEventListener('click', async () => {
       shuffle.disabled = true;
       try {
-        const r = await api('GET', '/random?n=6');
-        strip.replaceChildren(...r.scenes.map((s) => {
-          const a = document.createElement('a'); a.className = 'card'; a.href = s.stash; a.target = '_blank'; a.rel = 'noopener';
+        const r = await api('GET', '/random?n=1');
+        const s = r.scenes[0];
+        if (s) {
+          const a = document.createElement('a'); a.className = 'random-card'; a.href = s.stash; a.target = '_blank'; a.rel = 'noopener';
           const img = document.createElement('img'); img.src = s.cover; img.alt = ''; img.loading = 'lazy';
           const t = document.createElement('span'); t.textContent = s.title;
-          a.append(img, t); return a;
-        }));
-      } catch (e) { /* keep the current strip */ }
+          a.append(img, t);
+          randomItem.querySelectorAll('.random-card').forEach((el) => el.remove());
+          randomItem.prepend(a);
+        }
+      } catch (e) { /* keep the current scene */ }
       shuffle.disabled = false;
     });
   }

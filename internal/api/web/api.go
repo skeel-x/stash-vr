@@ -29,7 +29,7 @@ const (
 	stashProbeTimeout = 10 * time.Second
 	// maxStashErrorLen caps a message coming from the Stash client.
 	maxStashErrorLen = 200
-	// randomStripSize is how many scenes the Players page strip shows.
+	// randomStripSize is the default count for /api/ui/random.
 	randomStripSize = 6
 	// maxRandomScenes caps one /random request.
 	maxRandomScenes = 24

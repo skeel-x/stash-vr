@@ -55,6 +55,10 @@ type ProfileOption struct {
 	Title string
 }
 
+// randomDetailSize is how many random scenes the Players page shows under
+// Details.
+const randomDetailSize = 1
+
 type pageData struct {
 	Title       string
 	Base        string
@@ -153,7 +157,7 @@ func (h pageHandler) players(w http.ResponseWriter, r *http.Request) {
 	data.Links = LinksFor(r)
 	if data.Status.Connection == "ok" {
 		// A failed draw only leaves the strip empty; the page still renders.
-		random, err := randomScenes(r.Context(), h.lib, internal.GetBaseUrl(r), randomStripSize)
+		random, err := randomScenes(r.Context(), h.lib, internal.GetBaseUrl(r), randomDetailSize)
 		if err != nil {
 			log.Ctx(r.Context()).Debug().Err(err).Msg("Random strip: no scenes")
 		}

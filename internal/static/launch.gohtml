@@ -15,20 +15,11 @@
     <dt>Settings file</dt><dd><code>{{.Status.ConfigPath}}</code>{{if not .Status.ConfigFileExists}} (not written yet){{end}}</dd>
     <dt>Listening on</dt><dd><code>{{.Status.ListenAddress}}</code>, log level {{.Status.LogLevel}}</dd>
     <dt>Index</dt><dd>{{.Status.Links}} links in {{.Status.Sections}} sections <button type="button" id="reindex" class="small">Rebuild index</button> <span class="msg" id="reindex-msg"></span></dd>
+    {{if .Random}}<dt>Something random</dt><dd id="random-item">{{range .Random}}<a class="random-card" href="{{.Stash}}" target="_blank" rel="noopener"><img src="{{.Cover}}" alt="" loading="lazy"><span>{{.Title}}</span></a>{{end}} <button type="button" id="shuffle" class="small">Shuffle</button></dd>{{end}}
   </dl>
 </section>
 
 {{if eq .Status.Connection "ok"}}
-<section class="random">
-  <div class="row between">
-    <h2>Something random</h2>
-    <button type="button" id="shuffle" class="small">Shuffle</button>
-  </div>
-  <div class="strip" id="random-strip">
-    {{range .Random}}<a class="card" href="{{.Stash}}" target="_blank" rel="noopener"><img src="{{.Cover}}" alt="" loading="lazy"><span>{{.Title}}</span></a>{{end}}
-  </div>
-</section>
-
 <section class="players">
   <article class="player heresphere">
     <a class="launch" href="{{.Links.HereSphere}}">
