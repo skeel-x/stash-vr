@@ -47,8 +47,8 @@ func TestPerformerFacets_UsesSceneDateThenToday(t *testing.T) {
 	dated := &library.VideoData{SceneParts: &gql.SceneParts{Id: "1", Date: util.Ptr("2020-01-01"),
 		Performers: []*gql.ScenePartsPerformersPerformer{facetPerformer("A", "Sweden", "1990-06-15"), facetPerformer("B", "", ""), facetPerformer("C", "Sweden", "")}}}
 	got := names(performerFacets(dated, now))
-	want := []string{"Country:Sweden", "Age:29"}
-	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+	want := []string{"Country:Sweden", "Country:SE", "Age:29"}
+	if len(got) != 3 || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
 		t.Fatalf("dated: got %v want %v", got, want)
 	}
 

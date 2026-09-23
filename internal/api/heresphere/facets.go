@@ -57,7 +57,16 @@ func performerFacets(vd *library.VideoData, now time.Time) []tagDto {
 			continue
 		}
 		if p.Country != nil && *p.Country != "" {
-			add(fmt.Sprintf("%s%s%s", internal.LegendPerformerCountry, seperator, countryName(*p.Country)))
+			// Both the name and the code, so Country:Sweden and Country:SE
+			// select the same scenes.
+			code := strings.TrimSpace(*p.Country)
+			if len(code) == 2 {
+				code = strings.ToUpper(code)
+			}
+			add(fmt.Sprintf("%s%s%s", internal.LegendPerformerCountry, seperator, countryName(code)))
+			if name := countryName(code); name != code {
+				add(fmt.Sprintf("%s%s%s", internal.LegendPerformerCountry, seperator, code))
+			}
 		}
 		if p.Birthdate != nil {
 			if age, ok := ageAt(*p.Birthdate, at); ok {
