@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -168,4 +169,24 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("condition not met in time")
+}
+
+func TestVideoData_OversizedBodyIsIgnored(t *testing.T) {
+	loadDefaultRules(t)
+	h := &httpHandler{libraryService: library.NewService(&fakeStash{})}
+	huge := strings.Repeat("A", maxVideoDataBody+1024)
+	body, _ := json.Marshal(map[string]any{"hsp": huge})
+	req := httptest.NewRequest(http.MethodPost, "/7", bytes.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"videoId"}, Values: []string{"7"}}}))
+	rec := httptest.NewRecorder()
+
+	h.videoDataHandler(rec, req)
+	time.Sleep(50 * time.Millisecond)
+
+	if rec.Code != 200 {
+		t.Fatalf("the scene document must still be served, got %d", rec.Code)
+	}
+	if h.libraryService.HasProfile("7") {
+		t.Fatal("an oversized body must not store a profile")
+	}
 }

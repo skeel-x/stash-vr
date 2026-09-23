@@ -79,8 +79,14 @@ func (h *httpHandler) scanHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// maxVideoDataBody bounds the scene request body: a profile write-back is
+// at most MaxProfileBytes once decoded, plus base64 overhead and the
+// other fields.
+const maxVideoDataBody = library.MaxProfileBytes*4/3 + 64*1024
+
 func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
+	req.Body = http.MaxBytesReader(w, req.Body, maxVideoDataBody)
 
 	ctx := req.Context()
 	baseUrl := internal.GetBaseUrl(req)
