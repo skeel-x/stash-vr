@@ -103,7 +103,7 @@ If your proxy cannot send the header, set the prefix as `base_path` on the Setup
 
 ### Settings and the web UI
 
-Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash. Smart sections (Continue watching, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, with optional auto-refresh.
+Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash. Smart sections (Continue watching, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, filterable by level and text, with optional auto-refresh.
 
 `config.json` lives in the directory given by `CONFIG_PATH` (default: a `config` directory next to the binary). In Docker the image sets `CONFIG_PATH=/config`; mount a directory that is writable by uid 65532 (the image's non-root user). The environment variables and flags below only seed the file on first start; after that the file is the source of truth. `LISTEN_ADDRESS`, `DISABLE_LOG_COLOR` and `DISABLE_REDACT` are process settings and stay flags.
 
@@ -138,6 +138,15 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `PERFORMER_FACETS`
   * Default: `true`
   * Add `Country:` and `Age:` tags per performer to HereSphere's tag list. Runtime name: `performer_facets`.
+* `DATE_LOOKUP`
+  * Default: `true`
+  * Look up missing scene release dates from the stash-boxes configured in Stash. Runtime name: `date_lookup`.
+* `DATE_WRITEBACK`
+  * Default: `false`
+  * Also write dates found that way back to Stash. Runtime name: `date_writeback`.
+* `AUTO_STUDIO_MIN`, `AUTO_PERFORMER_MIN`
+  * Default: `0` (off)
+  * Generate a section per studio or performer with at least this many scenes, up to 50 of each. Runtime names: `auto_studio_min`, `auto_performer_min`.
 * `FUNSCRIPT_INDEX_PATH`
   * Default: empty (off)
   * Absolute path to the timestampTrade plugin's `funscript_index.sqlite`; scripts it lists for a scene are offered as alternates in HereSphere. Runtime name: `funscript_index_path`.
@@ -213,6 +222,22 @@ Changes reflect in HereSphere when videos are re-opened.
 #### Favorites
 
 When the favorite-feature of HereSphere is first used Stash-VR will create a tag in Stash named according to `FAVORITE_TAG` (set in docker env., defaults to `FAVORITE`) and apply that tag to your scene.
+
+#### Release dates, watched state and auto sections
+
+Scenes without a date in Stash get one from your stash-boxes (stashdb,
+ThePornDB and others configured in Stash): a background job asks them by
+fingerprint, one scene every few seconds, and accepts a result only when
+it is the only match or its title matches the scene. Answers are kept in
+`dates.json` next to `config.json`. Found dates show as `Released:` tags,
+feed HereSphere's release date and the `Age:` facet, and can optionally be
+written back to Stash.
+
+HereSphere also gets `Watched:yes`/`Watched:no` and, for scenes with a
+saved position, `Resume:12:34` tags. With `auto_studio_min` or
+`auto_performer_min` set, studios and performers with enough scenes become
+sections of their own; they show on the Sections page with an "auto" badge
+and can be ordered, renamed or hidden like any other section.
 
 #### Performer facets
 

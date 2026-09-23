@@ -102,8 +102,8 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 		}
 	}
 
-	if vd.SceneParts.Date != nil {
-		dto.DateReleased = util.Ptr(util.NormalizeDate(*vd.SceneParts.Date))
+	if d := vd.ReleaseDate(); d != "" {
+		dto.DateReleased = util.Ptr(util.NormalizeDate(d))
 	}
 
 	if vd.SceneParts.Rating100 != nil {
