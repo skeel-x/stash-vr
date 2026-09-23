@@ -54,3 +54,43 @@ func TestResolveFormat_LaterRulesOverrideAndProfileCarries(t *testing.T) {
 		t.Fatalf("no rules must give an empty format, got %+v", got)
 	}
 }
+
+func fp(v float64) *float64 { return &v }
+
+func TestResolveFormat_GeometryPerFieldAndGenerated(t *testing.T) {
+	rules := []config.VideoRule{
+		{Tag: "A", PositionX: fp(1), PositionY: fp(2), ZoomX: fp(1.5), Background: "color", BackgroundColor: "#ff0000"},
+		{Tag: "B", PositionY: fp(4.78), Yaw: fp(-3), OriginZ: fp(0.05), Mask: "alpha"},
+		{Tag: "C", Background: "passthrough"},
+	}
+	got := ResolveFormat(rules, tags("A", "B", "C"))
+	if *got.PositionX != 1 || *got.PositionY != 4.78 || *got.ZoomX != 1.5 || *got.Yaw != -3 || *got.OriginZ != 0.05 {
+		t.Fatalf("geometry %+v", got)
+	}
+	if got.PositionZ != nil || got.Pitch != nil || got.PanX != nil || got.OriginX != nil {
+		t.Fatalf("unset fields must stay nil: %+v", got)
+	}
+	if got.Background != "passthrough" || got.BackgroundColor != "#ff0000" || got.Mask != "alpha" || !got.Generated {
+		t.Fatalf("environment %+v", got)
+	}
+
+	for _, r := range []config.VideoRule{
+		{Tag: "A", PanY: fp(0)},
+		{Tag: "A", Roll: fp(0)},
+		{Tag: "A", Mask: "none"},
+		{Tag: "A", Background: "global"},
+		{Tag: "A", BackgroundColor: "#000000"},
+	} {
+		if f := ResolveFormat([]config.VideoRule{r}, tags("A")); !f.Generated {
+			t.Errorf("rule %+v must mark the format generated", r)
+		}
+	}
+	for _, r := range []config.VideoRule{
+		{Tag: "A", Passthrough: true, Projection: "fisheye", Fov: 190, Lens: "MKX200", Profile: "42"},
+		{Tag: "B", PositionX: fp(1)},
+	} {
+		if f := ResolveFormat([]config.VideoRule{r}, tags("A")); f.Generated {
+			t.Errorf("rule %+v must not mark the format generated", r)
+		}
+	}
+}

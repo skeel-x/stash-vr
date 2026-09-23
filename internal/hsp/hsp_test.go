@@ -282,3 +282,28 @@ func TestEncode_LargeProfileUsesSeveralChunks(t *testing.T) {
 		t.Fatalf("got %d tags", len(got.Tags))
 	}
 }
+
+func TestColorHex(t *testing.T) {
+	if c := ColorFromHex("#ffffff"); c != (Color{1, 1, 1, 1}) {
+		t.Fatalf("white %+v", c)
+	}
+	if c := ColorFromHex("#000000"); c != (Color{0, 0, 0, 1}) {
+		t.Fatalf("black %+v", c)
+	}
+	for _, s := range []string{"#1a2b3c", "#808080", "#ff0000", "#000001"} {
+		if got := ColorFromHex(s).Hex(); got != s {
+			t.Errorf("%s round trips to %s", s, got)
+		}
+	}
+	if c := ColorFromHex("#808080"); c.R < 0.21 || c.R > 0.22 {
+		t.Fatalf("mid grey must be linearised, got %v", c.R)
+	}
+	for _, bad := range []string{"", "red", "#12345", "#gggggg"} {
+		if c := ColorFromHex(bad); c != (Color{A: 1}) {
+			t.Errorf("%q: %+v", bad, c)
+		}
+	}
+	if (Color{R: 2, G: -1, B: 0.5}).Hex() != "#ff00bc" {
+		t.Fatalf("clamping: %s", (Color{R: 2, G: -1, B: 0.5}).Hex())
+	}
+}

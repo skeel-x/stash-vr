@@ -15,6 +15,19 @@ type Format struct {
 	Fov          float32
 	Passthrough  bool
 	ProfileScene string
+
+	// Screen geometry and environment for a generated HereSphere profile;
+	// nil and "" mean unset. See config.VideoRule.
+	PositionX, PositionY, PositionZ *float64
+	Pitch, Yaw, Roll                *float64
+	ZoomX, ZoomY, PanX, PanY        *float64
+	OriginX, OriginY, OriginZ       *float64
+	Background                      string
+	BackgroundColor                 string
+	Mask                            string
+	// Generated is true when a matching rule sets any geometry, background
+	// or mask field, so a profile is generated for scenes without one.
+	Generated bool
 }
 
 // ResolveFormat applies rules in order to the scene's tags: a rule whose
@@ -22,7 +35,8 @@ type Format struct {
 // it carries, so later rules override earlier ones.
 func ResolveFormat(rules []config.VideoRule, tags []*gql.TagPartsArrayTagsTag) Format {
 	var f Format
-	for _, r := range rules {
+	for i := range rules {
+		r := &rules[i]
 		if !hasTag(tags, r.Tag) {
 			continue
 		}
@@ -44,8 +58,38 @@ func ResolveFormat(rules []config.VideoRule, tags []*gql.TagPartsArrayTagsTag) F
 		if r.Profile != "" {
 			f.ProfileScene = r.Profile
 		}
+		resolveGeometry(&f, r)
 	}
 	return f
+}
+
+func resolveGeometry(f *Format, r *config.VideoRule) {
+	for _, p := range []struct {
+		dst **float64
+		src *float64
+	}{
+		{&f.PositionX, r.PositionX}, {&f.PositionY, r.PositionY}, {&f.PositionZ, r.PositionZ},
+		{&f.Pitch, r.Pitch}, {&f.Yaw, r.Yaw}, {&f.Roll, r.Roll},
+		{&f.ZoomX, r.ZoomX}, {&f.ZoomY, r.ZoomY}, {&f.PanX, r.PanX}, {&f.PanY, r.PanY},
+		{&f.OriginX, r.OriginX}, {&f.OriginY, r.OriginY}, {&f.OriginZ, r.OriginZ},
+	} {
+		if p.src != nil {
+			v := *p.src
+			*p.dst = &v
+		}
+	}
+	if r.Background != "" {
+		f.Background = r.Background
+	}
+	if r.BackgroundColor != "" {
+		f.BackgroundColor = r.BackgroundColor
+	}
+	if r.Mask != "" {
+		f.Mask = r.Mask
+	}
+	if r.HasGeometry() {
+		f.Generated = true
+	}
 }
 
 func hasTag(tags []*gql.TagPartsArrayTagsTag, name string) bool {

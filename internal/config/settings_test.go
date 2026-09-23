@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -472,5 +473,55 @@ func TestLoad_AutoSectionMinsSeedAndFile(t *testing.T) {
 	}
 	if err := Load(seed); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected a negative threshold in the file to be rejected, got %v", err)
+	}
+}
+
+func TestSet_ValidatesRuleGeometry(t *testing.T) {
+	if err := Load(seedFor(t)); err != nil {
+		t.Fatal(err)
+	}
+	f := func(v float64) *float64 { return &v }
+	bad := []VideoRule{
+		{Tag: "X", PositionY: f(math.NaN())},
+		{Tag: "X", PositionX: f(math.Inf(1))},
+		{Tag: "X", Yaw: f(10001)},
+		{Tag: "X", OriginZ: f(-10001)},
+		{Tag: "X", ZoomX: f(0)},
+		{Tag: "X", ZoomY: f(-1)},
+		{Tag: "X", Background: "black"},
+		{Tag: "X", Background: "color", BackgroundColor: "red"},
+		{Tag: "X", BackgroundColor: "#12345"},
+		{Tag: "X", Mask: "green"},
+	}
+	for _, r := range bad {
+		cfg := Application()
+		cfg.VideoRules = []VideoRule{r}
+		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
+			t.Errorf("rule %+v: expected ErrInvalid, got %v", r, err)
+		}
+	}
+	good := VideoRule{Tag: "Passthrough", Passthrough: true, PositionX: f(0), PositionY: f(4.78), PositionZ: f(-10000),
+		Pitch: f(-5), Yaw: f(10000), Roll: f(0), ZoomX: f(1.5), ZoomY: f(0.5), PanX: f(0.1), PanY: f(0),
+		OriginX: f(-0.06), OriginY: f(-0.02), OriginZ: f(0.05), Background: "color", BackgroundColor: "#1A2b3c", Mask: "chroma"}
+	cfg := Application()
+	cfg.VideoRules = []VideoRule{good, {Tag: "Y", Background: "global", Mask: "none"}, {Tag: "Z", Background: "passthrough", Mask: "alpha"}}
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(FilePath(Application()))
+	for _, key := range []string{`"position_y": 4.78`, `"position_x": 0`, `"zoom_x": 1.5`, `"origin_z": 0.05`, `"background": "color"`, `"background_color": "#1A2b3c"`, `"mask": "chroma"`} {
+		if !strings.Contains(string(data), key) {
+			t.Errorf("expected %s persisted, got %s", key, data)
+		}
+	}
+	if strings.Contains(string(data), `"pan_y": null`) || strings.Contains(string(data), `"mask": ""`) {
+		t.Fatalf("unset fields must be omitted, got %s", data)
+	}
+	got := Application().VideoRules[0]
+	if got.PositionX == nil || *got.PositionX != 0 || got.PositionY == nil || *got.PositionY != 4.78 {
+		t.Fatalf("pointers not kept: %+v", got)
+	}
+	if Application().VideoRules[1].PositionX != nil {
+		t.Fatal("unset geometry must stay nil")
 	}
 }

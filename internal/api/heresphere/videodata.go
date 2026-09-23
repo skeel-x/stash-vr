@@ -218,7 +218,9 @@ func setFormat(vd *library.VideoData, dto *videoDataDto, f library.Format) {
 }
 
 // profileLink picks the HereSphere profile for the scene: its own stored
-// profile first, else the profile scene named by the matching rule.
+// profile first, else the profile scene named by the matching rule, else
+// the profile generated from the rules' screen settings (served under the
+// scene's own id).
 func profileLink(baseUrl, id string, f library.Format, profiles profileLookup) string {
 	if profiles == nil {
 		return ""
@@ -228,6 +230,8 @@ func profileLink(baseUrl, id string, f library.Format, profiles profileLookup) s
 		return baseUrl + "/hsp/scene/" + id
 	case f.ProfileScene != "" && profiles.HasProfile(f.ProfileScene):
 		return baseUrl + "/hsp/scene/" + f.ProfileScene
+	case f.Generated:
+		return baseUrl + "/hsp/scene/" + id
 	}
 	return ""
 }

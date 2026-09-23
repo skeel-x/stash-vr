@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -47,12 +49,65 @@ type VideoRule struct {
 	Lens        string  `json:"lens,omitempty"`
 	Passthrough bool    `json:"passthrough,omitempty"`
 	Profile     string  `json:"profile,omitempty"`
+
+	// Screen geometry for generated HereSphere profiles, in HereSphere's
+	// own units. nil means unset, so 0 can be chosen deliberately.
+	PositionX *float64 `json:"position_x,omitempty"`
+	PositionY *float64 `json:"position_y,omitempty"`
+	PositionZ *float64 `json:"position_z,omitempty"`
+	Pitch     *float64 `json:"pitch,omitempty"`
+	Yaw       *float64 `json:"yaw,omitempty"`
+	Roll      *float64 `json:"roll,omitempty"`
+	ZoomX     *float64 `json:"zoom_x,omitempty"`
+	ZoomY     *float64 `json:"zoom_y,omitempty"`
+	PanX      *float64 `json:"pan_x,omitempty"`
+	PanY      *float64 `json:"pan_y,omitempty"`
+	OriginX   *float64 `json:"origin_x,omitempty"`
+	OriginY   *float64 `json:"origin_y,omitempty"`
+	OriginZ   *float64 `json:"origin_z,omitempty"`
+	// Background is "", "global", "color" or "passthrough";
+	// BackgroundColor ("#rrggbb") applies to "color". Mask is "", "none",
+	// "alpha" or "chroma".
+	Background      string `json:"background,omitempty"`
+	BackgroundColor string `json:"background_color,omitempty"`
+	Mask            string `json:"mask,omitempty"`
 }
+
+// HasGeometry reports whether r sets any screen, background or mask field,
+// which makes stash-vr generate a HereSphere profile for its scenes.
+func (r *VideoRule) HasGeometry() bool {
+	for _, v := range r.geometry() {
+		if v.value != nil {
+			return true
+		}
+	}
+	return r.Background != "" || r.BackgroundColor != "" || r.Mask != ""
+}
+
+type namedFloat struct {
+	name  string
+	value *float64
+}
+
+func (r *VideoRule) geometry() []namedFloat {
+	return []namedFloat{
+		{"position_x", r.PositionX}, {"position_y", r.PositionY}, {"position_z", r.PositionZ},
+		{"pitch", r.Pitch}, {"yaw", r.Yaw}, {"roll", r.Roll},
+		{"zoom_x", r.ZoomX}, {"zoom_y", r.ZoomY}, {"pan_x", r.PanX}, {"pan_y", r.PanY},
+		{"origin_x", r.OriginX}, {"origin_y", r.OriginY}, {"origin_z", r.OriginZ},
+	}
+}
+
+// MaxGeometry bounds every rule geometry value.
+const MaxGeometry = 10000
 
 var (
 	validProjections = map[string]struct{}{"equirectangular": {}, "equirectangular360": {}, "fisheye": {}, "cubemap": {}, "equiangularCubemap": {}, "perspective": {}}
 	validStereo      = map[string]struct{}{"mono": {}, "sbs": {}, "tb": {}}
 	validLenses      = map[string]struct{}{"MKX200": {}, "MKX220": {}, "VRCA220": {}}
+	validBackgrounds = map[string]struct{}{"global": {}, "color": {}, "passthrough": {}}
+	validMasks       = map[string]struct{}{"none": {}, "alpha": {}, "chroma": {}}
+	hexColor         = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 )
 
 // DefaultVideoRules reproduces the mapping earlier releases had in code,
@@ -76,7 +131,8 @@ func DefaultVideoRules() []VideoRule {
 }
 
 func validateVideoRules(rules []VideoRule) error {
-	for i, r := range rules {
+	for i := range rules {
+		r := &rules[i]
 		if strings.TrimSpace(r.Tag) == "" {
 			return fmt.Errorf("%w: video_rules[%d].tag must not be empty", ErrInvalid, i)
 		}
@@ -97,6 +153,36 @@ func validateVideoRules(rules []VideoRule) error {
 				return fmt.Errorf("%w: video_rules[%d].profile must be a scene id", ErrInvalid, i)
 			}
 		}
+		if err := validateRuleGeometry(i, r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateRuleGeometry(i int, r *VideoRule) error {
+	for _, g := range r.geometry() {
+		if g.value == nil {
+			continue
+		}
+		v := *g.value
+		if math.IsNaN(v) || math.IsInf(v, 0) || v < -MaxGeometry || v > MaxGeometry {
+			return fmt.Errorf("%w: video_rules[%d].%s must be a number between -%d and %d", ErrInvalid, i, g.name, MaxGeometry, MaxGeometry)
+		}
+	}
+	for _, z := range []namedFloat{{"zoom_x", r.ZoomX}, {"zoom_y", r.ZoomY}} {
+		if z.value != nil && *z.value <= 0 {
+			return fmt.Errorf("%w: video_rules[%d].%s must be above 0", ErrInvalid, i, z.name)
+		}
+	}
+	if _, ok := validBackgrounds[r.Background]; r.Background != "" && !ok {
+		return fmt.Errorf("%w: video_rules[%d].background %q is not supported", ErrInvalid, i, r.Background)
+	}
+	if r.BackgroundColor != "" && !hexColor.MatchString(r.BackgroundColor) {
+		return fmt.Errorf("%w: video_rules[%d].background_color must look like #rrggbb", ErrInvalid, i)
+	}
+	if _, ok := validMasks[r.Mask]; r.Mask != "" && !ok {
+		return fmt.Errorf("%w: video_rules[%d].mask %q is not supported", ErrInvalid, i, r.Mask)
 	}
 	return nil
 }

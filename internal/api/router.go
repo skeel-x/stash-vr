@@ -35,7 +35,7 @@ func Router(libraryService *library.Service) *chi.Mux {
 
 	router.Get("/cover/{videoId}", logMod("heatmap", heatmap.CoverHandler(libraryService)).ServeHTTP)
 	router.Get("/funscript/{videoId}/{n}", logMod("funscript", funscript.Handler(libraryService)).ServeHTTP)
-	router.Get("/hsp/scene/{videoId}", logMod("hsp", hsp.Handler(libraryService)).ServeHTTP)
+	router.Get("/hsp/scene/{videoId}", logMod("hsp", hsp.Handler(libraryService, heresphere.GenerateProfile)).ServeHTTP)
 
 	router.Mount("/api/ui", logMod("ui", web.ApiRouter(libraryService)))
 
