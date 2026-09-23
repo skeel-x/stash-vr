@@ -43,12 +43,9 @@
 
   <h2>Video rules</h2>
   <p class="lead">Tags decide how a scene is shown. Rules apply top to bottom; a later rule overrides an earlier one. Profiles stored: {{len .Profiles}}. Tune a scene in HereSphere and save it there; it then shows up here and can back a rule.</p>
-  <table class="sections rules">
-    <thead><tr><th></th><th>Tag</th><th>Projection</th><th>Stereo</th><th>FOV</th><th>Lens</th><th>Passthrough</th><th>Profile</th><th></th></tr></thead>
-    <tbody id="rules">
+  <div class="rules" id="rules">
     {{range .VideoRules}}{{template "rule-row" ($.Row .)}}{{end}}
-    </tbody>
-  </table>
+  </div>
   <template id="rule-template">{{template "rule-row" .EmptyRow}}</template>
   <div class="row">
     <button type="button" id="add-rule">Add rule</button>
@@ -85,15 +82,19 @@
 {{/* rule-row renders one editable rule; the inputs carry classes, not
      names, so the settings form's read() leaves them alone. */}}
 {{define "rule-row"}}{{$r := .Rule}}
-      <tr data-rule>
-        <td><span class="handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</span></td>
-        <td><input class="tag" value="{{$r.Tag}}" placeholder="Stash tag" aria-label="Tag"></td>
-        <td><select class="projection" aria-label="Projection"><option value="">unchanged</option>{{range .Projections}}<option value="{{.}}"{{if eq . $r.Projection}} selected{{end}}>{{.}}</option>{{end}}</select></td>
-        <td><select class="stereo" aria-label="Stereo"><option value="">unchanged</option>{{range .Stereos}}<option value="{{.}}"{{if eq . $r.Stereo}} selected{{end}}>{{.}}</option>{{end}}</select></td>
-        <td><input class="fov" type="number" min="0" max="360" step="1" value="{{if $r.Fov}}{{$r.Fov}}{{end}}" aria-label="Field of view"></td>
-        <td><select class="lens" aria-label="Lens"><option value="">none</option>{{range .Lenses}}<option value="{{.}}"{{if eq . $r.Lens}} selected{{end}}>{{.}}</option>{{end}}</select></td>
-        <td><input class="passthrough" type="checkbox" {{if $r.Passthrough}}checked{{end}} aria-label="Passthrough"></td>
-        <td><select class="profile" aria-label="Profile"><option value="">none</option>{{range .Profiles}}<option value="{{.ID}}"{{if eq .ID $r.Profile}} selected{{end}}>{{.ID}}{{if .Title}} {{.Title}}{{end}}</option>{{end}}</select></td>
-        <td><button type="button" class="remove" aria-label="Remove rule">×</button></td>
-      </tr>
+      <div class="rule" data-rule>
+        <div class="rule-head">
+          <span class="handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</span>
+          <input class="tag" value="{{$r.Tag}}" placeholder="Stash tag" aria-label="Tag">
+          <button type="button" class="remove" aria-label="Remove rule">×</button>
+        </div>
+        <div class="rule-fields">
+          <label class="field">Projection<select class="projection"><option value="">unchanged</option>{{range .Projections}}<option value="{{.}}"{{if eq . $r.Projection}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+          <label class="field">Stereo<select class="stereo"><option value="">unchanged</option>{{range .Stereos}}<option value="{{.}}"{{if eq . $r.Stereo}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+          <label class="field">Lens<select class="lens"><option value="">none</option>{{range .Lenses}}<option value="{{.}}"{{if eq . $r.Lens}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+          <label class="field">Field of view<input class="fov" type="number" min="0" max="360" step="1" value="{{if $r.Fov}}{{$r.Fov}}{{end}}" placeholder="unchanged"></label>
+          <label class="field">Profile<select class="profile"><option value="">none</option>{{range .Profiles}}<option value="{{.ID}}"{{if eq .ID $r.Profile}} selected{{end}}>{{.ID}}{{if .Title}} {{.Title}}{{end}}</option>{{end}}</select></label>
+          <label class="field check"><input class="passthrough" type="checkbox" {{if $r.Passthrough}}checked{{end}}> Passthrough</label>
+        </div>
+      </div>
 {{end}}

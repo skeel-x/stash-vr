@@ -102,7 +102,7 @@
     tbody.addEventListener('dragstart', (e) => {
       const handle = e.target.closest('.handle');
       if (!handle) return;
-      dragRow = handle.closest('tr');
+      dragRow = handle.closest('tr, .rule');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', '');
       dragRow.classList.add('dragging');
@@ -111,7 +111,7 @@
     tbody.addEventListener('dragover', (e) => {
       if (!dragRow) return;
       e.preventDefault();
-      const over = e.target.closest('tr');
+      const over = e.target.closest('tr, .rule');
       if (!over || over === dragRow) return;
       const rect = over.getBoundingClientRect();
       tbody.insertBefore(dragRow, (e.clientY - rect.top) < rect.height / 2 ? over : over.nextSibling);
@@ -121,7 +121,7 @@
     tbody.addEventListener('touchstart', (e) => {
       const handle = e.target.closest('.handle');
       if (!handle) return;
-      touchRow = handle.closest('tr');
+      touchRow = handle.closest('tr, .rule');
       touchRow.classList.add('dragging');
       e.preventDefault();
     }, { passive: false });
@@ -129,7 +129,7 @@
       if (!touchRow) return;
       const t = e.touches[0];
       const el = document.elementFromPoint(t.clientX, t.clientY);
-      const over = el && el.closest('tr');
+      const over = el && el.closest('tr, .rule');
       if (over && over !== touchRow) {
         const rect = over.getBoundingClientRect();
         tbody.insertBefore(touchRow, (t.clientY - rect.top) < rect.height / 2 ? over : over.nextSibling);
@@ -145,7 +145,7 @@
   const rulesBody = $('#rules');
   if (rulesBody) {
     makeSortable(rulesBody);
-    const ruleRows = () => Array.from(rulesBody.querySelectorAll('tr[data-rule]')).map((tr) => ({
+    const ruleRows = () => Array.from(rulesBody.querySelectorAll('[data-rule]')).map((tr) => ({
       tag: tr.querySelector('.tag').value.trim(),
       projection: tr.querySelector('.projection').value,
       stereo: tr.querySelector('.stereo').value,
@@ -156,7 +156,7 @@
     }));
     rulesBody.addEventListener('click', (e) => {
       const btn = e.target.closest('.remove');
-      if (btn) btn.closest('tr').remove();
+      if (btn) btn.closest('[data-rule]').remove();
     });
     $('#add-rule').addEventListener('click', () => {
       rulesBody.appendChild($('#rule-template').content.firstElementChild.cloneNode(true));
