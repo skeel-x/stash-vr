@@ -143,6 +143,7 @@ func DefaultVideoRules() []VideoRule {
 		{Tag: "CUBEMAP", Projection: "cubemap", Stereo: "sbs"},
 		{Tag: "EAC", Projection: "equiangularCubemap", Stereo: "sbs"},
 		{Tag: "FLAT", Projection: "perspective", Stereo: "mono"},
+		{Tag: "3D Conversion", Projection: "perspective", Stereo: "sbs"},
 		{Tag: "SBS", Stereo: "sbs"},
 		{Tag: "TB", Stereo: "tb"},
 		{Tag: "MONO", Stereo: "mono"},

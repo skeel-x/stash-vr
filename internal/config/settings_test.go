@@ -311,8 +311,8 @@ func TestLoad_SeedsDefaultVideoRulesWhenAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	rules := Application().VideoRules
-	if len(rules) != 19 || rules[0].Tag != "DOME" || rules[0].Projection != "equirectangular" || rules[18].Tag != "Augmented Reality" || !rules[18].Passthrough {
-		t.Fatalf("expected the 19 default rules, got %+v", rules)
+	if len(rules) != 20 || rules[0].Tag != "DOME" || rules[0].Projection != "equirectangular" || rules[19].Tag != "Augmented Reality" || !rules[19].Passthrough {
+		t.Fatalf("expected the 20 default rules, got %+v", rules)
 	}
 	data, _ := os.ReadFile(FilePath(Application()))
 	if !strings.Contains(string(data), `"video_rules"`) {
