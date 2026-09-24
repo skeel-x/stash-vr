@@ -322,6 +322,62 @@
     q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
   }
 
+  // Setup page: format coverage. Loaded only when the button is pressed so
+  // the page never waits on Stash for it.
+  const coverageBtn = $('#coverage');
+  if (coverageBtn) {
+    const out = $('#coverage-out');
+    const msg = $('#coverage-msg');
+    const cell = (tr, text, href, cls) => {
+      const td = tr.insertCell();
+      if (cls) td.className = cls;
+      if (href) {
+        const a = document.createElement('a'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = text;
+        td.appendChild(a);
+      } else td.textContent = text;
+      return td;
+    };
+    const table = (heads) => {
+      const t = document.createElement('table'); t.className = 'inspect';
+      const head = t.createTHead().insertRow();
+      heads.forEach((h) => { const th = document.createElement('th'); th.textContent = h; head.appendChild(th); });
+      return t;
+    };
+    coverageBtn.addEventListener('click', async () => {
+      coverageBtn.disabled = true;
+      setMsg(msg, 'Asking Stash');
+      try {
+        const r = await api('GET', '/coverage');
+        out.replaceChildren();
+        const tags = table(['Tag', 'Scenes']);
+        const body = tags.createTBody();
+        r.tags.forEach((t) => {
+          const tr = body.insertRow();
+          if (t.missing) tr.className = 'missing';
+          cell(tr, t.name);
+          cell(tr, t.missing ? 'no such tag' : String(t.count), t.link, 'num');
+        });
+        const tr = body.insertRow();
+        cell(tr, 'VR-shaped scenes without a projection tag');
+        cell(tr, String(r.untagged.count), undefined, 'num');
+        out.appendChild(tags);
+        if (r.untagged.scenes.length) {
+          const list = table(['Untagged VR-shaped scene', 'Size']);
+          const lb = list.createTBody();
+          r.untagged.scenes.forEach((s) => {
+            const row = lb.insertRow();
+            cell(row, s.id + ' ' + s.title, s.stash);
+            cell(row, s.width + 'x' + s.height, undefined, 'num');
+          });
+          out.appendChild(list);
+        }
+        const shown = r.untagged.scenes.length < r.untagged.count ? ' Showing the first ' + r.untagged.scenes.length + ' untagged scenes.' : '';
+        setMsg(msg, 'Checked ' + new Date(r.checked_at).toLocaleTimeString() + '.' + shown, 'ok');
+      } catch (e) { setMsg(msg, e.message, 'err'); }
+      coverageBtn.disabled = false;
+    });
+  }
+
   // Sections page: drag to reorder, save, reset.
   const tbody = $('#rows');
   if (tbody) {

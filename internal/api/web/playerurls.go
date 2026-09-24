@@ -21,7 +21,13 @@ type PlayerLinks struct {
 // StashSceneUrl turns the configured GraphQL endpoint into the Stash web
 // UI page for a scene.
 func StashSceneUrl(graphqlUrl, id string) string {
-	return strings.TrimSuffix(strings.TrimSuffix(graphqlUrl, "/graphql"), "/") + "/scenes/" + id
+	return stashWebBase(graphqlUrl) + "/scenes/" + id
+}
+
+// stashWebBase is the Stash web UI root for the configured GraphQL
+// endpoint.
+func stashWebBase(graphqlUrl string) string {
+	return strings.TrimSuffix(strings.TrimSuffix(graphqlUrl, "/graphql"), "/")
 }
 
 func LinksFor(req *http.Request) PlayerLinks {

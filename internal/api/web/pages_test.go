@@ -516,3 +516,23 @@ func TestStatus_CarriesLibraryCounts(t *testing.T) {
 		t.Fatalf("release_dates %v", out["release_dates"])
 	}
 }
+
+func TestSetup_RendersCoveragePanelLoadedOnDemand(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	stash := &fakeStash{}
+	lib.SetStashClient(stash)
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+	for _, want := range []string{"Format coverage", `id="coverage"`, "Check format coverage", `id="coverage-out"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Index(body, `id="coverage"`) < strings.Index(body, `id="save-rules"`) {
+		t.Error("the coverage panel belongs under the rules")
+	}
+	for _, op := range []string{"FindTagSceneCounts", "FindSceneDimensions"} {
+		if stash.calls[op] != 0 {
+			t.Errorf("the setup page must not wait on %s", op)
+		}
+	}
+}

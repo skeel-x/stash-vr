@@ -183,6 +183,30 @@ query FindSampleSceneCover {
   }
 }
 
+query FindTagSceneCounts {
+  findTags(filter: { per_page: -1 }) {
+    tags {
+      id
+      name
+      scene_count
+    }
+  }
+}
+
+query FindSceneDimensions($scene_filter: SceneFilterType) {
+  findScenes(scene_filter: $scene_filter, filter: { per_page: -1 }) {
+    count
+    scenes {
+      id
+      title
+      files {
+        width
+        height
+      }
+    }
+  }
+}
+
 query StashBoxes {
   configuration {
     general {
