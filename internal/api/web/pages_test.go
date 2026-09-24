@@ -301,7 +301,7 @@ func TestSetup_RendersVideoRulesAndProfiles(t *testing.T) {
 
 	body := getPage(t, h, "/setup", nil).Body.String()
 
-	for _, want := range []string{"Video rules", `data-rule`, `value="DOME"`, `value="Augmented Reality"`, `<option value="11649"`, "Profiles stored: 1", `id="save-rules"`, `id="reset-rules"`, `id="add-rule"`} {
+	for _, want := range []string{"Video rules", `data-rule`, `value="DOME"`, `value="Alpha"`, `<option value="11649"`, "Profiles stored: 1", `id="save-rules"`, `id="reset-rules"`, `id="add-rule"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
 		}
@@ -425,7 +425,7 @@ func TestSetup_OffersRulePresets(t *testing.T) {
 	for _, want := range []string{
 		`<select id="add-preset"`, `<option value="">Add a preset</option>`,
 		`<option value="0">RF52 190</option>`, `<option value="1">MKX200 200</option>`, `<option value="2">MKX220 220</option>`,
-		`<option value="3">VRCA220 220</option>`, `<option value="4">Passthrough</option>`, `<option value="5">Flat 2D</option>`,
+		`<option value="3">VRCA220 220</option>`, `<option value="4">Passthrough (alpha matte)</option>`, `<option value="5">Flat 2D</option>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
@@ -458,7 +458,7 @@ func TestRulePresets_AreValidRules(t *testing.T) {
 	if err := config.Validate(cfg); err != nil {
 		t.Fatal(err)
 	}
-	if p := presets[4].Rule; !p.Passthrough || p.Background != "passthrough" || p.Mask != "alpha" || !p.GeneratesProfile() {
+	if p := presets[4].Rule; p.Tag != "Alpha" || !p.Passthrough || p.Background != "passthrough" || p.Mask != "alpha" || !p.GeneratesProfile() {
 		t.Fatalf("passthrough preset %+v", p)
 	}
 }

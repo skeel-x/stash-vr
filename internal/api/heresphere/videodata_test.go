@@ -28,7 +28,7 @@ func TestBuildVideoData_FormatFromRules(t *testing.T) {
 	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		Files:         []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4", Duration: 100, Height: 1080}},
 		Paths:         &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")},
-		TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "MKX200"}}, {TagParts: gql.TagParts{Id: "2", Name: "TB"}}, {TagParts: gql.TagParts{Id: "3", Name: "Passthrough"}}}},
+		TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "MKX200"}}, {TagParts: gql.TagParts{Id: "2", Name: "TB"}}, {TagParts: gql.TagParts{Id: "3", Name: "Alpha"}}}},
 	}
 	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil, nil)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestBuildVideoData_FormatFromRules(t *testing.T) {
 		t.Fatalf("format = %s/%s/%s/%v", dto.Projection, dto.Stereo, dto.Lens, dto.Fov)
 	}
 	if dto.AlphaPackedSettings == nil || !dto.AlphaPackedSettings.DefaultSettings {
-		t.Fatal("expected alphaPackedSettings for a Passthrough scene")
+		t.Fatal("expected alphaPackedSettings for an Alpha scene")
 	}
 	if dto.WriteHSP == nil || !*dto.WriteHSP {
 		t.Fatal("expected writeHSP on")
@@ -52,7 +52,7 @@ func TestBuildVideoData_FormatFromRules(t *testing.T) {
 func TestBuildVideoData_NoAlphaWithoutPassthrough(t *testing.T) {
 	loadDefaultRules(t)
 	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		Files: []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4"}}, Paths: &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")}, TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "DOME"}}}}}
+		Files: []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4"}}, Paths: &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")}, TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "DOME"}}, {TagParts: gql.TagParts{Id: "2", Name: "Passthrough"}}, {TagParts: gql.TagParts{Id: "3", Name: "Augmented Reality"}}}}}
 	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil, nil)
 	if err != nil {
 		t.Fatal(err)

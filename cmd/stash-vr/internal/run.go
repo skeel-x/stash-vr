@@ -32,6 +32,9 @@ func Run(ctx context.Context) error {
 		log.Warn().Err(seedNotPersisted).Msg("settings will not persist; check CONFIG_PATH permissions")
 	}
 
+	if m := config.MigratedRules(); len(m) > 0 {
+		log.Info().Strs("tags", m).Msg("Dropped default video rules keyed on studio labels; measured tags from vrQualityTags replace them")
+	}
 	log.Info().Str("config", fmt.Sprintf("%+v", config.Application().Redacted())).Send()
 
 	stashClient := stash.NewClient(config.Application().StashGraphQLUrl, config.Application().StashApiKey)

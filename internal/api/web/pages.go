@@ -177,7 +177,7 @@ func rulePresets() []rulePreset {
 		{"MKX200 200", config.VideoRule{Tag: "MKX200", Projection: "fisheye", Stereo: "sbs", Lens: "MKX200", Fov: 200}},
 		{"MKX220 220", config.VideoRule{Tag: "MKX220", Projection: "fisheye", Stereo: "sbs", Lens: "MKX220", Fov: 220}},
 		{"VRCA220 220", config.VideoRule{Tag: "VRCA220", Projection: "fisheye", Stereo: "sbs", Lens: "VRCA220", Fov: 220}},
-		{"Passthrough", config.VideoRule{Tag: "Passthrough", Passthrough: true, Background: "passthrough", Mask: "alpha"}},
+		{"Passthrough (alpha matte)", config.VideoRule{Tag: "Alpha", Passthrough: true, Background: "passthrough", Mask: "alpha"}},
 		{"Flat 2D", config.VideoRule{Tag: "FLAT", Projection: "perspective", Stereo: "mono"}},
 	}
 }

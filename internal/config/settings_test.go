@@ -311,8 +311,8 @@ func TestLoad_SeedsDefaultVideoRulesWhenAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	rules := Application().VideoRules
-	if len(rules) != 20 || rules[0].Tag != "DOME" || rules[0].Projection != "equirectangular" || rules[19].Tag != "Augmented Reality" || !rules[19].Passthrough {
-		t.Fatalf("expected the 20 default rules, got %+v", rules)
+	if len(rules) != 16 || rules[0].Tag != "DOME" || rules[0].Projection != "equirectangular" || rules[15].Tag != "Alpha" || !rules[15].Passthrough {
+		t.Fatalf("expected the 16 default rules, got %+v", rules)
 	}
 	data, _ := os.ReadFile(FilePath(Application()))
 	if !strings.Contains(string(data), `"video_rules"`) {
@@ -556,7 +556,7 @@ func TestVideoRule_EyeSwapAndForceMono(t *testing.T) {
 	}
 }
 
-func TestDefaultVideoRules_LensesMonoEyeSwapAndDegrees(t *testing.T) {
+func TestDefaultVideoRules_LensesMonoEyeSwapAndProjections(t *testing.T) {
 	defaults := DefaultVideoRules()
 	byTag := map[string]*VideoRule{}
 	for i := range defaults {
@@ -578,11 +578,21 @@ func TestDefaultVideoRules_LensesMonoEyeSwapAndDegrees(t *testing.T) {
 	if r := byTag["RL"]; r.EyeSwap == nil || !*r.EyeSwap || r.Stereo != "" || r.Projection != "" || r.ForceMono != nil {
 		t.Errorf("RL must only set eye swap: %+v", r)
 	}
-	if r := byTag["180°"]; r.Projection != "equirectangular" || r.Stereo != "" {
-		t.Errorf("180°: %+v", r)
+	if r := byTag["DOME"]; r.Projection != "equirectangular" || r.Stereo != "sbs" {
+		t.Errorf("DOME: %+v", r)
 	}
-	if r := byTag["360°"]; r.Projection != "equirectangular360" || r.Stereo != "" {
-		t.Errorf("360°: %+v", r)
+	if r := byTag["SPHERE"]; r.Projection != "equirectangular360" || r.Stereo != "sbs" {
+		t.Errorf("SPHERE: %+v", r)
+	}
+	if r := byTag["Alpha"]; r == nil || !r.Passthrough {
+		t.Errorf("Alpha must switch passthrough on: %+v", r)
+	}
+	// Studio and stash-box labels describe marketing, not the file; only
+	// the measured tags may change the format.
+	for _, label := range []string{"Passthrough", "Augmented Reality", "180°", "360°"} {
+		if r, ok := byTag[label]; ok {
+			t.Errorf("default rule for label %q must be gone: %+v", label, r)
+		}
 	}
 	if err := validateVideoRules(DefaultVideoRules()); err != nil {
 		t.Fatal(err)
@@ -621,5 +631,42 @@ func TestLoad_ExistingRulesAreNotExtendedWithNewDefaults(t *testing.T) {
 	got := Application().VideoRules
 	if len(got) != 2 || got[0].Tag != "FISHEYE" || got[1].Tag != "DOME" || got[1].Stereo != "tb" || got[1].Projection != "" {
 		t.Fatalf("a config's own rules must load unchanged, got %+v", got)
+	}
+}
+
+func TestLoad_DropsUnchangedLegacyLabelRules(t *testing.T) {
+	seed := seedFor(t)
+	path := filepath.Join(seed.ConfigPath, "config.json")
+	body := `{"stash_graphql_url":"http://stash:9999/graphql","video_rules":[
+		{"tag":"DOME","projection":"equirectangular","stereo":"sbs"},
+		{"tag":"Passthrough","passthrough":true},
+		{"tag":"Augmented Reality","passthrough":true,"profile":"42"},
+		{"tag":"180°","projection":"equirectangular"},
+		{"tag":"Alpha","passthrough":true}]}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	var tags []string
+	for _, r := range Application().VideoRules {
+		tags = append(tags, r.Tag)
+	}
+	if strings.Join(tags, ",") != "DOME,Augmented Reality,Alpha" {
+		t.Fatalf("expected the unchanged label rules dropped and the edited one kept, got %v", tags)
+	}
+	if got := strings.Join(MigratedRules(), ","); got != "Passthrough,180°" {
+		t.Fatalf("MigratedRules = %q", got)
+	}
+	data, _ := os.ReadFile(path)
+	if strings.Contains(string(data), "180°") {
+		t.Fatalf("expected the migration persisted, got %s", data)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if len(MigratedRules()) != 0 {
+		t.Fatalf("a second load must find nothing to migrate, got %v", MigratedRules())
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -124,17 +125,17 @@ var (
 )
 
 // DefaultVideoRules reproduces the mapping earlier releases had in code,
-// plus passthrough for the tags that mark alpha-packed videos, the 220
-// degree lenses, mono and right-eye-first videos, and the degree tags.
-// The tags match what the vrQualityTags Stash plugin writes. Every call
-// returns fresh pointers.
+// plus the 220 degree lenses, mono and right-eye-first videos, and
+// passthrough for alpha-packed videos. The tags are the ones the
+// vrQualityTags Stash plugin measures and maintains; labels that come from
+// studios or stash-boxes (Passthrough, Augmented Reality, 180°, 360°) are
+// deliberately absent because they describe marketing, not the file.
+// Every call returns fresh pointers.
 func DefaultVideoRules() []VideoRule {
 	swap := true
 	return []VideoRule{
 		{Tag: "DOME", Projection: "equirectangular", Stereo: "sbs"},
-		{Tag: "180°", Projection: "equirectangular"},
 		{Tag: "SPHERE", Projection: "equirectangular360", Stereo: "sbs"},
-		{Tag: "360°", Projection: "equirectangular360"},
 		{Tag: "FISHEYE", Projection: "fisheye", Stereo: "sbs"},
 		{Tag: "MKX200", Projection: "fisheye", Stereo: "sbs", Lens: "MKX200", Fov: 200},
 		{Tag: "MKX220", Projection: "fisheye", Stereo: "sbs", Lens: "MKX220", Fov: 220},
@@ -148,9 +149,7 @@ func DefaultVideoRules() []VideoRule {
 		{Tag: "TB", Stereo: "tb"},
 		{Tag: "MONO", Stereo: "mono"},
 		{Tag: "RL", EyeSwap: &swap},
-		{Tag: "Passthrough", Passthrough: true},
 		{Tag: "Alpha", Passthrough: true},
-		{Tag: "Augmented Reality", Passthrough: true},
 	}
 }
 
@@ -318,6 +317,7 @@ func resolveConfigDir(configPath string) (string, error) {
 // value. A missing file is written from the seed so the next start is
 // file-driven. A file that cannot be parsed is an error naming the path.
 func Load(seed ApplicationConfig) error {
+	migrated = nil
 	dir, err := resolveConfigDir(seed.ConfigPath)
 	if err != nil {
 		return fmt.Errorf("resolve config dir: %w", err)
@@ -356,6 +356,10 @@ func Load(seed ApplicationConfig) error {
 		return fmt.Errorf("parse config %s: %w", path, err)
 	}
 	merged := applyFile(seed, fc)
+	if kept, dropped := dropLegacyLabelRules(merged.VideoRules); len(dropped) > 0 {
+		merged.VideoRules = kept
+		migrated = dropped
+	}
 	if merged.BasePath, err = NormalizeBasePath(merged.BasePath); err != nil {
 		return fmt.Errorf("config %s: %w", path, err)
 	}
@@ -365,7 +369,50 @@ func Load(seed ApplicationConfig) error {
 	mu.Lock()
 	store(cloneConfig(merged))
 	mu.Unlock()
+	if len(migrated) > 0 {
+		if err := write(path, merged); err != nil {
+			return fmt.Errorf("%w: %w", ErrSeedNotPersisted, err)
+		}
+	}
 	return nil
+}
+
+// MigratedRules lists the video rules the last Load dropped because they
+// were unchanged defaults for studio labels; the caller logs them.
+func MigratedRules() []string { return migrated }
+
+var migrated []string
+
+// legacyLabelRules are default rules from earlier releases keyed on
+// studio or stash-box labels. They switched passthrough or a projection on
+// for any scene carrying the label, whatever the file really is; the
+// measured tags from vrQualityTags replace them.
+var legacyLabelRules = []VideoRule{
+	{Tag: "Passthrough", Passthrough: true},
+	{Tag: "Augmented Reality", Passthrough: true},
+	{Tag: "180°", Projection: "equirectangular"},
+	{Tag: "360°", Projection: "equirectangular360"},
+}
+
+// dropLegacyLabelRules removes rules that are exactly one of the legacy
+// label defaults. A rule the user changed in any field is kept.
+func dropLegacyLabelRules(rules []VideoRule) (kept []VideoRule, dropped []string) {
+	kept = make([]VideoRule, 0, len(rules))
+	for i := range rules {
+		legacy := false
+		for j := range legacyLabelRules {
+			if reflect.DeepEqual(rules[i], legacyLabelRules[j]) {
+				legacy = true
+				break
+			}
+		}
+		if legacy {
+			dropped = append(dropped, rules[i].Tag)
+			continue
+		}
+		kept = append(kept, rules[i])
+	}
+	return kept, dropped
 }
 
 func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {

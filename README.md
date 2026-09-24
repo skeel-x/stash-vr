@@ -251,19 +251,25 @@ scene's date when Stash knows it, else today. Switch the facets off with
 The Setup page has a rules table that maps Stash tags to how a scene is
 shown: projection (equirectangular, 360, fisheye, cubemap, flat), stereo
 layout, field of view, lens and passthrough. Rules apply top to bottom and
-later rules override earlier ones. The defaults match the DOME, SPHERE,
-FISHEYE, MKX200, RF52, CUBEMAP, EAC, FLAT, SBS and TB tags Stash-VR always
-understood, the MKX220 and VRCA220 lenses (fisheye, 220 degrees), MONO
-(stereo mono), RL (right eye first: eye swap), 180° and 360°, and switch
-passthrough on for scenes tagged Passthrough, Alpha or Augmented Reality.
-These are the tags the vrQualityTags Stash plugin writes. All three
-players read the same table.
+later rules override earlier ones. The defaults react to the tags the
+[vrQualityTags](https://github.com/skeel-x/vrQualityTags) Stash plugin
+measures from the file itself: DOME, SPHERE, FISHEYE, MKX200, RF52,
+CUBEMAP, EAC, FLAT, SBS and TB, the MKX220 and VRCA220 lenses (fisheye,
+220 degrees), MONO (stereo mono), RL (right eye first: eye swap), and
+Alpha, which switches passthrough on for alpha-packed videos. Labels that
+studios or stash-boxes attach (Passthrough, Augmented Reality, 180°, 360°)
+no longer change the format on their own. All three players read the same
+table.
 
-A config written by an earlier version keeps its own rules; "Add missing
+A config written by an earlier version keeps its own rules, except that
+the old default rules for the Passthrough, Augmented Reality, 180° and
+360° labels are dropped automatically on start when they are unchanged
+(the log names them); a rule you edited is kept. "Add missing
 default rules" appends the defaults whose tag the table lacks and leaves
 the existing rules as they are. "Add a preset" appends a filled rule card
-(RF52 190, MKX200 200, MKX220 220, VRCA220 220, Passthrough with the
-passthrough background and alpha-packed mask, Flat 2D) to adjust before
+(RF52 190, MKX200 200, MKX220 220, VRCA220 220, Passthrough (alpha
+matte) on the Alpha tag with the passthrough background and alpha-packed
+mask, Flat 2D) to adjust before
 saving.
 
 Each rule can also turn eye swap and force mono on or off. HereSphere gets
