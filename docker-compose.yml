@@ -1,7 +1,7 @@
 version: "3.0"
 services:
   stash-vr:
-    image: ofl0w/stash-vr:latest
+    image: ghcr.io/skeel-x/stash-vr:latest
     container_name: stash-vr
     restart: unless-stopped
     ports:

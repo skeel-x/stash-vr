@@ -1,7 +1,6 @@
 .idea
 .git
 .github
-.goreleaser.yaml
 
 build/
 
