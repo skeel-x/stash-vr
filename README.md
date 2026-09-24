@@ -1,38 +1,75 @@
-# Stash-VR
+# Stash-VR (skeel-x fork)
 
-## Playa integration
+Watch your [Stash](https://github.com/stashapp/stash) library in VR. Stash-VR sits between your Stash instance and your VR video player, so you can browse, play and manage your scenes from the player's own VR interface. Flat/2D videos work as well as VR videos.
 
-> [!IMPORTANT]
-> This is a specialized fork of [o-fl0w/stash-vr](https://github.com/o-fl0w/stash-vr) that adds native support for the [Playa VR Video player](https://playavr.com/).
+This is an extended fork of [o-fl0w/stash-vr](https://github.com/o-fl0w/stash-vr). On top of the original it adds:
 
-### Playa Features
+* **A web UI** - Players page with one-tap links and library status, Sections, Setup (every runtime option, stored in `config.json`) and Log pages.
+* **Video rules** - an ordered table that maps Stash tags to projection, stereo layout, field of view, lens, eye swap, force mono and passthrough, shared by all players, with a scene inspector.
+* **HereSphere profiles** - per-scene screen settings saved from the headset and handed back on any headset, rule profiles and generated profiles.
+* **Passthrough** - alpha-packed and chroma-key masks, passthrough backgrounds.
+* **Funscript variants** - alternate scripts next to the video or from the timestampTrade index show up in HereSphere's script picker.
+* **Watch history** - watched state and resume position tags, resume on any headset.
+* **Smart and auto sections** - Continue watching, Recently added, Random and more, plus generated per-studio and per-performer sections, ordered and shown per player.
+* **Release-date lookup** - missing scene dates looked up from your stash-boxes, optionally written back to Stash.
+* **Performer facets** - `Country:` and `Age:` tags for filtering.
+* **Playa** - native support for the [Playa VR video player](https://playavr.com/).
 
-- **Native Integration**: Browsing and streaming directly, just visit the stash-vr page and it auto detects.
-- User made _saved filter_ will be shown as category along with the stash tags.
-- A synthetic `Random` category is exposed under saved filter/topmost list; selecting it randomizes the `/videos` feed, and it can be combined with other categories like tags or saved filters.
-- Current Limitations:
-  - only tested on Android phone version (works fine for 6K resolution or low bitrate. lags on 8K or too high bitrate).
-  - direct stream is the default; transcoded (HLS) qualities also work, including with an API key.
-  - No trailer or "preview", only thumbnails.
-  - might have to tinker on the graphql url or docker container network if you get timeout error.
-  - No write-back updates to the stash like play count, favorites, etc. mostly just the read only feature.
-  - some edge cases like setting 2K for web video playback and playing 4K video could cause timeout error. I did initial testing on android and its fine to set the setting resolution to 4K.
+It pairs with the companion Stash plugin [vrQualityTags](https://github.com/skeel-x/vrQualityTags), which measures each file (projection, stereo layout, lens, alpha channel, resolution) and tags it; the default video rules react to those tags. Stash-VR works without it, but then formats have to come from your own tags and rules.
+
+Credits: the original Stash-VR is by [o-fl0w](https://github.com/o-fl0w/stash-vr). The Playa integration was contributed by RGinting367.
+
+## Quick start
+
+### Docker
+
+Images for linux/amd64 and linux/arm64 are published to `ghcr.io/skeel-x/stash-vr` (tags `latest` and per version).
+
+```
+docker run -d --name=stash-vr \
+  -p 9666:9666 \
+  -v /path/on/host/stash-vr:/config \
+  -e STASH_GRAPHQL_URL=http://stash-host:9999/graphql \
+  -e STASH_API_KEY=XXX \
+  ghcr.io/skeel-x/stash-vr:latest
+```
+
+The `/config` directory holds `config.json`, stored profiles and caches; it must be writable by uid 65532 (the image's non-root user), for example `chown 65532:65532 /path/on/host/stash-vr`. `STASH_API_KEY` is only needed when Stash uses authentication. A compose file is in [docker-compose.yml](docker-compose.yml).
+
+### Release binary
+
+Download the binary for your platform (Linux amd64/arm64, Windows amd64, macOS arm64/amd64) from the [releases page](https://github.com/skeel-x/stash-vr/releases), verify it against the checksums file and run it:
+
+```
+chmod +x stash-vr_*_linux_amd64
+./stash-vr_*_linux_amd64 --STASH_GRAPHQL_URL=http://stash-host:9999/graphql --STASH_API_KEY=XXX
+```
+
+Run it with `-h` to list all options. `config.json` is written to a `config` directory next to the binary unless `CONFIG_PATH` says otherwise.
+
+### First steps
+
+1. Open `http://<host>:9666` in a regular browser. The Players page shows whether Stash is reachable.
+2. Go to **Setup** and check the Stash URL and API key, then look through the video rules and the other options. Changes apply immediately.
+3. Optionally install [vrQualityTags](https://github.com/skeel-x/vrQualityTags) in Stash and run it so the default video rules have tags to act on.
+4. Arrange sections on the **Sections** page.
+5. In the headset, open the link for your player from the Players page (HereSphere, DeoVR) or add the shown address as a source in Playa.
+
+### Playa notes
+
+- Browsing and streaming work directly: visit the Stash-VR address in Playa and it is detected automatically.
+- Saved filters show as categories along with the Stash tags. A synthetic `Random` category randomizes the video feed and can be combined with other categories.
+- Direct stream is the default; transcoded (HLS) qualities also work, including with an API key.
+- No trailers or previews, only thumbnails. No write-back to Stash (play count, favorites and so on).
+- Very high bitrates (8K) can lag on phones. If you get timeouts, check the GraphQL URL and the container network.
 
 ---
-Watch your [Stash](https://github.com/stashapp/stash) library in VR for that full immersion effect.
-
-Stash-VR bridges your Stash instance and VR video player allowing you to browse, play and manage your scenes using the video players native VR UI.
-
-It's lightweight, optionally configurable and has support for two-way sync.
-
-**[Install](#installation) Stash-VR, point it to your Stash instance and point your VR video player to Stash-VR.**
-
-(Traditional flat/2d videos as well as VR videos are supported.)
 
 ## Supported video players
 
 * HereSphere (two-way sync)
 * DeoVR
+* Playa
 
 ## Features
 
@@ -52,27 +89,23 @@ It's lightweight, optionally configurable and has support for two-way sync.
 
 ## Installation
 
-Container images available at [docker hub](https://hub.docker.com/r/ofl0w/stash-vr/tags).
-
-For details or docker compose see [docker_compose.yml](docker-compose.yml).
+See [Quick start](#quick-start) for Docker and release binaries. For all compose options see [docker-compose.yml](docker-compose.yml).
 
 After installation open your endpoint (e.g. `http://localhost:9666`) in a regular browser to verify your setup.
 
-### Docker
+Stash-VR listens on port `9666` by default. To change the local port, use docker port binding, e.g. `-p 9000:9666`, or set `LISTEN_ADDRESS=:9000` to listen on port `9000` instead.
 
-```
-docker run --name=stash-vr -e STASH_GRAPHQL_URL=http://stash-host:9999/graphql -e STASH_API_KEY=XXX -p 9666:9666 ofl0w/stash-vr:latest
-```
-
-Stash-VR listens on port `9666` by default. To change local port, use docker port binding, e.g. `-p 9000:9666`, or set env. `LISTEN_ADDRESS=:9000` to listen on port `9000` instead.
-
-### Binaries
-
-Download and extract a binary for your platform. Run `stash-vr -h` to display help.
-
-Example: Connect to Stash running on stash-host:9999 with api key XXX and set Stash-VR to listen on port 9000:
+Example: connect to Stash running on stash-host:9999 with api key XXX and listen on port 9000:
 
 `stash-vr --STASH_GRAPHQL_URL=http://stash-host:9999/graphql --STASH_API_KEY=XXX --LISTEN_ADDRESS=:9000`
+
+### Building from source
+
+Requires Go (see `go.mod` for the version):
+
+```
+go build -o stash-vr ./cmd/stash-vr
+```
 
 ### Reverse proxy under a sub-path
 
