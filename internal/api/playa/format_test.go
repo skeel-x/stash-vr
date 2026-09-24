@@ -29,6 +29,8 @@ func TestProjectionAndStereo_FromRules(t *testing.T) {
 		{[]string{"MKX200"}, "FSH", "LR"},
 		{[]string{"RF52"}, "FSH", "LR"},
 		{[]string{"FLAT"}, "FLT", "MN"},
+		{[]string{"FLAT", "SBS"}, "FLT", "LR"},
+		{[]string{"FLAT", "TB"}, "FLT", "TB"},
 		{[]string{"SBS"}, "180", "LR"},
 		{[]string{"Virtual Reality"}, "180", "LR"},
 		{[]string{"Blonde"}, "FLT", "MN"},

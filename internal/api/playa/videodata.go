@@ -333,7 +333,7 @@ func projectionAndStereo(vd *library.VideoData) (string, string) {
 	// A stereo-only rule still means a VR scene, and a generic VR tag with
 	// no projection rule defaults to 180 SBS; an explicit FLAT rule
 	// (f.Projection set) stays flat even beside a generic VR tag.
-	if projection == "FLT" && stereo != "MN" {
+	if projection == "FLT" && stereo != "MN" && f.Projection == "" {
 		projection = "180"
 	} else if projection == "FLT" && stereo == "MN" && hasGenericVR && f.Projection == "" {
 		projection = "180"

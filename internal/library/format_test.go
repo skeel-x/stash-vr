@@ -27,6 +27,8 @@ func TestResolveFormat_DefaultsReproduceLegacyMapping(t *testing.T) {
 		{"mkx200", tags("MKX200"), Format{Projection: "fisheye", Stereo: "sbs", Lens: "MKX200", Fov: 200}},
 		{"rf52", tags("RF52"), Format{Projection: "fisheye", Stereo: "sbs", Fov: 190}},
 		{"flat", tags("FLAT"), Format{Projection: "perspective", Stereo: "mono"}},
+		{"flat 3d side by side", tags("FLAT", "SBS"), Format{Projection: "perspective", Stereo: "sbs"}},
+		{"flat 3d over under", tags("TB", "FLAT"), Format{Projection: "perspective", Stereo: "tb"}},
 		{"passthrough", tags("FISHEYE", "Passthrough"), Format{Projection: "fisheye", Stereo: "sbs", Passthrough: true}},
 		{"augmented reality", tags("Augmented Reality"), Format{Passthrough: true}},
 		{"mkx220", tags("MKX220"), Format{Projection: "fisheye", Stereo: "sbs", Lens: "MKX220", Fov: 220}},
