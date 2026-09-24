@@ -170,6 +170,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Post("/reindex", h.reindex)
 	r.Get("/log", h.getLog)
 	r.Get("/random", h.getRandom)
+	r.Get("/inspect", h.inspect)
 	return r
 }
 

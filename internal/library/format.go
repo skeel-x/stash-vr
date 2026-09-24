@@ -113,3 +113,15 @@ func hasTag(tags []*gql.TagPartsArrayTagsTag, name string) bool {
 	}
 	return false
 }
+
+// MatchingRules returns the indexes of the rules whose tag the scene has,
+// in rule order: the rules ResolveFormat applies.
+func MatchingRules(rules []config.VideoRule, tags []*gql.TagPartsArrayTagsTag) []int {
+	out := []int{}
+	for i := range rules {
+		if hasTag(tags, rules[i].Tag) {
+			out = append(out, i)
+		}
+	}
+	return out
+}

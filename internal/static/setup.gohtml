@@ -70,6 +70,15 @@
     <span class="msg" id="rules-msg"></span>
   </div>
 
+  <h3>Scene inspector</h3>
+  <p class="lead">See which rules a scene matches, what they resolve to and where its HereSphere profile comes from. Uses the saved rules. Titles are searched among scenes a player has already loaded; an id always works.</p>
+  <div class="row inspect-row">
+    <input id="inspect-q" placeholder="Scene id or title" aria-label="Scene id or title">
+    <button type="button" id="inspect">Inspect</button>
+    <span class="msg" id="inspect-msg"></span>
+  </div>
+  <div id="inspect-out"></div>
+
   <h2>Server</h2>
   <label>Log level
     <select name="log_level">

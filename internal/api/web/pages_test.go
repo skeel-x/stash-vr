@@ -462,3 +462,16 @@ func TestRulePresets_AreValidRules(t *testing.T) {
 		t.Fatalf("passthrough preset %+v", p)
 	}
 }
+
+func TestSetup_RendersSceneInspector(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+	for _, want := range []string{"Scene inspector", `id="inspect-q"`, `placeholder="Scene id or title"`, `id="inspect"`, `id="inspect-out"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Index(body, `id="inspect-q"`) < strings.Index(body, `id="save-rules"`) {
+		t.Error("the inspector belongs under the rules")
+	}
+}

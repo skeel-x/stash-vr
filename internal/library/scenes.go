@@ -8,6 +8,7 @@ import (
 	"slices"
 	"stash-vr/internal/stash/gql"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -152,4 +153,30 @@ func (libraryService *Service) fetchVideoData(ctx context.Context, sceneIds []in
 		vds[i] = &vd
 	}
 	return vds, nil
+}
+
+// SearchCachedScenes returns up to limit cached scenes whose title contains
+// q (case-insensitively), by numeric id. It only looks at scenes already
+// fetched, so it never queries Stash; scenes the index lists but no player
+// has loaded yet are not found by title.
+func (libraryService *Service) SearchCachedScenes(q string, limit int) []*VideoData {
+	needle := strings.ToLower(strings.TrimSpace(q))
+	if needle == "" || limit <= 0 {
+		return nil
+	}
+	var out []*VideoData
+	for _, vd := range libraryService.snapshot() {
+		if vd != nil && vd.SceneParts != nil && strings.Contains(strings.ToLower(vd.Title()), needle) {
+			out = append(out, vd)
+		}
+	}
+	slices.SortFunc(out, func(a, b *VideoData) int {
+		x, _ := strconv.Atoi(a.Id())
+		y, _ := strconv.Atoi(b.Id())
+		return x - y
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
 }

@@ -145,3 +145,28 @@ func (libraryService *Service) ListProfiles() []string {
 	})
 	return ids
 }
+
+// Where a scene's HereSphere profile comes from.
+const (
+	ProfileOwn       = "own"       // stored for the scene itself
+	ProfileRule      = "rule"      // stored for the scene a matching rule names
+	ProfileGenerated = "generated" // generated from the rules' settings
+	ProfileNone      = "none"
+)
+
+// ProfileSourceFor picks the profile for scene id with resolved format f:
+// its own stored profile first, else the stored profile of the scene the
+// rules name, else a generated one when the rules ask for it. scene is the
+// id the profile is stored or served under, empty for none. A nil has
+// means no profile is stored.
+func ProfileSourceFor(id string, f Format, has func(string) bool) (source, scene string) {
+	switch {
+	case has != nil && has(id):
+		return ProfileOwn, id
+	case has != nil && f.ProfileScene != "" && has(f.ProfileScene):
+		return ProfileRule, f.ProfileScene
+	case f.Generated:
+		return ProfileGenerated, id
+	}
+	return ProfileNone, ""
+}

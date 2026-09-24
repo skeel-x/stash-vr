@@ -42,10 +42,11 @@ func Handler(libraryService *library.Service, generate Generator) http.HandlerFu
 			return
 		}
 		f := library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
+		source, scene := library.ProfileSourceFor(id, f, libraryService.HasProfile)
 		switch {
-		case f.ProfileScene != "" && libraryService.HasProfile(f.ProfileScene):
-			serveStored(w, r, libraryService.ProfilePath(f.ProfileScene))
-		case f.Generated && generate != nil:
+		case source == library.ProfileOwn || source == library.ProfileRule:
+			serveStored(w, r, libraryService.ProfilePath(scene))
+		case source == library.ProfileGenerated && generate != nil:
 			data, err := generate(r, vd, f)
 			if err != nil {
 				log.Ctx(ctx).Warn().Err(err).Str("scene", id).Msg("Failed to generate HereSphere profile")

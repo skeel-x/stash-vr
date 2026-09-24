@@ -266,6 +266,62 @@
     });
   }
 
+  // Setup page: scene inspector. One request per click (or Enter), never
+  // per keystroke.
+  const inspectBtn = $('#inspect');
+  if (inspectBtn) {
+    const q = $('#inspect-q');
+    const out = $('#inspect-out');
+    const el = (tag, text, cls) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; };
+    const describe = (f) => {
+      const parts = [f.projection, f.stereo, f.lens, f.fov ? f.fov + '°' : '',
+        f.passthrough ? 'passthrough' : '', f.eye_swap ? 'eye swap' : '', f.force_mono ? 'force mono' : '',
+        f.background ? 'background ' + f.background : '', f.mask ? 'mask ' + f.mask : ''].filter(Boolean);
+      if (f.geometry) parts.push('screen: ' + Object.keys(f.geometry).map((k) => k + ' ' + f.geometry[k]).join(', '));
+      return parts.length ? parts.join(', ') : 'player defaults';
+    };
+    const sources = { own: 'own profile', rule: 'rule profile of scene ', generated: 'generated', none: 'none' };
+    const run = async () => {
+      const query = q.value.trim();
+      if (!query) { setMsg($('#inspect-msg'), 'Enter a scene id or part of a title', 'err'); return; }
+      inspectBtn.disabled = true;
+      setMsg($('#inspect-msg'), 'Looking up');
+      try {
+        const r = await api('GET', '/inspect?q=' + encodeURIComponent(query));
+        out.replaceChildren();
+        if (!r.scenes.length) {
+          setMsg($('#inspect-msg'), 'No scene found. Titles only match scenes a player has loaded; try the id.', 'err');
+        } else {
+          setMsg($('#inspect-msg'), '', 'ok');
+          const table = el('table', undefined, 'inspect');
+          const head = table.createTHead().insertRow();
+          ['Scene', 'Matching rules', 'Result', 'Profile'].forEach((h) => head.appendChild(el('th', h)));
+          const body = table.createTBody();
+          r.scenes.forEach((s) => {
+            const tr = body.insertRow();
+            const scene = tr.insertCell();
+            const a = el('a', s.id + ' ' + s.title); a.href = s.stash; a.target = '_blank'; a.rel = 'noopener';
+            scene.appendChild(a);
+            tr.insertCell().textContent = s.matched.length ? s.matched.map((m) => (m.index + 1) + '. ' + m.tag).join(', ') : 'none';
+            tr.insertCell().textContent = describe(s.format);
+            const prof = tr.insertCell();
+            const label = sources[s.profile.source] || s.profile.source;
+            prof.textContent = s.profile.source === 'rule' ? label + s.profile.scene : label;
+            if (s.profile.link) {
+              const l = el('a', 'link'); l.href = s.profile.link; l.target = '_blank'; l.rel = 'noopener';
+              prof.append(' ', l);
+            }
+          });
+          out.appendChild(table);
+        }
+      } catch (e) { setMsg($('#inspect-msg'), e.message, 'err'); }
+      inspectBtn.disabled = false;
+    };
+    inspectBtn.addEventListener('click', run);
+    // Enter would otherwise submit the settings form around it.
+    q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
+  }
+
   // Sections page: drag to reorder, save, reset.
   const tbody = $('#rows');
   if (tbody) {
