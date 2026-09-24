@@ -333,6 +333,12 @@ scene's own, a rule's saved profile, generated, or none, with its link.
 An id is always looked up; titles are matched against scenes a player has
 already loaded, so the search never queries the whole library.
 
+The format coverage panel below it (press "Check format coverage") shows how
+many scenes carry each tag the vrQualityTags plugin manages, each count
+linking to that tag's scene list in Stash. It also counts VR-shaped scenes
+(at least 3840 wide, about 2:1 or 1:1) that have no projection tag and lists
+the first 50 with links, so a scene the plugin missed is easy to find.
+
 #### Funscript variants
 
 Stash-VR lists every funscript it finds next to a scene's video in
