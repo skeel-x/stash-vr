@@ -238,3 +238,29 @@ func TestGetSavedFilterSceneSetsFor_AutoSectionsAreCategoriesUnlessHidden(t *tes
 		}
 	}
 }
+
+func TestAutoSectionCount_ReadsTheCachedIndex(t *testing.T) {
+	loadAutoConfig(t, 2, 0, nil)
+	stash := &routingStash{groupings: twoStudioGroupings}
+	svc := NewService(stash)
+	if n := svc.AutoSectionCount(); n != 0 {
+		t.Fatalf("no index yet must count 0, got %d", n)
+	}
+	if stash.groupingQueries() != 0 {
+		t.Fatal("counting must not build the index")
+	}
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	auto, err := svc.autoSections(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := svc.AutoSectionCount(); n != len(auto) || n == 0 {
+		t.Fatalf("count %d want %d", n, len(auto))
+	}
+	svc.ResetSections()
+	if n := svc.AutoSectionCount(); n != 0 {
+		t.Fatalf("a reset index counts 0, got %d", n)
+	}
+}

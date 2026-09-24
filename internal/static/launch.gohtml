@@ -15,6 +15,9 @@
     <dt>Settings file</dt><dd><code>{{.Status.ConfigPath}}</code>{{if not .Status.ConfigFileExists}} (not written yet){{end}}</dd>
     <dt>Listening on</dt><dd><code>{{.Status.ListenAddress}}</code>, log level {{.Status.LogLevel}}</dd>
     <dt>Index</dt><dd>{{.Status.Links}} links in {{.Status.Sections}} sections <button type="button" id="reindex" class="small">Rebuild index</button> <span class="msg" id="reindex-msg"></span></dd>
+    <dt>Auto sections</dt><dd>{{.Status.AutoSections}}</dd>
+    <dt>Release dates</dt><dd>{{.Status.ReleaseDates.Found}} found, {{.Status.ReleaseDates.Missing}} missing, {{.Status.ReleaseDates.Unchecked}} unchecked</dd>
+    <dt>HereSphere profiles</dt><dd>{{.Status.Profiles}} stored, {{.Status.GeneratedRules}} {{if eq .Status.GeneratedRules 1}}rule generates{{else}}rules generate{{end}} profiles</dd>
     {{if .Random}}<dt>Something random</dt><dd id="random-item">{{range .Random}}<a class="random-card" href="{{.Stash}}" target="_blank" rel="noopener"><img src="{{.Cover}}" alt="" loading="lazy"><span>{{.Title}}</span></a>{{end}} <button type="button" id="shuffle" class="small">Shuffle</button></dd>{{end}}
   </dl>
 </section>

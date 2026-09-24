@@ -131,3 +131,11 @@ func (libraryService *Service) autoSections(ctx context.Context) ([]AutoSection,
 	}
 	return res.auto, nil
 }
+
+// AutoSectionCount is how many auto sections the cached index holds; 0
+// before the index is built. It never builds the index.
+func (libraryService *Service) AutoSectionCount() int {
+	libraryService.muSets.Lock()
+	defer libraryService.muSets.Unlock()
+	return len(libraryService.auto)
+}

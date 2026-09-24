@@ -35,10 +35,25 @@ type Status struct {
 	Sections         int    `json:"sections"`
 	Links            int    `json:"links"`
 	Scenes           int    `json:"scenes"`
+	// ReleaseDates counts the undated cached scenes by lookup state.
+	ReleaseDates DateCounts `json:"release_dates"`
+	// Profiles is how many HereSphere profiles are stored, GeneratedRules
+	// how many video rules make stash-vr generate one.
+	Profiles       int `json:"profiles"`
+	GeneratedRules int `json:"generated_rules"`
+	// AutoSections is how many studio and performer sections the index has.
+	AutoSections int `json:"auto_sections"`
 	// SampleCoverUrl carries the Stash API key (via stash.ApiKeyed) so the
 	// Players page's headset-reachability check can load it directly. It must
 	// never be serialised to the browser.
 	SampleCoverUrl string `json:"-"`
+}
+
+// DateCounts is library.DateStats for the browser.
+type DateCounts struct {
+	Found     int `json:"found"`
+	Missing   int `json:"missing"`
+	Unchecked int `json:"unchecked"`
 }
 
 // BuildStatus probes Stash and the library. It never returns an error: every
@@ -57,6 +72,14 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 	}
 	if _, err := os.Stat(s.ConfigPath); err == nil {
 		s.ConfigFileExists = true
+	}
+	d := lib.DateStats()
+	s.ReleaseDates = DateCounts{Found: d.Found, Missing: d.Missing, Unchecked: d.Unchecked}
+	s.Profiles = len(lib.ListProfiles())
+	for i := range cfg.VideoRules {
+		if cfg.VideoRules[i].GeneratesProfile() {
+			s.GeneratedRules++
+		}
 	}
 
 	version, err := stash.GetVersion(probeCtx, lib.Client())
@@ -86,6 +109,7 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 		stats := lib.StatsSnapshot()
 		s.Links = stats.Links
 		s.Scenes = stats.Scenes
+		s.AutoSections = lib.AutoSectionCount()
 	}
 
 	cover, err := gql.FindSampleSceneCover(probeCtx, lib.Client())

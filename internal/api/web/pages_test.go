@@ -475,3 +475,44 @@ func TestSetup_RendersSceneInspector(t *testing.T) {
 		t.Error("the inspector belongs under the rules")
 	}
 }
+
+func TestPlayers_DetailsShowLibraryStatus(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	if err := lib.SaveProfile("11649", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	y := 4.78
+	yes := true
+	cfg := config.Application()
+	cfg.AutoStudioMin = 2
+	cfg.VideoRules = []config.VideoRule{{Tag: "A", PositionY: &y}, {Tag: "RL", EyeSwap: &yes}, {Tag: "DOME", Projection: "equirectangular"}}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := getPage(t, PagesRouter(lib), "/", nil).Body.String()
+	for _, want := range []string{
+		"<dt>Release dates</dt><dd>0 found, 0 missing, 0 unchecked</dd>",
+		"<dt>HereSphere profiles</dt><dd>1 stored, 2 rules generate profiles</dd>",
+		"<dt>Auto sections</dt><dd>1</dd>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+}
+
+func TestStatus_CarriesLibraryCounts(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	if err := lib.SaveProfile("7", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	_, out := do(t, h, http.MethodGet, "/status", nil)
+	// Of the default rules only RL (eye swap) generates profiles.
+	if out["profiles"] != float64(1) || out["generated_rules"] != float64(1) || out["auto_sections"] != float64(0) {
+		t.Fatalf("status %v", out)
+	}
+	dates, ok := out["release_dates"].(map[string]any)
+	if !ok || dates["found"] != float64(0) || dates["missing"] != float64(0) || dates["unchecked"] != float64(0) {
+		t.Fatalf("release_dates %v", out["release_dates"])
+	}
+}
