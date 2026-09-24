@@ -103,7 +103,7 @@ If your proxy cannot send the header, set the prefix as `base_path` on the Setup
 
 ### Settings and the web UI
 
-Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash. Smart sections (Continue watching, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, filterable by level and text, with optional auto-refresh.
+Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash, and lists the auto section count, release dates found, missing and unchecked, stored HereSphere profiles and how many video rules generate profiles. Smart sections (Continue watching, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, filterable by level and text, with optional auto-refresh.
 
 `config.json` lives in the directory given by `CONFIG_PATH` (default: a `config` directory next to the binary). In Docker the image sets `CONFIG_PATH=/config`; mount a directory that is writable by uid 65532 (the image's non-root user). The environment variables and flags below only seed the file on first start; after that the file is the source of truth. `LISTEN_ADDRESS`, `DISABLE_LOG_COLOR` and `DISABLE_REDACT` are process settings and stay flags.
 
@@ -253,8 +253,22 @@ shown: projection (equirectangular, 360, fisheye, cubemap, flat), stereo
 layout, field of view, lens and passthrough. Rules apply top to bottom and
 later rules override earlier ones. The defaults match the DOME, SPHERE,
 FISHEYE, MKX200, RF52, CUBEMAP, EAC, FLAT, SBS and TB tags Stash-VR always
-understood, and switch passthrough on for scenes tagged Passthrough,
-Alpha or Augmented Reality. All three players read the same table.
+understood, the MKX220 and VRCA220 lenses (fisheye, 220 degrees), MONO
+(stereo mono), RL (right eye first: eye swap), 180° and 360°, and switch
+passthrough on for scenes tagged Passthrough, Alpha or Augmented Reality.
+These are the tags the vrQualityTags Stash plugin writes. All three
+players read the same table.
+
+A config written by an earlier version keeps its own rules; "Add missing
+default rules" appends the defaults whose tag the table lacks and leaves
+the existing rules as they are. "Add a preset" appends a filled rule card
+(RF52 190, MKX200 200, MKX220 220, VRCA220 220, Passthrough with the
+passthrough background and alpha-packed mask, Flat 2D) to adjust before
+saving.
+
+Each rule can also turn eye swap and force mono on or off. HereSphere gets
+them through a generated profile; DeoVR has no eye swap and shows force
+mono as stereo off.
 
 HereSphere is asked to write its per-scene profile back. When you adjust
 the screen (distance, position, scale, background) and save in HereSphere,
@@ -270,7 +284,15 @@ rule card. Stash-VR then builds a HereSphere profile for every matching
 scene that has no saved profile of its own. The values use HereSphere's
 own units; "Copy from a saved profile" fills them from a scene you have
 tuned and saved in the headset. Earlier versions of saved profiles are
-kept in `hsp/history`.
+kept in `hsp/history`. Generated profiles carry Stash's resume position
+and last played time, so a scene resumes where it was left on any headset.
+
+The scene inspector under the rules takes a scene id or part of a title
+and shows, for up to five scenes, which rules match (by position and tag),
+what they resolve to and where the HereSphere profile comes from: the
+scene's own, a rule's saved profile, generated, or none, with its link.
+An id is always looked up; titles are matched against scenes a player has
+already loaded, so the search never queries the whole library.
 
 #### Funscript variants
 
