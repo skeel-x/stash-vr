@@ -184,3 +184,32 @@ func TestBuildVideoData_LinksGeneratedProfile(t *testing.T) {
 		t.Fatalf("hsp = %v", dto.Hsp)
 	}
 }
+
+func TestBuildProfile_EyeSwapAndForceMono(t *testing.T) {
+	loadDefaultRules(t)
+	fk := buildProfile(profileScene(), "", library.Format{EyeSwap: true, Generated: true}).Format[0]
+	if !fk.EyeSwap || fk.ForceMono {
+		t.Fatalf("eye swap: %+v", fk)
+	}
+	fk = buildProfile(profileScene(), "", library.Format{ForceMono: true, Generated: true}).Format[0]
+	if fk.EyeSwap || !fk.ForceMono {
+		t.Fatalf("force mono: %+v", fk)
+	}
+}
+
+func TestBuildVideoData_EyeSwapRuleLinksGeneratedProfile(t *testing.T) {
+	loadDefaultRules(t)
+	yes := true
+	cfg := config.Application()
+	cfg.VideoRules = []config.VideoRule{{Tag: "FISHEYE", Projection: "fisheye", Stereo: "sbs"}, {Tag: "Passthrough", EyeSwap: &yes}}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	dto, err := buildVideoData(t.Context(), profileScene(), "https://vr.example", nil, fakeProfiles{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dto.Hsp == nil || *dto.Hsp != "https://vr.example/hsp/scene/31" {
+		t.Fatalf("hsp = %v", dto.Hsp)
+	}
+}

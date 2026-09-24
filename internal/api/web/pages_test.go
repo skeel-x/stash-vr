@@ -371,3 +371,23 @@ func TestSetup_RendersScreenAndBackgroundGroup(t *testing.T) {
 		t.Error("unset position_x must render blank")
 	}
 }
+
+func TestSetup_RendersEyeSwapAndForceMono(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	yes, no := true, false
+	cfg := config.Application()
+	cfg.VideoRules = []config.VideoRule{{Tag: "RL", EyeSwap: &yes}, {Tag: "M", ForceMono: &no}}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+	for _, want := range []string{
+		`Eye swap<select class="eye-swap"><option value="">unchanged</option><option value="on" selected>on</option><option value="off">off</option></select>`,
+		`Force mono<select class="force-mono"><option value="">unchanged</option><option value="on">on</option><option value="off" selected>off</option></select>`,
+		`Force mono<select class="force-mono"><option value="">unchanged</option><option value="on">on</option><option value="off">off</option></select>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+}

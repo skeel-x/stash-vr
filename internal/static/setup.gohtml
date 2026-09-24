@@ -106,6 +106,8 @@
           <label class="field">Lens<select class="lens"><option value="">none</option>{{range .Lenses}}<option value="{{.}}"{{if eq . $r.Lens}} selected{{end}}>{{.}}</option>{{end}}</select></label>
           <label class="field">Field of view<input class="fov" type="number" min="0" max="360" step="1" value="{{if $r.Fov}}{{$r.Fov}}{{end}}" placeholder="unchanged"></label>
           <label class="field">Profile<select class="profile"><option value="">none</option>{{range .Profiles}}<option value="{{.ID}}"{{if eq .ID $r.Profile}} selected{{end}}>{{.ID}}{{if .Title}} {{.Title}}{{end}}</option>{{end}}</select></label>
+          {{$es := .Flag $r.EyeSwap}}<label class="field">Eye swap<select class="eye-swap"><option value="">unchanged</option><option value="on"{{if eq $es "on"}} selected{{end}}>on</option><option value="off"{{if eq $es "off"}} selected{{end}}>off</option></select></label>
+          {{$fm := .Flag $r.ForceMono}}<label class="field">Force mono<select class="force-mono"><option value="">unchanged</option><option value="on"{{if eq $fm "on"}} selected{{end}}>on</option><option value="off"{{if eq $fm "off"}} selected{{end}}>off</option></select></label>
           <label class="field check"><input class="passthrough" type="checkbox" {{if $r.Passthrough}}checked{{end}}> Passthrough</label>
         </div>
         <details class="rule-screen"{{if .ScreenOpen}} open{{end}}>

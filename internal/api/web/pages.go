@@ -129,6 +129,18 @@ func (r ruleRow) Geometry() []geometryField {
 	return out
 }
 
+// Flag is the value of a tri-state select for an optional rule flag:
+// "" when unset, else "on" or "off".
+func (r ruleRow) Flag(b *bool) string {
+	switch {
+	case b == nil:
+		return ""
+	case *b:
+		return "on"
+	}
+	return "off"
+}
+
 // ScreenOpen reports whether the rule's "Screen and background" group
 // starts expanded: only when something in it is set.
 func (r ruleRow) ScreenOpen() bool { return r.Rule.HasGeometry() }

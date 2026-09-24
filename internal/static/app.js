@@ -192,6 +192,11 @@
       if (background === 'color') rule.background_color = tr.querySelector('.background-color').value;
       const mask = tr.querySelector('.mask').value;
       if (mask) rule.mask = mask;
+      // Eye swap and force mono are left out when unchanged.
+      [['.eye-swap', 'eye_swap'], ['.force-mono', 'force_mono']].forEach(([sel, key]) => {
+        const v = tr.querySelector(sel).value;
+        if (v) rule[key] = v === 'on';
+      });
       return rule;
     });
     // "Copy from a saved profile" fills the rule's screen fields from the

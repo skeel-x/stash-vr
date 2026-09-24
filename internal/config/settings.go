@@ -49,6 +49,11 @@ type VideoRule struct {
 	Lens        string  `json:"lens,omitempty"`
 	Passthrough bool    `json:"passthrough,omitempty"`
 	Profile     string  `json:"profile,omitempty"`
+	// EyeSwap and ForceMono set HereSphere's eye swap and force mono in
+	// generated profiles; nil means unset, so false can override an
+	// earlier rule.
+	EyeSwap   *bool `json:"eye_swap,omitempty"`
+	ForceMono *bool `json:"force_mono,omitempty"`
 
 	// Screen geometry for generated HereSphere profiles, in HereSphere's
 	// own units. nil means unset, so 0 can be chosen deliberately.
@@ -83,6 +88,14 @@ func (r *VideoRule) HasGeometry() bool {
 	}
 	return r.Background != "" || r.BackgroundColor != "" || r.Mask != ""
 }
+
+// GeneratesProfile reports whether scenes matching r get a generated
+// HereSphere profile: r sets geometry, or turns eye swap or force mono on.
+func (r *VideoRule) GeneratesProfile() bool {
+	return r.HasGeometry() || isTrue(r.EyeSwap) || isTrue(r.ForceMono)
+}
+
+func isTrue(b *bool) bool { return b != nil && *b }
 
 type namedFloat struct {
 	name  string

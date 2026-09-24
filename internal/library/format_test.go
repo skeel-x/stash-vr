@@ -94,3 +94,25 @@ func TestResolveFormat_GeometryPerFieldAndGenerated(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveFormat_EyeSwapAndForceMono(t *testing.T) {
+	yes, no := true, false
+	rules := []config.VideoRule{
+		{Tag: "RL", EyeSwap: &yes},
+		{Tag: "MONO", Stereo: "mono"},
+		{Tag: "FM", ForceMono: &yes},
+		{Tag: "NOSWAP", EyeSwap: &no},
+	}
+	if got := ResolveFormat(rules, tags("RL")); !got.EyeSwap || got.ForceMono || !got.Generated || got.Stereo != "" {
+		t.Fatalf("RL: %+v", got)
+	}
+	if got := ResolveFormat(rules, tags("MONO")); got.EyeSwap || got.ForceMono || got.Generated || got.Stereo != "mono" {
+		t.Fatalf("MONO: %+v", got)
+	}
+	if got := ResolveFormat(rules, tags("FM")); !got.ForceMono || !got.Generated {
+		t.Fatalf("FM: %+v", got)
+	}
+	if got := ResolveFormat(rules, tags("RL", "NOSWAP")); got.EyeSwap || got.Generated {
+		t.Fatalf("a later rule turning eye swap off must win: %+v", got)
+	}
+}

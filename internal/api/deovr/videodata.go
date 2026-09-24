@@ -111,8 +111,8 @@ func setMarkers(vd *library.VideoData, dto *videoDataDto) {
 }
 
 // setFormat maps the resolved rule format to DeoVR's screen and stereo
-// vocabulary. DeoVR has no passthrough or cubemap modes; cubemaps fall
-// back to a sphere.
+// vocabulary. DeoVR has no passthrough, cubemap or eye swap modes; cubemaps
+// fall back to a sphere, and force mono turns stereo off.
 func setFormat(dto *videoDataDto, f library.Format) {
 	switch f.Projection {
 	case "equirectangular":
@@ -141,6 +141,9 @@ func setFormat(dto *videoDataDto, f library.Format) {
 	}
 	if dto.ScreenType == "rf52" {
 		dto.StereoMode = "cuv"
+	}
+	if f.ForceMono {
+		dto.StereoMode = "off"
 	}
 	dto.Is3d = dto.ScreenType != "" || dto.StereoMode != ""
 }

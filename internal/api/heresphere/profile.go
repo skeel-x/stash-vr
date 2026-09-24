@@ -72,6 +72,7 @@ func buildProfile(vd *library.VideoData, baseUrl string, f library.Format) *hsp.
 	if v, ok := hspStereo[f.Stereo]; ok {
 		fk.Stereo = v
 	}
+	fk.EyeSwap, fk.ForceMono = f.EyeSwap, f.ForceMono
 	setF32(&fk.Zoom.X, f.ZoomX)
 	setF32(&fk.Zoom.Y, f.ZoomY)
 	setF32(&fk.Pan.X, f.PanX)

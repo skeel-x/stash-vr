@@ -525,3 +525,33 @@ func TestSet_ValidatesRuleGeometry(t *testing.T) {
 		t.Fatal("unset geometry must stay nil")
 	}
 }
+
+func TestVideoRule_EyeSwapAndForceMono(t *testing.T) {
+	if err := Load(seedFor(t)); err != nil {
+		t.Fatal(err)
+	}
+	yes, no := true, false
+	cfg := Application()
+	cfg.VideoRules = []VideoRule{{Tag: "RL", EyeSwap: &yes}, {Tag: "M", ForceMono: &no}, {Tag: "N"}}
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(FilePath(Application()))
+	if !strings.Contains(string(data), `"eye_swap": true`) || !strings.Contains(string(data), `"force_mono": false`) {
+		t.Fatalf("expected eye_swap and force_mono persisted, got %s", data)
+	}
+	rules := Application().VideoRules
+	if rules[2].EyeSwap != nil || rules[2].ForceMono != nil {
+		t.Fatalf("unset flags must stay nil: %+v", rules[2])
+	}
+	if !rules[0].GeneratesProfile() || rules[1].GeneratesProfile() || rules[2].GeneratesProfile() {
+		t.Fatalf("only a rule turning eye swap or force mono on generates a profile: %+v", rules)
+	}
+	x := 1.0
+	if !(&VideoRule{Tag: "G", PositionX: &x}).GeneratesProfile() || !(&VideoRule{Tag: "M", ForceMono: &yes}).GeneratesProfile() {
+		t.Fatal("geometry and force mono rules generate profiles")
+	}
+	if (&VideoRule{Tag: "RL", EyeSwap: &yes}).HasGeometry() {
+		t.Fatal("eye swap is not screen geometry")
+	}
+}

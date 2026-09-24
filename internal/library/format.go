@@ -25,8 +25,12 @@ type Format struct {
 	Background                      string
 	BackgroundColor                 string
 	Mask                            string
+	// EyeSwap and ForceMono are HereSphere format flags; DeoVR maps force
+	// mono to its stereo mode off and has nothing for eye swap.
+	EyeSwap, ForceMono bool
 	// Generated is true when a matching rule sets any geometry, background
-	// or mask field, so a profile is generated for scenes without one.
+	// or mask field, or eye swap or force mono ends up on, so a profile is
+	// generated for scenes without one.
 	Generated bool
 }
 
@@ -58,7 +62,16 @@ func ResolveFormat(rules []config.VideoRule, tags []*gql.TagPartsArrayTagsTag) F
 		if r.Profile != "" {
 			f.ProfileScene = r.Profile
 		}
+		if r.EyeSwap != nil {
+			f.EyeSwap = *r.EyeSwap
+		}
+		if r.ForceMono != nil {
+			f.ForceMono = *r.ForceMono
+		}
 		resolveGeometry(&f, r)
+	}
+	if f.EyeSwap || f.ForceMono {
+		f.Generated = true
 	}
 	return f
 }

@@ -31,3 +31,22 @@ func TestSetFormat_MapsResolvedFormatToDeoVR(t *testing.T) {
 		}
 	}
 }
+
+func TestSetFormat_ForceMonoTurnsStereoOff(t *testing.T) {
+	for _, f := range []library.Format{
+		{Projection: "equirectangular", Stereo: "sbs", ForceMono: true},
+		{Projection: "fisheye", Stereo: "sbs", Fov: 190, ForceMono: true},
+		{Projection: "fisheye", Stereo: "sbs", EyeSwap: true, ForceMono: true},
+	} {
+		var dto videoDataDto
+		setFormat(&dto, f)
+		if dto.StereoMode != "off" || !dto.Is3d {
+			t.Errorf("%+v: stereo %q is3d %v", f, dto.StereoMode, dto.Is3d)
+		}
+	}
+	var dto videoDataDto
+	setFormat(&dto, library.Format{Projection: "equirectangular", Stereo: "sbs", EyeSwap: true})
+	if dto.StereoMode != "sbs" || dto.ScreenType != "dome" {
+		t.Fatalf("eye swap has no DeoVR field and must leave the mapping alone: %s/%s", dto.ScreenType, dto.StereoMode)
+	}
+}
