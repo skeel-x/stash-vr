@@ -165,6 +165,39 @@ func (d pageData) DefaultRows() []ruleRow {
 	return out
 }
 
+// rulePreset is a filled rule the "Add a preset" select appends.
+type rulePreset struct {
+	Label string
+	Rule  config.VideoRule
+}
+
+func rulePresets() []rulePreset {
+	return []rulePreset{
+		{"RF52 190", config.VideoRule{Tag: "RF52", Projection: "fisheye", Stereo: "sbs", Fov: 190}},
+		{"MKX200 200", config.VideoRule{Tag: "MKX200", Projection: "fisheye", Stereo: "sbs", Lens: "MKX200", Fov: 200}},
+		{"MKX220 220", config.VideoRule{Tag: "MKX220", Projection: "fisheye", Stereo: "sbs", Lens: "MKX220", Fov: 220}},
+		{"VRCA220 220", config.VideoRule{Tag: "VRCA220", Projection: "fisheye", Stereo: "sbs", Lens: "VRCA220", Fov: 220}},
+		{"Passthrough", config.VideoRule{Tag: "Passthrough", Passthrough: true, Background: "passthrough", Mask: "alpha"}},
+		{"Flat 2D", config.VideoRule{Tag: "FLAT", Projection: "perspective", Stereo: "mono"}},
+	}
+}
+
+// presetRow is a preset's label with its rule card.
+type presetRow struct {
+	Label string
+	Row   ruleRow
+}
+
+// PresetRows are the presets as rule cards, in select order.
+func (d pageData) PresetRows() []presetRow {
+	presets := rulePresets()
+	out := make([]presetRow, len(presets))
+	for i := range presets {
+		out[i] = presetRow{Label: presets[i].Label, Row: d.Row(presets[i].Rule)}
+	}
+	return out
+}
+
 // EmptyRow is the blank row the "Add rule" button clones.
 func (d pageData) EmptyRow() ruleRow {
 	return d.Row(config.VideoRule{})

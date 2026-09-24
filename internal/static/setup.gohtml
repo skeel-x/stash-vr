@@ -60,8 +60,10 @@
   </div>
   <template id="rule-template">{{template "rule-row" .EmptyRow}}</template>
   <template id="default-rules">{{range .DefaultRows}}{{template "rule-row" .}}{{end}}</template>
+  <template id="preset-rules">{{range .PresetRows}}{{template "rule-row" .Row}}{{end}}</template>
   <div class="row">
     <button type="button" id="add-rule">Add rule</button>
+    <select id="add-preset" aria-label="Add a preset"><option value="">Add a preset</option>{{range $i, $p := .PresetRows}}<option value="{{$i}}">{{$p.Label}}</option>{{end}}</select>
     <button type="button" id="add-defaults" title="Appends the default rules whose tag is not in the table yet; existing rules are left as they are">Add missing default rules</button>
     <button type="button" id="save-rules" class="primary">Save rules</button>
     <button type="button" id="reset-rules">Reset to defaults</button>

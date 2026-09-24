@@ -227,6 +227,18 @@
     $('#add-rule').addEventListener('click', () => {
       rulesBody.appendChild($('#rule-template').content.firstElementChild.cloneNode(true));
     });
+    // "Add a preset" appends a filled rule card to edit; nothing is saved
+    // until "Save rules".
+    $('#add-preset').addEventListener('change', (e) => {
+      if (e.target.value === '') return;
+      const card = $('#preset-rules').content.querySelectorAll('[data-rule]')[Number(e.target.value)];
+      e.target.value = '';
+      if (!card) return;
+      const added = card.cloneNode(true);
+      rulesBody.appendChild(added);
+      added.querySelector('.tag').focus();
+      setMsg($('#rules-msg'), 'Preset added at the end. Adjust it, then save rules.', 'ok');
+    });
     // Appends the default rules whose tag no rule in the table has yet
     // (compared case-insensitively, as tags match); existing rules keep
     // their order and values.

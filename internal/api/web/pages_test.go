@@ -418,3 +418,47 @@ func TestSetup_OffersMissingDefaultRules(t *testing.T) {
 		t.Fatalf("expected %d default rule cards, got %d", len(config.DefaultVideoRules()), got)
 	}
 }
+
+func TestSetup_OffersRulePresets(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+	for _, want := range []string{
+		`<select id="add-preset"`, `<option value="">Add a preset</option>`,
+		`<option value="0">RF52 190</option>`, `<option value="1">MKX200 200</option>`, `<option value="2">MKX220 220</option>`,
+		`<option value="3">VRCA220 220</option>`, `<option value="4">Passthrough</option>`, `<option value="5">Flat 2D</option>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	start := strings.Index(body, `<template id="preset-rules">`)
+	if start < 0 {
+		t.Fatal("missing the preset template")
+	}
+	tmpl := body[start : start+strings.Index(body[start:], "</template>")]
+	if got := strings.Count(tmpl, "data-rule"); got != 6 {
+		t.Fatalf("expected 6 preset cards, got %d", got)
+	}
+	for _, want := range []string{`value="RF52"`, `value="190"`, `value="VRCA220"`, `value="220"`, `<option value="passthrough" selected>passthrough</option>`, `<option value="alpha" selected>alpha packed</option>`, `<option value="perspective" selected>`} {
+		if !strings.Contains(tmpl, want) {
+			t.Errorf("preset template missing %q", want)
+		}
+	}
+}
+
+func TestRulePresets_AreValidRules(t *testing.T) {
+	newEnv(t, &fakeStash{})
+	presets := rulePresets()
+	rules := make([]config.VideoRule, len(presets))
+	for i := range presets {
+		rules[i] = presets[i].Rule
+	}
+	cfg := config.Application()
+	cfg.VideoRules = rules
+	if err := config.Validate(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if p := presets[4].Rule; !p.Passthrough || p.Background != "passthrough" || p.Mask != "alpha" || !p.GeneratesProfile() {
+		t.Fatalf("passthrough preset %+v", p)
+	}
+}
