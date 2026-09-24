@@ -213,3 +213,25 @@ func TestBuildVideoData_EyeSwapRuleLinksGeneratedProfile(t *testing.T) {
 		t.Fatalf("hsp = %v", dto.Hsp)
 	}
 }
+
+func TestBuildProfile_CarriesResumeAndLastPlayed(t *testing.T) {
+	loadDefaultRules(t)
+	vd := profileScene()
+	played := time.Date(2026, 9, 20, 21, 30, 15, 0, time.FixedZone("CEST", 2*3600))
+	vd.SceneParts.Resume_time = util.Ptr(754.5)
+	vd.SceneParts.Last_played_at = &played
+	p := buildProfile(vd, "", library.Format{Generated: true})
+	if p.Resume != hsp.TimespanTicks(754.5) {
+		t.Fatalf("resume %d want %d", p.Resume, hsp.TimespanTicks(754.5))
+	}
+	if p.DateLastPlayed != hsp.DateTicks(played.UTC()) || p.DateLastPlayed == 0 {
+		t.Fatalf("last played %d want %d", p.DateLastPlayed, hsp.DateTicks(played.UTC()))
+	}
+
+	vd = profileScene()
+	vd.SceneParts.Resume_time = util.Ptr(0.0)
+	p = buildProfile(vd, "", library.Format{Generated: true})
+	if p.Resume != 0 || p.DateLastPlayed != 0 {
+		t.Fatalf("an unplayed scene must leave resume and last played at 0, got %d/%d", p.Resume, p.DateLastPlayed)
+	}
+}

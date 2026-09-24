@@ -247,6 +247,7 @@ fragment SceneParts on Scene {
     }
   }
   play_count
+  last_played_at
   resume_time
   o_counter
   organized

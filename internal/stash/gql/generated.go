@@ -1322,6 +1322,11 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetPlay_count() *i
 	return v.SceneParts.Play_count
 }
 
+// GetLast_played_at returns FindScenesFindScenesFindScenesResultTypeScenesScene.Last_played_at, and is useful for accessing the field via an interface.
+func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetLast_played_at() *time.Time {
+	return v.SceneParts.Last_played_at
+}
+
 // GetResume_time returns FindScenesFindScenesFindScenesResultTypeScenesScene.Resume_time, and is useful for accessing the field via an interface.
 func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetResume_time() *float64 {
 	return v.SceneParts.Resume_time
@@ -1410,6 +1415,8 @@ type __premarshalFindScenesFindScenesFindScenesResultTypeScenesScene struct {
 
 	Play_count *int `json:"play_count"`
 
+	Last_played_at *time.Time `json:"last_played_at"`
+
 	Resume_time *float64 `json:"resume_time"`
 
 	O_counter *int `json:"o_counter"`
@@ -1449,6 +1456,7 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) __premarshalJSON()
 	retval.Performers = v.SceneParts.Performers
 	retval.Groups = v.SceneParts.Groups
 	retval.Play_count = v.SceneParts.Play_count
+	retval.Last_played_at = v.SceneParts.Last_played_at
 	retval.Resume_time = v.SceneParts.Resume_time
 	retval.O_counter = v.SceneParts.O_counter
 	retval.Organized = v.SceneParts.Organized
@@ -3654,6 +3662,8 @@ type SceneParts struct {
 	Groups        []*ScenePartsGroupsSceneGroup         `json:"groups"`
 	// The number ot times a scene has been played
 	Play_count *int `json:"play_count"`
+	// The last time play count was updated
+	Last_played_at *time.Time `json:"last_played_at"`
 	// The time index a scene was left at
 	Resume_time *float64                       `json:"resume_time"`
 	O_counter   *int                           `json:"o_counter"`
@@ -3698,6 +3708,9 @@ func (v *SceneParts) GetGroups() []*ScenePartsGroupsSceneGroup { return v.Groups
 
 // GetPlay_count returns SceneParts.Play_count, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetPlay_count() *int { return v.Play_count }
+
+// GetLast_played_at returns SceneParts.Last_played_at, and is useful for accessing the field via an interface.
+func (v *SceneParts) GetLast_played_at() *time.Time { return v.Last_played_at }
 
 // GetResume_time returns SceneParts.Resume_time, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetResume_time() *float64 { return v.Resume_time }
@@ -3773,6 +3786,8 @@ type __premarshalSceneParts struct {
 
 	Play_count *int `json:"play_count"`
 
+	Last_played_at *time.Time `json:"last_played_at"`
+
 	Resume_time *float64 `json:"resume_time"`
 
 	O_counter *int `json:"o_counter"`
@@ -3812,6 +3827,7 @@ func (v *SceneParts) __premarshalJSON() (*__premarshalSceneParts, error) {
 	retval.Performers = v.Performers
 	retval.Groups = v.Groups
 	retval.Play_count = v.Play_count
+	retval.Last_played_at = v.Last_played_at
 	retval.Resume_time = v.Resume_time
 	retval.O_counter = v.O_counter
 	retval.Organized = v.Organized
@@ -5805,6 +5821,7 @@ fragment SceneParts on Scene {
 		}
 	}
 	play_count
+	last_played_at
 	resume_time
 	o_counter
 	organized

@@ -39,7 +39,8 @@ var (
 )
 
 // buildProfile starts from hsp.Default and fills in what the HereSphere
-// document says about the scene (id, title, dates, rating, tags) and what
+// document says about the scene (id, title, dates, rating, tags, resume
+// position) and what
 // the rules say about the screen. vd must have a file.
 func buildProfile(vd *library.VideoData, baseUrl string, f library.Format) *hsp.Profile {
 	p := hsp.Default()
@@ -51,6 +52,14 @@ func buildProfile(vd *library.VideoData, baseUrl string, f library.Format) *hsp.
 		p.DateReleased = dateTicks(util.NormalizeDate(d))
 	}
 	p.Duration = hsp.TimespanTicks(sp.Files[0].Duration)
+	// Stash's resume position and last play time, so a scene opened on
+	// another headset (or in Stash) resumes where it was left.
+	if sp.Resume_time != nil && *sp.Resume_time > 0 {
+		p.Resume = hsp.TimespanTicks(*sp.Resume_time)
+	}
+	if sp.Last_played_at != nil {
+		p.DateLastPlayed = hsp.DateTicks(sp.Last_played_at.UTC())
+	}
 	if sp.Rating100 != nil {
 		p.AverageRating = float32(*sp.Rating100) / 20
 	}
