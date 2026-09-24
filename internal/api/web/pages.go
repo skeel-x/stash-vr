@@ -154,6 +154,17 @@ func (r ruleRow) BackgroundColor() string {
 	return strings.ToLower(r.Rule.BackgroundColor)
 }
 
+// DefaultRows are the default rules as rule cards, for "Add missing
+// default rules", which appends those whose tag the table lacks.
+func (d pageData) DefaultRows() []ruleRow {
+	defaults := config.DefaultVideoRules()
+	out := make([]ruleRow, len(defaults))
+	for i := range defaults {
+		out[i] = d.Row(defaults[i])
+	}
+	return out
+}
+
 // EmptyRow is the blank row the "Add rule" button clones.
 func (d pageData) EmptyRow() ruleRow {
 	return d.Row(config.VideoRule{})

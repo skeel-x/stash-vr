@@ -703,8 +703,8 @@ func TestPutVideoRules_RoundTripAndValidation(t *testing.T) {
 	}
 
 	rec, out = do(t, h, http.MethodPut, "/video-rules", []any{})
-	if rec.Code != 200 || len(config.Application().VideoRules) != 13 {
-		t.Fatalf("expected an empty PUT to restore the %d defaults, got %d %v", 13, rec.Code, out)
+	if n := len(config.DefaultVideoRules()); rec.Code != 200 || len(config.Application().VideoRules) != n {
+		t.Fatalf("expected an empty PUT to restore the %d defaults, got %d %v", n, rec.Code, out)
 	}
 }
 

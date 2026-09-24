@@ -227,6 +227,21 @@
     $('#add-rule').addEventListener('click', () => {
       rulesBody.appendChild($('#rule-template').content.firstElementChild.cloneNode(true));
     });
+    // Appends the default rules whose tag no rule in the table has yet
+    // (compared case-insensitively, as tags match); existing rules keep
+    // their order and values.
+    $('#add-defaults').addEventListener('click', () => {
+      const have = new Set(Array.from(rulesBody.querySelectorAll('[data-rule] .tag')).map((i) => i.value.trim().toLowerCase()));
+      let added = 0;
+      Array.from($('#default-rules').content.querySelectorAll('[data-rule]')).forEach((card) => {
+        const tag = card.querySelector('.tag').value.trim().toLowerCase();
+        if (have.has(tag)) return;
+        rulesBody.appendChild(card.cloneNode(true));
+        have.add(tag);
+        added++;
+      });
+      setMsg($('#rules-msg'), added ? 'Added ' + added + (added === 1 ? ' rule' : ' rules') + '. Save rules to keep them.' : 'Every default rule is already in the table.', 'ok');
+    });
     $('#save-rules').addEventListener('click', async () => {
       setMsg($('#rules-msg'), 'Saving');
       try { await api('PUT', '/video-rules', ruleRows()); setMsg($('#rules-msg'), 'Saved. Scenes use the new rules when opened next.', 'ok'); }

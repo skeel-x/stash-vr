@@ -29,6 +29,12 @@ func TestResolveFormat_DefaultsReproduceLegacyMapping(t *testing.T) {
 		{"flat", tags("FLAT"), Format{Projection: "perspective", Stereo: "mono"}},
 		{"passthrough", tags("FISHEYE", "Passthrough"), Format{Projection: "fisheye", Stereo: "sbs", Passthrough: true}},
 		{"augmented reality", tags("Augmented Reality"), Format{Passthrough: true}},
+		{"mkx220", tags("MKX220"), Format{Projection: "fisheye", Stereo: "sbs", Lens: "MKX220", Fov: 220}},
+		{"vrca220", tags("VRCA220"), Format{Projection: "fisheye", Stereo: "sbs", Lens: "VRCA220", Fov: 220}},
+		{"180 degrees", tags("180°"), Format{Projection: "equirectangular"}},
+		{"360 degrees tb", tags("360°", "TB"), Format{Projection: "equirectangular360", Stereo: "tb"}},
+		{"mono overrides sbs", tags("SBS", "MONO"), Format{Stereo: "mono"}},
+		{"rl swaps eyes only", tags("FISHEYE", "RL"), Format{Projection: "fisheye", Stereo: "sbs", EyeSwap: true, Generated: true}},
 		{"unknown", tags("Blonde"), Format{}},
 		{"lowercase and alias", []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "Half dome", Aliases: []string{"dome"}}}}, Format{Projection: "equirectangular", Stereo: "sbs"}},
 	}

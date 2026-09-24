@@ -311,8 +311,8 @@ func TestLoad_SeedsDefaultVideoRulesWhenAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	rules := Application().VideoRules
-	if len(rules) != 13 || rules[0].Tag != "DOME" || rules[0].Projection != "equirectangular" || rules[12].Tag != "Augmented Reality" || !rules[12].Passthrough {
-		t.Fatalf("expected the 13 default rules, got %+v", rules)
+	if len(rules) != 19 || rules[0].Tag != "DOME" || rules[0].Projection != "equirectangular" || rules[18].Tag != "Augmented Reality" || !rules[18].Passthrough {
+		t.Fatalf("expected the 19 default rules, got %+v", rules)
 	}
 	data, _ := os.ReadFile(FilePath(Application()))
 	if !strings.Contains(string(data), `"video_rules"`) {
@@ -553,5 +553,73 @@ func TestVideoRule_EyeSwapAndForceMono(t *testing.T) {
 	}
 	if (&VideoRule{Tag: "RL", EyeSwap: &yes}).HasGeometry() {
 		t.Fatal("eye swap is not screen geometry")
+	}
+}
+
+func TestDefaultVideoRules_LensesMonoEyeSwapAndDegrees(t *testing.T) {
+	defaults := DefaultVideoRules()
+	byTag := map[string]*VideoRule{}
+	for i := range defaults {
+		r := &defaults[i]
+		if _, dup := byTag[r.Tag]; dup {
+			t.Fatalf("duplicate default tag %q", r.Tag)
+		}
+		byTag[r.Tag] = r
+	}
+	if r := byTag["MKX220"]; r.Projection != "fisheye" || r.Stereo != "sbs" || r.Lens != "MKX220" || r.Fov != 220 {
+		t.Errorf("MKX220: %+v", r)
+	}
+	if r := byTag["VRCA220"]; r.Projection != "fisheye" || r.Stereo != "sbs" || r.Lens != "VRCA220" || r.Fov != 220 {
+		t.Errorf("VRCA220: %+v", r)
+	}
+	if r := byTag["MONO"]; r.Stereo != "mono" || r.Projection != "" || r.EyeSwap != nil || r.ForceMono != nil {
+		t.Errorf("MONO must only set stereo mono: %+v", r)
+	}
+	if r := byTag["RL"]; r.EyeSwap == nil || !*r.EyeSwap || r.Stereo != "" || r.Projection != "" || r.ForceMono != nil {
+		t.Errorf("RL must only set eye swap: %+v", r)
+	}
+	if r := byTag["180°"]; r.Projection != "equirectangular" || r.Stereo != "" {
+		t.Errorf("180°: %+v", r)
+	}
+	if r := byTag["360°"]; r.Projection != "equirectangular360" || r.Stereo != "" {
+		t.Errorf("360°: %+v", r)
+	}
+	if err := validateVideoRules(DefaultVideoRules()); err != nil {
+		t.Fatal(err)
+	}
+	// Each call must return fresh pointers, so editing one list cannot
+	// change the defaults.
+	first := DefaultVideoRules()
+	for i := range first {
+		if first[i].EyeSwap != nil {
+			*first[i].EyeSwap = false
+		}
+	}
+	if r := DefaultVideoRules(); !*findRule(r, "RL").EyeSwap {
+		t.Fatal("defaults share the eye swap pointer")
+	}
+}
+
+func findRule(rules []VideoRule, tag string) *VideoRule {
+	for i := range rules {
+		if rules[i].Tag == tag {
+			return &rules[i]
+		}
+	}
+	return nil
+}
+
+func TestLoad_ExistingRulesAreNotExtendedWithNewDefaults(t *testing.T) {
+	seed := seedFor(t)
+	path := filepath.Join(seed.ConfigPath, "config.json")
+	if err := os.WriteFile(path, []byte(`{"stash_graphql_url":"http://stash:9999/graphql","video_rules":[{"tag":"FISHEYE","projection":"fisheye"},{"tag":"DOME","stereo":"tb"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	got := Application().VideoRules
+	if len(got) != 2 || got[0].Tag != "FISHEYE" || got[1].Tag != "DOME" || got[1].Stereo != "tb" || got[1].Projection != "" {
+		t.Fatalf("a config's own rules must load unchanged, got %+v", got)
 	}
 }

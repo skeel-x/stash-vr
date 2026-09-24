@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -389,5 +390,31 @@ func TestSetup_RendersEyeSwapAndForceMono(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
 		}
+	}
+}
+
+func TestSetup_OffersMissingDefaultRules(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.VideoRules = []config.VideoRule{{Tag: "dome", Stereo: "tb"}}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+	if !strings.Contains(body, `id="add-defaults"`) || !strings.Contains(body, "Add missing default rules") {
+		t.Fatal("missing the Add missing default rules button")
+	}
+	start := strings.Index(body, `<template id="default-rules">`)
+	if start < 0 {
+		t.Fatal("missing the default rules template")
+	}
+	tmpl := body[start : start+strings.Index(body[start:], "</template>")]
+	for _, r := range config.DefaultVideoRules() {
+		if !strings.Contains(tmpl, `value="`+template.HTMLEscapeString(r.Tag)+`"`) {
+			t.Errorf("default rule %q not offered", r.Tag)
+		}
+	}
+	if got := strings.Count(tmpl, "data-rule"); got != len(config.DefaultVideoRules()) {
+		t.Fatalf("expected %d default rule cards, got %d", len(config.DefaultVideoRules()), got)
 	}
 }

@@ -124,19 +124,29 @@ var (
 )
 
 // DefaultVideoRules reproduces the mapping earlier releases had in code,
-// plus passthrough for the tags that mark alpha-packed videos.
+// plus passthrough for the tags that mark alpha-packed videos, the 220
+// degree lenses, mono and right-eye-first videos, and the degree tags.
+// The tags match what the vrQualityTags Stash plugin writes. Every call
+// returns fresh pointers.
 func DefaultVideoRules() []VideoRule {
+	swap := true
 	return []VideoRule{
 		{Tag: "DOME", Projection: "equirectangular", Stereo: "sbs"},
+		{Tag: "180°", Projection: "equirectangular"},
 		{Tag: "SPHERE", Projection: "equirectangular360", Stereo: "sbs"},
+		{Tag: "360°", Projection: "equirectangular360"},
 		{Tag: "FISHEYE", Projection: "fisheye", Stereo: "sbs"},
 		{Tag: "MKX200", Projection: "fisheye", Stereo: "sbs", Lens: "MKX200", Fov: 200},
+		{Tag: "MKX220", Projection: "fisheye", Stereo: "sbs", Lens: "MKX220", Fov: 220},
+		{Tag: "VRCA220", Projection: "fisheye", Stereo: "sbs", Lens: "VRCA220", Fov: 220},
 		{Tag: "RF52", Projection: "fisheye", Stereo: "sbs", Fov: 190},
 		{Tag: "CUBEMAP", Projection: "cubemap", Stereo: "sbs"},
 		{Tag: "EAC", Projection: "equiangularCubemap", Stereo: "sbs"},
 		{Tag: "FLAT", Projection: "perspective", Stereo: "mono"},
 		{Tag: "SBS", Stereo: "sbs"},
 		{Tag: "TB", Stereo: "tb"},
+		{Tag: "MONO", Stereo: "mono"},
+		{Tag: "RL", EyeSwap: &swap},
 		{Tag: "Passthrough", Passthrough: true},
 		{Tag: "Alpha", Passthrough: true},
 		{Tag: "Augmented Reality", Passthrough: true},
