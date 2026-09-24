@@ -150,6 +150,11 @@ table.sections td input[type=checkbox]{width:26px;height:26px}
 table.inspect{width:100%;border-collapse:collapse;font-size:15px}
 table.inspect th{text-align:left;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line)}
 table.inspect td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.coverage{margin:8px 0 16px}
+.coverage>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:18px;font-weight:600}
+#coverage-out{overflow-x:auto}
+table.inspect td.num{text-align:right;font-variant-numeric:tabular-nums}
+table.inspect tr.missing td{color:var(--muted)}
 #add-preset{width:auto;margin:0;max-width:100%}
 .handle{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:6px;color:var(--muted);cursor:grab;user-select:none;touch-action:none;font-size:22px}
 .handle:hover{background:var(--raised)}

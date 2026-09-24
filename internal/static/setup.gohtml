@@ -79,6 +79,16 @@
   </div>
   <div id="inspect-out"></div>
 
+  <details class="coverage" id="coverage-panel">
+    <summary>Format coverage</summary>
+    <p class="lead">Scene counts for the tags the vrQualityTags plugin manages, and VR-shaped scenes (at least 3840 wide, about 2:1 or 1:1) that have no projection tag. Counts link to the scene list in Stash. Asks Stash on demand; results are reused for a minute.</p>
+    <div class="row">
+      <button type="button" id="coverage">Check format coverage</button>
+      <span class="msg" id="coverage-msg"></span>
+    </div>
+    <div id="coverage-out"></div>
+  </details>
+
   <h2>Server</h2>
   <label>Log level
     <select name="log_level">

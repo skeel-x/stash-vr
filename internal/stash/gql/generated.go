@@ -984,6 +984,67 @@ func (v *FindSavedSceneFiltersResponse) GetFindSavedFilters() []*FindSavedSceneF
 	return v.FindSavedFilters
 }
 
+// FindSceneDimensionsFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
+type FindSceneDimensionsFindScenesFindScenesResultType struct {
+	Count  int                                                             `json:"count"`
+	Scenes []*FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
+}
+
+// GetCount returns FindSceneDimensionsFindScenesFindScenesResultType.Count, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsFindScenesFindScenesResultType) GetCount() int { return v.Count }
+
+// GetScenes returns FindSceneDimensionsFindScenesFindScenesResultType.Scenes, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsFindScenesFindScenesResultType) GetScenes() []*FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene {
+	return v.Scenes
+}
+
+// FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene includes the requested fields of the GraphQL type Scene.
+type FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene struct {
+	Id    string                                                                        `json:"id"`
+	Title *string                                                                       `json:"title"`
+	Files []*FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile `json:"files"`
+}
+
+// GetId returns FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene.Id, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene) GetId() string { return v.Id }
+
+// GetTitle returns FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene.Title, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene) GetTitle() *string {
+	return v.Title
+}
+
+// GetFiles returns FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene.Files, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsFindScenesFindScenesResultTypeScenesScene) GetFiles() []*FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile {
+	return v.Files
+}
+
+// FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile includes the requested fields of the GraphQL type VideoFile.
+type FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
+// GetWidth returns FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile.Width, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile) GetWidth() int {
+	return v.Width
+}
+
+// GetHeight returns FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile.Height, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsFindScenesFindScenesResultTypeScenesSceneFilesVideoFile) GetHeight() int {
+	return v.Height
+}
+
+// FindSceneDimensionsResponse is returned by FindSceneDimensions on success.
+type FindSceneDimensionsResponse struct {
+	// A function which queries Scene objects
+	FindScenes *FindSceneDimensionsFindScenesFindScenesResultType `json:"findScenes"`
+}
+
+// GetFindScenes returns FindSceneDimensionsResponse.FindScenes, and is useful for accessing the field via an interface.
+func (v *FindSceneDimensionsResponse) GetFindScenes() *FindSceneDimensionsFindScenesFindScenesResultType {
+	return v.FindScenes
+}
+
 // FindSceneGroupingsFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
 type FindSceneGroupingsFindScenesFindScenesResultType struct {
 	Scenes []*FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
@@ -1626,6 +1687,44 @@ type FindTagByNameResponse struct {
 
 // GetFindTags returns FindTagByNameResponse.FindTags, and is useful for accessing the field via an interface.
 func (v *FindTagByNameResponse) GetFindTags() *FindTagByNameFindTagsFindTagsResultType {
+	return v.FindTags
+}
+
+// FindTagSceneCountsFindTagsFindTagsResultType includes the requested fields of the GraphQL type FindTagsResultType.
+type FindTagSceneCountsFindTagsFindTagsResultType struct {
+	Tags []*FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag `json:"tags"`
+}
+
+// GetTags returns FindTagSceneCountsFindTagsFindTagsResultType.Tags, and is useful for accessing the field via an interface.
+func (v *FindTagSceneCountsFindTagsFindTagsResultType) GetTags() []*FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag {
+	return v.Tags
+}
+
+// FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag includes the requested fields of the GraphQL type Tag.
+type FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Scene_count int    `json:"scene_count"`
+}
+
+// GetId returns FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag.Id, and is useful for accessing the field via an interface.
+func (v *FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag) GetId() string { return v.Id }
+
+// GetName returns FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag.Name, and is useful for accessing the field via an interface.
+func (v *FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag) GetName() string { return v.Name }
+
+// GetScene_count returns FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag.Scene_count, and is useful for accessing the field via an interface.
+func (v *FindTagSceneCountsFindTagsFindTagsResultTypeTagsTag) GetScene_count() int {
+	return v.Scene_count
+}
+
+// FindTagSceneCountsResponse is returned by FindTagSceneCounts on success.
+type FindTagSceneCountsResponse struct {
+	FindTags *FindTagSceneCountsFindTagsFindTagsResultType `json:"findTags"`
+}
+
+// GetFindTags returns FindTagSceneCountsResponse.FindTags, and is useful for accessing the field via an interface.
+func (v *FindTagSceneCountsResponse) GetFindTags() *FindTagSceneCountsFindTagsFindTagsResultType {
 	return v.FindTags
 }
 
@@ -4964,6 +5063,14 @@ type __FindPerformerInput struct {
 // GetId returns __FindPerformerInput.Id, and is useful for accessing the field via an interface.
 func (v *__FindPerformerInput) GetId() string { return v.Id }
 
+// __FindSceneDimensionsInput is used internally by genqlient
+type __FindSceneDimensionsInput struct {
+	Scene_filter *SceneFilterType `json:"scene_filter,omitempty"`
+}
+
+// GetScene_filter returns __FindSceneDimensionsInput.Scene_filter, and is useful for accessing the field via an interface.
+func (v *__FindSceneDimensionsInput) GetScene_filter() *SceneFilterType { return v.Scene_filter }
+
 // __FindSceneIdsByFilterInput is used internally by genqlient
 type __FindSceneIdsByFilterInput struct {
 	Scene_filter *SceneFilterType `json:"scene_filter,omitempty"`
@@ -5603,6 +5710,48 @@ func FindSavedSceneFilters(
 	return data_, err_
 }
 
+// The query executed by FindSceneDimensions.
+const FindSceneDimensions_Operation = `
+query FindSceneDimensions ($scene_filter: SceneFilterType) {
+	findScenes(scene_filter: $scene_filter, filter: {per_page:-1}) {
+		count
+		scenes {
+			id
+			title
+			files {
+				width
+				height
+			}
+		}
+	}
+}
+`
+
+func FindSceneDimensions(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	scene_filter *SceneFilterType,
+) (data_ *FindSceneDimensionsResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindSceneDimensions",
+		Query:  FindSceneDimensions_Operation,
+		Variables: &__FindSceneDimensionsInput{
+			Scene_filter: scene_filter,
+		},
+	}
+
+	data_ = &FindSceneDimensionsResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
 // The query executed by FindSceneGroupings.
 const FindSceneGroupings_Operation = `
 query FindSceneGroupings {
@@ -6004,6 +6153,40 @@ func FindTagByName(
 	}
 
 	data_ = &FindTagByNameResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindTagSceneCounts.
+const FindTagSceneCounts_Operation = `
+query FindTagSceneCounts {
+	findTags(filter: {per_page:-1}) {
+		tags {
+			id
+			name
+			scene_count
+		}
+	}
+}
+`
+
+func FindTagSceneCounts(
+	ctx_ context.Context,
+	client_ graphql.Client,
+) (data_ *FindTagSceneCountsResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindTagSceneCounts",
+		Query:  FindTagSceneCounts_Operation,
+	}
+
+	data_ = &FindTagSceneCountsResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

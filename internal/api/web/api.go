@@ -153,6 +153,8 @@ type apiHandler struct {
 	// writeMu serialises the read-modify-write cycles of the mutating
 	// endpoints so two concurrent settings changes cannot interleave.
 	writeMu sync.Mutex
+	// coverageCache keeps the last format coverage report for a minute.
+	coverageCache coverageCache
 }
 
 // ApiRouter serves the JSON API used by the pages. Mounted at /api/ui.
@@ -171,6 +173,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Get("/log", h.getLog)
 	r.Get("/random", h.getRandom)
 	r.Get("/inspect", h.inspect)
+	r.Get("/coverage", h.coverage)
 	return r
 }
 
