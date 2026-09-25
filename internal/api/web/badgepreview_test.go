@@ -256,10 +256,15 @@ func TestBadgePreview_DefaultSceneFilters(t *testing.T) {
 		t.Fatalf("expected one scene query, got %d", len(st.filters))
 	}
 	f := st.filters[0]
-	for _, want := range []string{`"t8"`, `"t7"`, `"ta"`, `"is_missing":"cover"`, `"per_page":1`} {
+	// The first query pairs the top tier with Alpha in one INCLUDES_ALL
+	// criterion: Stash ignores a second tags criterion nested under AND.
+	for _, want := range []string{`"modifier":"INCLUDES_ALL"`, `"value":["t8","ta"]`, `"is_missing":"cover"`, `"per_page":1`} {
 		if !strings.Contains(f, want) {
 			t.Errorf("scene filter %s lacks %s", f, want)
 		}
+	}
+	if strings.Contains(f, `"AND"`) {
+		t.Errorf("scene filter %s must not nest tags under AND", f)
 	}
 }
 

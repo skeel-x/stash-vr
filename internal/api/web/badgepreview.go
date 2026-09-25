@@ -193,9 +193,11 @@ func findPreviewScene(ctx context.Context, lib *library.Service) (string, error)
 	var tries []*gql.SceneFilterType
 	if len(tiers) > 0 {
 		if len(alpha) > 0 {
-			// Stash allows one of AND, OR and NOT per level, so the cover
-			// condition nests inside the Alpha one.
-			tries = append(tries, &gql.SceneFilterType{Tags: includesAny(tiers), AND: &gql.SceneFilterType{Tags: includesAny(alpha), NOT: withCover}})
+			// Stash ignores a second tags criterion nested under AND, so
+			// "a tier and Alpha" is one INCLUDES_ALL query per tier.
+			for _, tier := range tiers {
+				tries = append(tries, &gql.SceneFilterType{Tags: includesAll([]string{tier, alpha[0]}), NOT: withCover})
+			}
 		}
 		tries = append(tries, &gql.SceneFilterType{Tags: includesAny(tiers), NOT: withCover})
 	}
@@ -217,6 +219,13 @@ func findPreviewScene(ctx context.Context, lib *library.Service) (string, error)
 		}
 	}
 	return "", errNoPreviewScene
+}
+
+// includesAll matches scenes carrying every one of the tags, without child
+// tags.
+func includesAll(ids []string) *gql.HierarchicalMultiCriterionInput {
+	depth := 0
+	return &gql.HierarchicalMultiCriterionInput{Modifier: gql.CriterionModifierIncludesAll, Value: ids, Depth: &depth}
 }
 
 // includesAny matches scenes carrying any of the tags, without child tags.
