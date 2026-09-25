@@ -83,6 +83,7 @@ type ConfigView struct {
 	SmartSectionSize   int                `json:"smart_section_size"`
 	AutoStudioMin      int                `json:"auto_studio_min"`
 	AutoPerformerMin   int                `json:"auto_performer_min"`
+	CoverBadges        config.CoverBadges `json:"cover_badges"`
 	ListenAddress      string             `json:"listen_address"`
 	ConfigPath         string             `json:"config_path"`
 	Filters            []config.Filter    `json:"filters"`
@@ -92,23 +93,48 @@ type ConfigView struct {
 // configInput is what PUT /config accepts. An empty StashApiKey keeps the
 // current key.
 type configInput struct {
-	StashGraphQLUrl    string  `json:"stash_graphql_url"`
-	StashApiKey        string  `json:"stash_api_key"`
-	FavoriteTag        string  `json:"favorite_tag"`
-	ExcludeSortName    string  `json:"exclude_sort_name"`
-	GenerateSummaryIds bool    `json:"generate_summary_ids"`
-	HeatmapHeightPx    int     `json:"heatmap_height_px"`
-	ForceHTTPS         bool    `json:"force_https"`
-	BasePath           *string `json:"base_path"`
-	DeovrAutoload      *bool   `json:"deovr_autoload"`
-	PerformerFacets    *bool   `json:"performer_facets"`
-	DateLookup         *bool   `json:"date_lookup"`
-	DateWriteback      *bool   `json:"date_writeback"`
-	FunscriptIndexPath *string `json:"funscript_index_path"`
-	LogLevel           string  `json:"log_level"`
-	SmartSectionSize   *int    `json:"smart_section_size"`
-	AutoStudioMin      *int    `json:"auto_studio_min"`
-	AutoPerformerMin   *int    `json:"auto_performer_min"`
+	StashGraphQLUrl    string            `json:"stash_graphql_url"`
+	StashApiKey        string            `json:"stash_api_key"`
+	FavoriteTag        string            `json:"favorite_tag"`
+	ExcludeSortName    string            `json:"exclude_sort_name"`
+	GenerateSummaryIds bool              `json:"generate_summary_ids"`
+	HeatmapHeightPx    int               `json:"heatmap_height_px"`
+	ForceHTTPS         bool              `json:"force_https"`
+	BasePath           *string           `json:"base_path"`
+	DeovrAutoload      *bool             `json:"deovr_autoload"`
+	PerformerFacets    *bool             `json:"performer_facets"`
+	DateLookup         *bool             `json:"date_lookup"`
+	DateWriteback      *bool             `json:"date_writeback"`
+	FunscriptIndexPath *string           `json:"funscript_index_path"`
+	LogLevel           string            `json:"log_level"`
+	SmartSectionSize   *int              `json:"smart_section_size"`
+	AutoStudioMin      *int              `json:"auto_studio_min"`
+	AutoPerformerMin   *int              `json:"auto_performer_min"`
+	CoverBadges        *coverBadgesInput `json:"cover_badges"`
+}
+
+// coverBadgesInput is the cover_badges object of PUT /config; a missing
+// key keeps the current setting.
+type coverBadgesInput struct {
+	Quality     *bool `json:"quality"`
+	Format      *bool `json:"format"`
+	Passthrough *bool `json:"passthrough"`
+}
+
+// apply copies the badges in names onto b.
+func (in *coverBadgesInput) apply(b *config.CoverBadges) {
+	if in == nil {
+		return
+	}
+	if in.Quality != nil {
+		b.Quality = *in.Quality
+	}
+	if in.Format != nil {
+		b.Format = *in.Format
+	}
+	if in.Passthrough != nil {
+		b.Passthrough = *in.Passthrough
+	}
 }
 
 type testInput struct {
@@ -141,6 +167,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		SmartSectionSize:   cfg.SmartSectionSize,
 		AutoStudioMin:      cfg.AutoStudioMin,
 		AutoPerformerMin:   cfg.AutoPerformerMin,
+		CoverBadges:        cfg.CoverBadges,
 		ListenAddress:      cfg.ListenAddress,
 		ConfigPath:         config.FilePath(cfg),
 		Filters:            cfg.Filters,
@@ -315,6 +342,7 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	if in.AutoPerformerMin != nil {
 		next.AutoPerformerMin = *in.AutoPerformerMin
 	}
+	in.CoverBadges.apply(&next.CoverBadges)
 
 	// Validate before the host rule so an unusable URL is reported as such
 	// rather than as a missing API key.

@@ -53,6 +53,12 @@
   <label class="check"><input name="date_writeback" type="checkbox" {{if .Config.DateWriteback}}checked{{end}}> Write found dates back to Stash</label>
   <p class="lead">Release dates: {{.DateStats.Found}} found, {{.DateStats.Missing}} missing, {{.DateStats.Unchecked}} unchecked. Scenes without a date in Stash are matched on the stash-boxes configured in Stash, one every few seconds; found dates feed the Age facet and the Released tag and are kept in dates.json next to the settings.</p>
 
+  <h3>Cover badges</h3>
+  <p class="lead">Labels drawn onto scene covers, so the headset shows them in the library grid.</p>
+  <label class="check"><input name="cover_badge_quality" type="checkbox" {{if .Config.CoverBadges.Quality}}checked{{end}}> Quality: the vrQualityTags tier (8K, 7K, 6K HBR), else the file resolution</label>
+  <label class="check"><input name="cover_badge_format" type="checkbox" {{if .Config.CoverBadges.Format}}checked{{end}}> Format: the projection from the video rules (180, 360, FISHEYE, FLAT 3D)</label>
+  <label class="check"><input name="cover_badge_passthrough" type="checkbox" {{if .Config.CoverBadges.Passthrough}}checked{{end}}> Passthrough: AR on scenes with an alpha matte or a chroma key</label>
+
   <h2>Video rules</h2>
   <p class="lead">Tags decide how a scene is shown. Rules apply top to bottom; a later rule overrides an earlier one. Profiles stored: {{len .Profiles}}. Tune a scene in HereSphere and save it there; it then shows up here and can back a rule.</p>
   <div class="rules" id="rules">

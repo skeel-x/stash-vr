@@ -29,6 +29,9 @@ const (
 	envKeySmartSectionSize   = "SMART_SECTION_SIZE"
 	envKeyAutoStudioMin      = "AUTO_STUDIO_MIN"
 	envKeyAutoPerformerMin   = "AUTO_PERFORMER_MIN"
+	envKeyCoverBadgeQuality  = "COVER_BADGE_QUALITY"
+	envKeyCoverBadgeFormat   = "COVER_BADGE_FORMAT"
+	envKeyCoverBadgePass     = "COVER_BADGE_PASSTHROUGH"
 )
 
 type ApplicationConfig struct {
@@ -53,6 +56,7 @@ type ApplicationConfig struct {
 	ExcludeSortName    string
 	ConfigPath         string
 	GenerateSummaryIds bool
+	CoverBadges        CoverBadges
 	Filters            []Filter
 	VideoRules         []VideoRule
 }
@@ -121,6 +125,15 @@ func Init() error {
 	pflag.String(envKeyGenerateSummaryIds, "", "Generate summary ids for categorized tags")
 	_ = viper.BindPFlag(envKeyGenerateSummaryIds, pflag.Lookup(envKeyGenerateSummaryIds))
 
+	pflag.Bool(envKeyCoverBadgeQuality, true, "Draw the quality tier or resolution onto scene covers")
+	_ = viper.BindPFlag(envKeyCoverBadgeQuality, pflag.Lookup(envKeyCoverBadgeQuality))
+
+	pflag.Bool(envKeyCoverBadgeFormat, false, "Draw the projection (180, 360, FISHEYE, FLAT 3D) onto scene covers")
+	_ = viper.BindPFlag(envKeyCoverBadgeFormat, pflag.Lookup(envKeyCoverBadgeFormat))
+
+	pflag.Bool(envKeyCoverBadgePass, true, "Draw an AR badge onto covers of passthrough scenes")
+	_ = viper.BindPFlag(envKeyCoverBadgePass, pflag.Lookup(envKeyCoverBadgePass))
+
 	pflag.BoolP("help", "h", false, "Display usage information")
 	_ = viper.BindPFlag("help", pflag.Lookup("help"))
 
@@ -155,6 +168,11 @@ func Init() error {
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),
 		ConfigPath:         viper.GetString(envKeyUserConfigPath),
 		GenerateSummaryIds: viper.GetBool(envKeyGenerateSummaryIds),
+		CoverBadges: CoverBadges{
+			Quality:     viper.GetBool(envKeyCoverBadgeQuality),
+			Format:      viper.GetBool(envKeyCoverBadgeFormat),
+			Passthrough: viper.GetBool(envKeyCoverBadgePass),
+		},
 	}
 
 	return Load(seed)

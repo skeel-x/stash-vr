@@ -102,6 +102,11 @@
       smart_section_size: Number(form.smart_section_size.value || 50),
       auto_studio_min: Number(form.auto_studio_min.value || 0),
       auto_performer_min: Number(form.auto_performer_min.value || 0),
+      cover_badges: {
+        quality: form.cover_badge_quality.checked,
+        format: form.cover_badge_format.checked,
+        passthrough: form.cover_badge_passthrough.checked,
+      },
     });
     $('#test').addEventListener('click', async () => {
       setMsg($('#test-msg'), 'Testing');

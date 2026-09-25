@@ -561,3 +561,32 @@ func TestSetup_RendersCoveragePanelLoadedOnDemand(t *testing.T) {
 		}
 	}
 }
+
+func TestSetup_RendersCoverBadgeCheckboxes(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.CoverBadges = config.CoverBadges{Quality: true, Format: false, Passthrough: true}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/setup", nil).Body.String()
+
+	for _, want := range []string{
+		"Cover badges",
+		`<input name="cover_badge_quality" type="checkbox" checked>`,
+		`<input name="cover_badge_format" type="checkbox" >`,
+		`<input name="cover_badge_passthrough" type="checkbox" checked>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("setup missing %q", want)
+		}
+	}
+	players := strings.Index(body, "<h2>Players</h2>")
+	badges := strings.Index(body, "Cover badges")
+	rules := strings.Index(body, "<h2>Video rules</h2>")
+	if players < 0 || badges < players || badges > rules {
+		t.Fatal("the cover badge checkboxes belong to the Players group")
+	}
+}

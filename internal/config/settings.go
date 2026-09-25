@@ -40,6 +40,26 @@ func validateFilters(filters []Filter) error {
 	return nil
 }
 
+// CoverBadges switches the labels drawn onto scene covers: the quality
+// tier or resolution, the projection, and a passthrough (AR) marker.
+type CoverBadges struct {
+	Quality     bool `json:"quality"`
+	Format      bool `json:"format"`
+	Passthrough bool `json:"passthrough"`
+}
+
+// Any reports whether at least one badge is switched on.
+func (b CoverBadges) Any() bool {
+	return b.Quality || b.Format || b.Passthrough
+}
+
+// coverBadgesFile is CoverBadges as persisted; a missing key keeps the seed.
+type coverBadgesFile struct {
+	Quality     *bool `json:"quality,omitempty"`
+	Format      *bool `json:"format,omitempty"`
+	Passthrough *bool `json:"passthrough,omitempty"`
+}
+
 // VideoRule maps a Stash tag to player format settings. Rules apply in
 // order; every non-empty field overrides what earlier rules set.
 type VideoRule struct {
@@ -243,25 +263,26 @@ var validLogLevels = map[string]struct{}{
 // fileConfig is the persisted subset of ApplicationConfig. Pointer fields let
 // a file that lacks a key fall back to the seed (flags/env/defaults).
 type fileConfig struct {
-	StashGraphQLUrl    *string     `json:"stash_graphql_url,omitempty"`
-	StashApiKey        *string     `json:"stash_api_key,omitempty"`
-	FavoriteTag        *string     `json:"favorite_tag,omitempty"`
-	ExcludeSortName    *string     `json:"exclude_sort_name,omitempty"`
-	GenerateSummaryIds *bool       `json:"generate_summary_ids,omitempty"`
-	HeatmapHeightPx    *int        `json:"heatmap_height_px,omitempty"`
-	SmartSectionSize   *int        `json:"smart_section_size,omitempty"`
-	AutoStudioMin      *int        `json:"auto_studio_min,omitempty"`
-	AutoPerformerMin   *int        `json:"auto_performer_min,omitempty"`
-	ForceHTTPS         *bool       `json:"force_https,omitempty"`
-	BasePath           *string     `json:"base_path,omitempty"`
-	DeovrAutoload      *bool       `json:"deovr_autoload,omitempty"`
-	PerformerFacets    *bool       `json:"performer_facets,omitempty"`
-	DateLookup         *bool       `json:"date_lookup,omitempty"`
-	DateWriteback      *bool       `json:"date_writeback,omitempty"`
-	FunscriptIndexPath *string     `json:"funscript_index_path,omitempty"`
-	LogLevel           *string     `json:"log_level,omitempty"`
-	Filters            []Filter    `json:"filters"`
-	VideoRules         []VideoRule `json:"video_rules"`
+	StashGraphQLUrl    *string          `json:"stash_graphql_url,omitempty"`
+	StashApiKey        *string          `json:"stash_api_key,omitempty"`
+	FavoriteTag        *string          `json:"favorite_tag,omitempty"`
+	ExcludeSortName    *string          `json:"exclude_sort_name,omitempty"`
+	GenerateSummaryIds *bool            `json:"generate_summary_ids,omitempty"`
+	HeatmapHeightPx    *int             `json:"heatmap_height_px,omitempty"`
+	SmartSectionSize   *int             `json:"smart_section_size,omitempty"`
+	AutoStudioMin      *int             `json:"auto_studio_min,omitempty"`
+	AutoPerformerMin   *int             `json:"auto_performer_min,omitempty"`
+	ForceHTTPS         *bool            `json:"force_https,omitempty"`
+	BasePath           *string          `json:"base_path,omitempty"`
+	DeovrAutoload      *bool            `json:"deovr_autoload,omitempty"`
+	PerformerFacets    *bool            `json:"performer_facets,omitempty"`
+	DateLookup         *bool            `json:"date_lookup,omitempty"`
+	DateWriteback      *bool            `json:"date_writeback,omitempty"`
+	FunscriptIndexPath *string          `json:"funscript_index_path,omitempty"`
+	LogLevel           *string          `json:"log_level,omitempty"`
+	CoverBadges        *coverBadgesFile `json:"cover_badges,omitempty"`
+	Filters            []Filter         `json:"filters"`
+	VideoRules         []VideoRule      `json:"video_rules"`
 }
 
 var (
@@ -471,6 +492,17 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.LogLevel != nil {
 		base.LogLevel = *fc.LogLevel
 	}
+	if b := fc.CoverBadges; b != nil {
+		if b.Quality != nil {
+			base.CoverBadges.Quality = *b.Quality
+		}
+		if b.Format != nil {
+			base.CoverBadges.Format = *b.Format
+		}
+		if b.Passthrough != nil {
+			base.CoverBadges.Passthrough = *b.Passthrough
+		}
+	}
 	if fc.Filters != nil {
 		base.Filters = fc.Filters
 	}
@@ -581,8 +613,13 @@ func write(path string, c ApplicationConfig) error {
 		DateWriteback:      &c.DateWriteback,
 		FunscriptIndexPath: &c.FunscriptIndexPath,
 		LogLevel:           &c.LogLevel,
-		Filters:            c.Filters,
-		VideoRules:         c.VideoRules,
+		CoverBadges: &coverBadgesFile{
+			Quality:     &c.CoverBadges.Quality,
+			Format:      &c.CoverBadges.Format,
+			Passthrough: &c.CoverBadges.Passthrough,
+		},
+		Filters:    c.Filters,
+		VideoRules: c.VideoRules,
 	}
 	if fc.Filters == nil {
 		fc.Filters = []Filter{}

@@ -670,3 +670,62 @@ func TestLoad_DropsUnchangedLegacyLabelRules(t *testing.T) {
 		t.Fatalf("a second load must find nothing to migrate, got %v", MigratedRules())
 	}
 }
+
+func TestLoad_CoverBadgesSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+	seed.CoverBadges = CoverBadges{Quality: true, Passthrough: true}
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := Application().CoverBadges; got != (CoverBadges{Quality: true, Passthrough: true}) {
+		t.Fatalf("expected the seed badges, got %+v", got)
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"cover_badges": {`) || !strings.Contains(string(data), `"format": false`) {
+		t.Fatalf("expected cover_badges persisted, got %s", data)
+	}
+
+	// A file naming only some badges keeps the seed for the others.
+	if err := os.WriteFile(FilePath(seed), []byte(`{"cover_badges":{"format":true,"quality":false}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := Application().CoverBadges; got != (CoverBadges{Format: true, Passthrough: true}) {
+		t.Fatalf("expected file badges merged over the seed, got %+v", got)
+	}
+}
+
+func TestSet_PersistsCoverBadges(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	next := Application()
+	next.CoverBadges = CoverBadges{Format: true}
+	if _, err := Set(next); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().CoverBadges; got != (CoverBadges{Format: true}) {
+		t.Fatalf("expected badges to survive a reload, got %+v", got)
+	}
+}
+
+func TestCoverBadges_Any(t *testing.T) {
+	if (CoverBadges{}).Any() {
+		t.Fatal("no badge switched on must report false")
+	}
+	for _, b := range []CoverBadges{{Quality: true}, {Format: true}, {Passthrough: true}} {
+		if !b.Any() {
+			t.Fatalf("%+v must report true", b)
+		}
+	}
+}

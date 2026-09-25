@@ -890,3 +890,57 @@ func TestProfileValues_EnumsAndMissingSections(t *testing.T) {
 		t.Fatalf("missing sections must stay unset: %+v", empty)
 	}
 }
+
+func TestPutConfig_CoverBadgesAreAdditive(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	base := func() map[string]any {
+		return map[string]any{
+			"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+			"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+			"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		}
+	}
+	cfg := config.Application()
+	cfg.CoverBadges = config.CoverBadges{Quality: true, Passthrough: true}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	body := base()
+	body["cover_badges"] = map[string]any{"format": true, "quality": false}
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200, got %d %s", rec.Code, rec.Body.String())
+	}
+	want := config.CoverBadges{Format: true, Passthrough: true}
+	if got := config.Application().CoverBadges; got != want {
+		t.Fatalf("expected %+v stored, got %+v", want, got)
+	}
+	view, _ := out["cover_badges"].(map[string]any)
+	if view["quality"] != false || view["format"] != true || view["passthrough"] != true {
+		t.Fatalf("expected the badges echoed back, got %v", out["cover_badges"])
+	}
+	data, _ := os.ReadFile(config.FilePath(config.Application()))
+	if !strings.Contains(string(data), `"format": true`) {
+		t.Fatalf("expected cover_badges persisted to config.json, got %s", data)
+	}
+
+	rec, _ = do(t, h, http.MethodPut, "/config", base())
+	if rec.Code != 200 {
+		t.Fatalf("expected 200 without the field, got %d %s", rec.Code, rec.Body.String())
+	}
+	if got := config.Application().CoverBadges; got != want {
+		t.Fatalf("expected badges kept when the field is missing, got %+v", got)
+	}
+}
+
+func TestGetConfig_IncludesCoverBadges(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	_, out := do(t, h, http.MethodGet, "/config", nil)
+
+	if _, ok := out["cover_badges"].(map[string]any); !ok {
+		t.Fatalf("expected cover_badges in the config view, got %v", out)
+	}
+}
