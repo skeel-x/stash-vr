@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"image/jpeg"
 	"net/http"
 	"net/url"
 	"stash-vr/internal/api/internal"
@@ -99,7 +98,7 @@ func (h httpHandler) posterHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	poster, err := buildPosterImage(ctx, vd)
+	poster, err := buildPoster(ctx, vd)
 	if err != nil {
 		if errors.Is(err, errPosterNotFound) {
 			w.WriteHeader(http.StatusNotFound)
@@ -111,7 +110,8 @@ func (h httpHandler) posterHandler(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "private, max-age=3600")
-	if err := jpeg.Encode(w, poster, nil); err != nil {
+	w.Header().Set("Content-Length", strconv.Itoa(len(poster)))
+	if _, err := w.Write(poster); err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("error writing Playa poster")
 	}
 }

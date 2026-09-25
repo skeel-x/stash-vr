@@ -17,6 +17,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/config"
 	"stash-vr/internal/stash"
 	"strings"
@@ -31,20 +32,14 @@ var httpClient = &http.Client{Timeout: 15 * time.Second}
 var maxCoverBytes int64 = 32 << 20
 
 var errImageNotFound = errors.New("image not found")
-var errScreenshotImageNotFound = errors.New("screenshot image not found")
-var errHeatmapImageNotFound = errors.New("heatmap image not found")
+
+// coverJPEGQuality is the JPEG quality of rendered covers.
+const coverJPEGQuality = 85
 
 // ErrImageNotFound returns the sentinel error other packages use to map a
 // missing screenshot to HTTP 404.
 func ErrImageNotFound() error {
 	return errImageNotFound
-}
-
-// BuildCover fetches the scene screenshot and, when available, overlays the
-// interactive heatmap. It is the exported entry point used by the Playa
-// poster endpoint.
-func BuildCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.Image, error) {
-	return buildHeatmapCover(ctx, coverUrl, heatmapUrl)
 }
 
 // fetchScreenshot fetches fileUrl from Stash, mapping a 404 to
@@ -80,24 +75,22 @@ func UnwrapURLError(err error) error {
 	return err
 }
 
-func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
-	log.Ctx(ctx).Trace().Str("url", stash.Redacted(fileUrl)).Msg("Fetching image")
+// fetchBytes fetches fileUrl fully into memory, at most maxCoverBytes, and
+// returns its content type and body.
+func fetchBytes(ctx context.Context, fileUrl string) (contentType string, body []byte, err error) {
 	resp, err := fetchScreenshot(ctx, fileUrl)
 	if err != nil {
-		if errors.Is(err, errImageNotFound) {
-			log.Ctx(ctx).Debug().Msg("Image not found")
-		}
-		return nil, err
+		return "", nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-
-	img, format, err := image.Decode(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxCoverBytes+1))
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-
-	log.Ctx(ctx).Trace().Str("format", format).Msg("Fetched image")
-	return img, nil
+	if int64(len(b)) > maxCoverBytes {
+		return "", nil, fmt.Errorf("image larger than %d bytes", maxCoverBytes)
+	}
+	return resp.Header.Get("Content-Type"), b, nil
 }
 
 // loadScreenshot fetches the Stash screenshot fully into memory and returns
@@ -107,25 +100,15 @@ func fetchImage(ctx context.Context, fileUrl string) (image.Image, error) {
 // headers and body atomically, so a fetch or transcode failure never leaves
 // a partially written, cacheable response on the wire.
 func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, body []byte, err error) {
-	resp, err := fetchScreenshot(ctx, fileUrl)
+	ct, b, err := fetchBytes(ctx, fileUrl)
 	if err != nil {
 		return "", nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	ct := resp.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "image/jpeg") || strings.HasPrefix(ct, "image/png") {
-		b, err := io.ReadAll(io.LimitReader(resp.Body, maxCoverBytes+1))
-		if err != nil {
-			return "", nil, err
-		}
-		if int64(len(b)) > maxCoverBytes {
-			return "", nil, fmt.Errorf("screenshot larger than %d bytes", maxCoverBytes)
-		}
 		return ct, b, nil
 	}
 
-	img, _, err := image.Decode(resp.Body)
+	img, _, err := image.Decode(bytes.NewReader(b))
 	if err != nil {
 		return "", nil, fmt.Errorf("decode screenshot: %w", err)
 	}
@@ -136,52 +119,78 @@ func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, bo
 	return "image/jpeg", buf.Bytes(), nil
 }
 
-func buildHeatmapCover(ctx context.Context, coverUrl string, heatmapUrl string) (image.Image, error) {
+// RenderCover returns a scene's cover as JPEG: the screenshot at coverUrl
+// with the heatmap at heatmapUrl across the bottom (when heatmapUrl is
+// set and the heatmap loads) and badges drawn in the top left corner.
+// Covers already rendered from the same screenshot, heatmap and badges
+// come from coverbadge.Rendered. A missing screenshot is
+// ErrImageNotFound.
+func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
 	var (
-		cover      draw.Image
-		coverErr   error
-		heatmap    image.Image
-		heatmapErr error
+		shot, heat []byte
+		shotErr    error
 	)
-
-	g, _ := errgroup.WithContext(ctx)
-
+	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		img, err := fetchImage(log.Ctx(ctx).With().Str("image", "cover").Logger().WithContext(ctx), coverUrl)
-		if err != nil {
-			coverErr = errors.Join(errScreenshotImageNotFound, err)
-			return coverErr
-		}
-		dest, ok := img.(draw.Image)
-		if !ok {
-			dest = image.NewRGBA(img.Bounds())
-			draw.Copy(dest, image.Pt(0, 0), img, img.Bounds(), draw.Src, nil)
-		}
-		cover = dest
-		return nil
+		_, shot, shotErr = fetchBytes(gctx, coverUrl)
+		return shotErr
 	})
-
-	g.Go(func() error {
-		img, err := fetchImage(log.Ctx(ctx).With().Str("image", "heatmap").Logger().WithContext(ctx), heatmapUrl)
-		if err != nil {
-			heatmapErr = errors.Join(errHeatmapImageNotFound, err)
-			return heatmapErr
-		}
-		heatmap = img
-		return nil
-	})
-
+	if heatmapUrl != "" {
+		g.Go(func() error {
+			_, b, err := fetchBytes(gctx, heatmapUrl)
+			if err != nil {
+				// No heatmap: the plain screenshot is served instead.
+				log.Ctx(ctx).Debug().Err(err).Msg("Heatmap unavailable")
+				return nil
+			}
+			heat = b
+			return nil
+		})
+	}
 	_ = g.Wait()
-
-	if coverErr != nil {
-		return nil, coverErr
-	}
-	if heatmapErr != nil {
-		// No heatmap available: serve the plain screenshot instead.
-		return cover, nil
+	if shotErr != nil {
+		return nil, fmt.Errorf("screenshot: %w", shotErr)
 	}
 
-	return overlay(cover, heatmap), nil
+	key := coverbadge.CacheKey(sceneId, badges, shot, heat)
+	if b, ok := coverbadge.Rendered.Get(key); ok {
+		log.Ctx(ctx).Trace().Msg("Rendered cover from cache")
+		return b, nil
+	}
+
+	cover, err := composeCover(ctx, shot, heat, badges)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, cover, &jpeg.Options{Quality: coverJPEGQuality}); err != nil {
+		return nil, fmt.Errorf("encode cover: %w", err)
+	}
+	coverbadge.Rendered.Add(key, buf.Bytes())
+	return buf.Bytes(), nil
+}
+
+// composeCover decodes the screenshot, overlays the heatmap when heat is
+// set and decodes, and draws the badges.
+func composeCover(ctx context.Context, shot, heat []byte, badges []coverbadge.Badge) (image.Image, error) {
+	img, format, err := image.Decode(bytes.NewReader(shot))
+	if err != nil {
+		return nil, fmt.Errorf("decode screenshot: %w", err)
+	}
+	log.Ctx(ctx).Trace().Str("format", format).Msg("Decoded screenshot")
+	if heat != nil {
+		if heatmap, _, err := image.Decode(bytes.NewReader(heat)); err != nil {
+			log.Ctx(ctx).Debug().Err(err).Msg("Undecodable heatmap, leaving it out")
+		} else {
+			dest, ok := img.(draw.Image)
+			if !ok {
+				dest = image.NewRGBA(img.Bounds())
+				draw.Copy(dest, img.Bounds().Min, img, img.Bounds(), draw.Src, nil)
+			}
+			img = overlay(dest, heatmap)
+		}
+	}
+	return coverbadge.Draw(img, badges), nil
 }
 
 func overlay(dest draw.Image, heatmap image.Image) image.Image {

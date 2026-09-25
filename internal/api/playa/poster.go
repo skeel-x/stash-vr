@@ -1,14 +1,17 @@
 package playa
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"image"
-	_ "image/jpeg"
+	"image/jpeg"
 	_ "image/png"
 	"net/http"
+	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/api/heatmap"
+	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
 	"time"
@@ -21,7 +24,11 @@ var errPosterNotFound = errors.New("poster not found")
 // posterClient bounds the plain (non-heatmap) poster fetch from Stash.
 var posterClient = &http.Client{Timeout: 15 * time.Second}
 
-func buildPosterImage(ctx context.Context, vd *library.VideoData) (image.Image, error) {
+// buildPoster returns the scene's poster as JPEG. Interactive scenes get
+// the heatmap and scenes with cover badges get the badges, rendered and
+// cached the same way as /cover; other screenshots are re-encoded as
+// they are.
+func buildPoster(ctx context.Context, vd *library.VideoData) ([]byte, error) {
 	if vd == nil || vd.SceneParts == nil || vd.SceneParts.Paths == nil {
 		return nil, errPosterNotFound
 	}
@@ -29,20 +36,25 @@ func buildPosterImage(ctx context.Context, vd *library.VideoData) (image.Image, 
 	if paths.Screenshot == nil || *paths.Screenshot == "" {
 		return nil, errPosterNotFound
 	}
+	cfg := config.Application()
+	badges := coverbadge.ForScene(vd, cfg.CoverBadges, cfg.VideoRules)
+	heatmapURL := ""
 	if vd.SceneParts.Interactive && paths.Interactive_heatmap != nil && *paths.Interactive_heatmap != "" {
-		return buildHeatmapPoster(ctx, *paths.Screenshot, *paths.Interactive_heatmap)
+		heatmapURL = stash.ApiKeyed(*paths.Interactive_heatmap)
 	}
-	return fetchPosterImage(ctx, stash.ApiKeyed(*paths.Screenshot))
-}
-
-func buildHeatmapPoster(ctx context.Context, screenshotURL string, heatmapURL string) (image.Image, error) {
-	coverURL := stash.ApiKeyed(screenshotURL)
-	mapURL := stash.ApiKeyed(heatmapURL)
-	poster, err := heatmapBuildCover(ctx, coverURL, mapURL)
+	if heatmapURL != "" || len(badges) > 0 {
+		b, err := heatmap.RenderCover(ctx, vd.Id(), stash.ApiKeyed(*paths.Screenshot), heatmapURL, badges)
+		return b, mapPosterError(err)
+	}
+	poster, err := fetchPosterImage(ctx, stash.ApiKeyed(*paths.Screenshot))
 	if err != nil {
-		return nil, mapPosterError(err)
+		return nil, err
 	}
-	return poster, nil
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, poster, nil); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func fetchPosterImage(ctx context.Context, fileURL string) (image.Image, error) {
@@ -81,8 +93,4 @@ func mapPosterError(err error) error {
 		return errPosterNotFound
 	}
 	return err
-}
-
-func heatmapBuildCover(ctx context.Context, coverURL string, heatmapURL string) (image.Image, error) {
-	return heatmap.BuildCover(ctx, coverURL, heatmapURL)
 }
