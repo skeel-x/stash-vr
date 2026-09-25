@@ -120,6 +120,8 @@ type coverBadgesInput struct {
 	Quality     *bool `json:"quality"`
 	Format      *bool `json:"format"`
 	Passthrough *bool `json:"passthrough"`
+	Duration    *bool `json:"duration"`
+	FrameRate   *bool `json:"framerate"`
 }
 
 // apply copies the badges in names onto b.
@@ -135,6 +137,12 @@ func (in *coverBadgesInput) apply(b *config.CoverBadges) {
 	}
 	if in.Passthrough != nil {
 		b.Passthrough = *in.Passthrough
+	}
+	if in.Duration != nil {
+		b.Duration = *in.Duration
+	}
+	if in.FrameRate != nil {
+		b.FrameRate = *in.FrameRate
 	}
 }
 

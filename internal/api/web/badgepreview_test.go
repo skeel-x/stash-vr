@@ -91,7 +91,7 @@ func (s *previewStash) MakeRequest(_ context.Context, req *graphql.Request, resp
 			for _, n := range sc.tags {
 				tags = append(tags, fmt.Sprintf(`{"id":%q,"name":%q,"sort_name":"","aliases":[],"parents":[]}`, n, n))
 			}
-			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"Scene %d / ÅÄÖ","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","width":8192,"height":4096,"video_codec":"hevc"}],"tags":[%s],"interactive":false,"paths":{"screenshot":"%s%s","stream":"%s/stream"}}`, id, id, strings.Join(tags, ","), s.base, sc.shot, s.base))
+			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"Scene %d / ÅÄÖ","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":2520,"frame_rate":59.94,"path":"/s.mp4","width":8192,"height":4096,"video_codec":"hevc"}],"tags":[%s],"interactive":false,"paths":{"screenshot":"%s%s","stream":"%s/stream"}}`, id, id, strings.Join(tags, ","), s.base, sc.shot, s.base))
 		}
 		payload = `{"findScenes":{"scenes":[` + strings.Join(scenes, ",") + `]}}`
 	}
@@ -375,9 +375,38 @@ func TestSetup_RendersBadgePreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"#badge-preview-img", "#badge-preview-scene", "#badge-preview-show", "/badge-preview?", "X-Scene-Title"} {
+	for _, want := range []string{"#badge-preview-img", "#badge-preview-scene", "#badge-preview-show", "/badge-preview?", "X-Scene-Title", "'duration', 'framerate'", "form.cover_badge_duration.checked", "form.cover_badge_framerate.checked"} {
 		if !strings.Contains(string(js), want) {
 			t.Errorf("app.js does not wire %s", want)
 		}
+	}
+}
+
+func TestPreviewFlags_DurationAndFrameRate(t *testing.T) {
+	on, err := previewFlags(url.Values{"duration": {"1"}, "framerate": {"1"}, "quality": {"0"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if on != (config.CoverBadges{Duration: true, FrameRate: true}) {
+		t.Fatalf("expected duration and frame rate on, got %+v", on)
+	}
+	for _, name := range []string{"duration", "framerate"} {
+		if _, err := previewFlags(url.Values{name: {"maybe"}}); err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s: expected an error naming it, got %v", name, err)
+		}
+	}
+}
+
+func TestBadgePreview_DrawsDurationAndFrameRate(t *testing.T) {
+	h, _ := previewEnv(t, allPreviewTags, config.CoverBadges{})
+
+	img := previewImage(t, preview(h, "scene=23&duration=1&framerate=1"))
+
+	if !bottomLeftHas(img, coverbadge.Neutral) {
+		t.Fatal("expected the neutral duration and frame rate badges")
+	}
+	img = previewImage(t, preview(h, "scene=23&duration=0&framerate=0"))
+	if bottomLeftHas(img, coverbadge.Neutral) {
+		t.Fatal("expected no badges with both off")
 	}
 }

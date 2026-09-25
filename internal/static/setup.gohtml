@@ -58,6 +58,8 @@
   <label class="check"><input name="cover_badge_quality" type="checkbox" {{if .Config.CoverBadges.Quality}}checked{{end}}> Quality: the vrQualityTags tier (8K, 7K, 6K HBR), else the file resolution</label>
   <label class="check"><input name="cover_badge_format" type="checkbox" {{if .Config.CoverBadges.Format}}checked{{end}}> Format: the projection from the video rules (180, 360, FISHEYE, FLAT 3D)</label>
   <label class="check"><input name="cover_badge_passthrough" type="checkbox" {{if .Config.CoverBadges.Passthrough}}checked{{end}}> Passthrough: AR on scenes with an alpha matte or a chroma key</label>
+  <label class="check"><input name="cover_badge_duration" type="checkbox" {{if .Config.CoverBadges.Duration}}checked{{end}}> Duration: the running time of the file (42 min, 1 h 05)</label>
+  <label class="check"><input name="cover_badge_framerate" type="checkbox" {{if .Config.CoverBadges.FrameRate}}checked{{end}}> Frame rate: the rounded frame rate of the file (60 fps)</label>
   <div class="badge-preview" id="badge-preview">
     <p class="lead">Preview with the boxes as ticked above, before saving. Uses the saved video rules.</p>
     <img id="badge-preview-img" alt="A scene cover with the badges as ticked above" hidden>

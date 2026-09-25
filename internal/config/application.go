@@ -32,6 +32,8 @@ const (
 	envKeyCoverBadgeQuality  = "COVER_BADGE_QUALITY"
 	envKeyCoverBadgeFormat   = "COVER_BADGE_FORMAT"
 	envKeyCoverBadgePass     = "COVER_BADGE_PASSTHROUGH"
+	envKeyCoverBadgeDuration = "COVER_BADGE_DURATION"
+	envKeyCoverBadgeRate     = "COVER_BADGE_FRAMERATE"
 )
 
 type ApplicationConfig struct {
@@ -134,6 +136,12 @@ func Init() error {
 	pflag.Bool(envKeyCoverBadgePass, true, "Draw an AR badge onto covers of passthrough scenes")
 	_ = viper.BindPFlag(envKeyCoverBadgePass, pflag.Lookup(envKeyCoverBadgePass))
 
+	pflag.Bool(envKeyCoverBadgeDuration, true, "Draw the running time onto scene covers")
+	_ = viper.BindPFlag(envKeyCoverBadgeDuration, pflag.Lookup(envKeyCoverBadgeDuration))
+
+	pflag.Bool(envKeyCoverBadgeRate, true, "Draw the frame rate onto scene covers")
+	_ = viper.BindPFlag(envKeyCoverBadgeRate, pflag.Lookup(envKeyCoverBadgeRate))
+
 	pflag.BoolP("help", "h", false, "Display usage information")
 	_ = viper.BindPFlag("help", pflag.Lookup("help"))
 
@@ -172,6 +180,8 @@ func Init() error {
 			Quality:     viper.GetBool(envKeyCoverBadgeQuality),
 			Format:      viper.GetBool(envKeyCoverBadgeFormat),
 			Passthrough: viper.GetBool(envKeyCoverBadgePass),
+			Duration:    viper.GetBool(envKeyCoverBadgeDuration),
+			FrameRate:   viper.GetBool(envKeyCoverBadgeRate),
 		},
 	}
 

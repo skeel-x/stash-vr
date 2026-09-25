@@ -1,11 +1,12 @@
 // Package coverbadge picks and draws the small labels stash-vr puts onto
-// scene covers: the quality tier or resolution, the projection and a
-// passthrough marker.
+// scene covers: the quality tier or resolution, the projection, a
+// passthrough marker, the running time and the frame rate.
 package coverbadge
 
 import (
 	"fmt"
 	"image/color"
+	"math"
 	"strings"
 
 	"stash-vr/internal/config"
@@ -19,6 +20,8 @@ const (
 	KindQuality     Kind = "quality"
 	KindFormat      Kind = "format"
 	KindPassthrough Kind = "passthrough"
+	KindDuration    Kind = "duration"
+	KindFrameRate   Kind = "framerate"
 )
 
 // Badge is one label drawn onto a cover.
@@ -62,8 +65,9 @@ func TierTags() []string {
 }
 
 // ForScene returns the badges a scene's cover gets under the switches in
-// on, in drawing order: quality, format, passthrough. rules are the video
-// rules the format and passthrough badges resolve through.
+// on, in drawing order: quality, format, passthrough, duration, frame
+// rate. rules are the video rules the format and passthrough badges
+// resolve through.
 func ForScene(vd *library.VideoData, on config.CoverBadges, rules []config.VideoRule) []Badge {
 	if vd == nil || vd.SceneParts == nil || !on.Any() {
 		return nil
@@ -85,7 +89,54 @@ func ForScene(vd *library.VideoData, on config.CoverBadges, rules []config.Video
 			out = append(out, Badge{Kind: KindPassthrough, Label: "AR", Fill: Accent, Text: White})
 		}
 	}
+	if on.Duration || on.FrameRate {
+		out = append(out, fileBadges(vd, on)...)
+	}
 	return out
+}
+
+// fileBadges are the duration and frame rate badges from the primary
+// file; each is left out when the file does not say.
+func fileBadges(vd *library.VideoData, on config.CoverBadges) []Badge {
+	files := vd.SceneParts.Files
+	if len(files) == 0 || files[0] == nil {
+		return nil
+	}
+	var out []Badge
+	if on.Duration {
+		if label := durationLabel(files[0].Duration); label != "" {
+			out = append(out, Badge{Kind: KindDuration, Label: label, Fill: Neutral, Text: White})
+		}
+	}
+	if on.FrameRate {
+		if label := frameRateLabel(files[0].Frame_rate); label != "" {
+			out = append(out, Badge{Kind: KindFrameRate, Label: label, Fill: Neutral, Text: White})
+		}
+	}
+	return out
+}
+
+// durationLabel is the running time in whole minutes ("42 min", at least
+// "1 min"), or hours and minutes from one hour ("1 h 05"); "" when the
+// duration is unknown.
+func durationLabel(seconds float64) string {
+	if !(seconds > 0) || math.IsInf(seconds, 0) {
+		return ""
+	}
+	minutes := max(1, int(math.Round(seconds/60)))
+	if minutes < 60 {
+		return fmt.Sprintf("%d min", minutes)
+	}
+	return fmt.Sprintf("%d h %02d", minutes/60, minutes%60)
+}
+
+// frameRateLabel is the frame rate rounded to whole frames ("60 fps" for
+// 59.94); "" when it is unknown.
+func frameRateLabel(fps float64) string {
+	if !(fps > 0) || math.IsInf(fps, 0) {
+		return ""
+	}
+	return fmt.Sprintf("%d fps", int(math.Round(fps)))
 }
 
 func qualityBadge(vd *library.VideoData) (Badge, bool) {

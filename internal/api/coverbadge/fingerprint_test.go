@@ -61,3 +61,21 @@ func TestFingerprint_CarriesTheLayoutVersion(t *testing.T) {
 		t.Fatal("badges moved to the bottom left corner in layout 2")
 	}
 }
+
+func TestFingerprint_DurationAndFrameRate(t *testing.T) {
+	rules := config.DefaultVideoRules()
+	base := config.CoverBadges{Quality: true}
+	q := Fingerprint(base, rules)
+
+	withDuration := base
+	withDuration.Duration = true
+	withRate := base
+	withRate.FrameRate = true
+	d, r := Fingerprint(withDuration, rules), Fingerprint(withRate, rules)
+	if d == q || r == q || d == r {
+		t.Fatalf("the duration and frame rate switches must change the fingerprint: %s %s %s", q, d, r)
+	}
+	if Fingerprint(config.CoverBadges{Duration: true}, rules) == "" || Fingerprint(config.CoverBadges{FrameRate: true}, rules) == "" {
+		t.Fatal("either badge alone must give a fingerprint")
+	}
+}

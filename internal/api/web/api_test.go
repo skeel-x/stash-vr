@@ -907,18 +907,18 @@ func TestPutConfig_CoverBadgesAreAdditive(t *testing.T) {
 	}
 
 	body := base()
-	body["cover_badges"] = map[string]any{"format": true, "quality": false}
+	body["cover_badges"] = map[string]any{"format": true, "quality": false, "duration": true, "framerate": false}
 	rec, out := do(t, h, http.MethodPut, "/config", body)
 
 	if rec.Code != 200 {
 		t.Fatalf("expected 200, got %d %s", rec.Code, rec.Body.String())
 	}
-	want := config.CoverBadges{Format: true, Passthrough: true}
+	want := config.CoverBadges{Format: true, Passthrough: true, Duration: true}
 	if got := config.Application().CoverBadges; got != want {
 		t.Fatalf("expected %+v stored, got %+v", want, got)
 	}
 	view, _ := out["cover_badges"].(map[string]any)
-	if view["quality"] != false || view["format"] != true || view["passthrough"] != true {
+	if view["quality"] != false || view["format"] != true || view["passthrough"] != true || view["duration"] != true || view["framerate"] != false {
 		t.Fatalf("expected the badges echoed back, got %v", out["cover_badges"])
 	}
 	data, _ := os.ReadFile(config.FilePath(config.Application()))

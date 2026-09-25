@@ -4101,6 +4101,7 @@ func (v *ScenePartsCaptionsVideoCaption) GetLanguage_code() string { return v.La
 type ScenePartsFilesVideoFile struct {
 	Basename    string  `json:"basename"`
 	Duration    float64 `json:"duration"`
+	Frame_rate  float64 `json:"frame_rate"`
 	Path        string  `json:"path"`
 	Width       int     `json:"width"`
 	Height      int     `json:"height"`
@@ -4112,6 +4113,9 @@ func (v *ScenePartsFilesVideoFile) GetBasename() string { return v.Basename }
 
 // GetDuration returns ScenePartsFilesVideoFile.Duration, and is useful for accessing the field via an interface.
 func (v *ScenePartsFilesVideoFile) GetDuration() float64 { return v.Duration }
+
+// GetFrame_rate returns ScenePartsFilesVideoFile.Frame_rate, and is useful for accessing the field via an interface.
+func (v *ScenePartsFilesVideoFile) GetFrame_rate() float64 { return v.Frame_rate }
 
 // GetPath returns ScenePartsFilesVideoFile.Path, and is useful for accessing the field via an interface.
 func (v *ScenePartsFilesVideoFile) GetPath() string { return v.Path }
@@ -6149,6 +6153,7 @@ fragment SceneParts on Scene {
 	files {
 		basename
 		duration
+		frame_rate
 		path
 		width
 		height

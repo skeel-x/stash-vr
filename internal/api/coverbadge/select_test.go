@@ -179,3 +179,82 @@ func TestTierTags(t *testing.T) {
 		t.Fatal("TierTags must return a copy")
 	}
 }
+
+// timed returns an 8K scene whose primary file has the given duration in
+// seconds and frame rate.
+func timed(duration, fps float64, tagNames ...string) *library.VideoData {
+	vd := scene(8192, 4096, tagNames...)
+	vd.SceneParts.Files[0].Duration = duration
+	vd.SceneParts.Files[0].Frame_rate = fps
+	return vd
+}
+
+func TestForScene_Duration(t *testing.T) {
+	on := config.CoverBadges{Duration: true}
+	for _, c := range []struct {
+		seconds float64
+		want    []string
+	}{
+		{2520, []string{"42 min"}},
+		{2549, []string{"42 min"}},
+		{20, []string{"1 min"}},
+		{3599, []string{"1 h 00"}},
+		{3900, []string{"1 h 05"}},
+		{2*3600 + 30*60, []string{"2 h 30"}},
+		{0, nil},
+		{-5, nil},
+	} {
+		got := ForScene(timed(c.seconds, 0), on, nil)
+		if !equal(labels(got), c.want) {
+			t.Errorf("%v s: got %v, want %v", c.seconds, labels(got), c.want)
+		}
+		if len(got) == 1 && (got[0].Kind != KindDuration || got[0].Fill != Neutral || got[0].Text != White) {
+			t.Errorf("%v s: expected a neutral duration badge, got %+v", c.seconds, got[0])
+		}
+	}
+}
+
+func TestForScene_FrameRate(t *testing.T) {
+	on := config.CoverBadges{FrameRate: true}
+	for _, c := range []struct {
+		fps  float64
+		want []string
+	}{
+		{59.94, []string{"60 fps"}},
+		{29.97, []string{"30 fps"}},
+		{23.976, []string{"24 fps"}},
+		{90, []string{"90 fps"}},
+		{0, nil},
+	} {
+		got := ForScene(timed(60, c.fps), on, nil)
+		if !equal(labels(got), c.want) {
+			t.Errorf("%v fps: got %v, want %v", c.fps, labels(got), c.want)
+		}
+		if len(got) == 1 && (got[0].Kind != KindFrameRate || got[0].Fill != Neutral || got[0].Text != White) {
+			t.Errorf("%v fps: expected a neutral frame rate badge, got %+v", c.fps, got[0])
+		}
+	}
+}
+
+func TestForScene_DurationAndFrameRateNeedAFile(t *testing.T) {
+	on := config.CoverBadges{Duration: true, FrameRate: true}
+	if got := ForScene(scene(0, 0), on, nil); len(got) != 0 {
+		t.Fatalf("a scene without files gets neither badge, got %v", labels(got))
+	}
+	vd := scene(0, 0)
+	vd.SceneParts.Files = []*gql.ScenePartsFilesVideoFile{nil}
+	if got := ForScene(vd, on, nil); len(got) != 0 {
+		t.Fatalf("a nil file gets neither badge, got %v", labels(got))
+	}
+}
+
+func TestForScene_AllFiveInOrder(t *testing.T) {
+	rules := config.DefaultVideoRules()
+	on := config.CoverBadges{Quality: true, Format: true, Passthrough: true, Duration: true, FrameRate: true}
+
+	got := labels(ForScene(timed(2520, 59.94, "8K", "DOME", "Alpha"), on, rules))
+
+	if !equal(got, []string{"8K", "180", "AR", "42 min", "60 fps"}) {
+		t.Fatalf("expected quality, format, AR, duration, frame rate, got %v", got)
+	}
+}

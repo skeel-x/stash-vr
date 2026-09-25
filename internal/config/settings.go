@@ -41,16 +41,19 @@ func validateFilters(filters []Filter) error {
 }
 
 // CoverBadges switches the labels drawn onto scene covers: the quality
-// tier or resolution, the projection, and a passthrough (AR) marker.
+// tier or resolution, the projection, a passthrough (AR) marker, the
+// running time and the frame rate.
 type CoverBadges struct {
 	Quality     bool `json:"quality"`
 	Format      bool `json:"format"`
 	Passthrough bool `json:"passthrough"`
+	Duration    bool `json:"duration"`
+	FrameRate   bool `json:"framerate"`
 }
 
 // Any reports whether at least one badge is switched on.
 func (b CoverBadges) Any() bool {
-	return b.Quality || b.Format || b.Passthrough
+	return b.Quality || b.Format || b.Passthrough || b.Duration || b.FrameRate
 }
 
 // coverBadgesFile is CoverBadges as persisted; a missing key keeps the seed.
@@ -58,6 +61,8 @@ type coverBadgesFile struct {
 	Quality     *bool `json:"quality,omitempty"`
 	Format      *bool `json:"format,omitempty"`
 	Passthrough *bool `json:"passthrough,omitempty"`
+	Duration    *bool `json:"duration,omitempty"`
+	FrameRate   *bool `json:"framerate,omitempty"`
 }
 
 // VideoRule maps a Stash tag to player format settings. Rules apply in
@@ -502,6 +507,12 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 		if b.Passthrough != nil {
 			base.CoverBadges.Passthrough = *b.Passthrough
 		}
+		if b.Duration != nil {
+			base.CoverBadges.Duration = *b.Duration
+		}
+		if b.FrameRate != nil {
+			base.CoverBadges.FrameRate = *b.FrameRate
+		}
 	}
 	if fc.Filters != nil {
 		base.Filters = fc.Filters
@@ -617,6 +628,8 @@ func write(path string, c ApplicationConfig) error {
 			Quality:     &c.CoverBadges.Quality,
 			Format:      &c.CoverBadges.Format,
 			Passthrough: &c.CoverBadges.Passthrough,
+			Duration:    &c.CoverBadges.Duration,
+			FrameRate:   &c.CoverBadges.FrameRate,
 		},
 		Filters:    c.Filters,
 		VideoRules: c.VideoRules,

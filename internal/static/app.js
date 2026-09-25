@@ -106,6 +106,8 @@
         quality: form.cover_badge_quality.checked,
         format: form.cover_badge_format.checked,
         passthrough: form.cover_badge_passthrough.checked,
+        duration: form.cover_badge_duration.checked,
+        framerate: form.cover_badge_framerate.checked,
       },
     });
     $('#test').addEventListener('click', async () => {
@@ -335,7 +337,7 @@
     const sceneInput = $('#badge-preview-scene');
     const previewMsg = $('#badge-preview-msg');
     const previewTitle = $('#badge-preview-title');
-    const boxes = ['quality', 'format', 'passthrough'].map((k) => [k, document.querySelector('input[name="cover_badge_' + k + '"]')]);
+    const boxes = ['quality', 'format', 'passthrough', 'duration', 'framerate'].map((k) => [k, document.querySelector('input[name="cover_badge_' + k + '"]')]);
     let seq = 0;
     let objectUrl = '';
     const show = async () => {

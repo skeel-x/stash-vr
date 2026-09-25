@@ -62,8 +62,9 @@ func (c *previewSceneCache) get(key string, load func() (string, error)) (string
 }
 
 // badgePreview renders a scene's cover with the badges switched on in the
-// query (quality, format, passthrough) instead of the saved settings, so
-// the Setup page can show them before they are saved. scene picks the
+// query (quality, format, passthrough, duration, framerate) instead of
+// the saved settings, so the Setup page can show them before they are
+// saved. scene picks the
 // scene; without it a scene with a tier tag, and an Alpha tag if there is
 // one, is chosen. The response is never cached and the cover is not kept
 // in the rendered cover cache. The scene id and its percent-encoded title
@@ -135,14 +136,17 @@ func (h *apiHandler) badgePreview(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// previewFlags reads the quality, format and passthrough switches; a
-// missing one is off.
+// previewFlags reads the quality, format, passthrough, duration and
+// framerate switches; a missing one is off.
 func previewFlags(q url.Values) (config.CoverBadges, error) {
 	var on config.CoverBadges
 	for _, f := range []struct {
 		name string
 		dst  *bool
-	}{{"quality", &on.Quality}, {"format", &on.Format}, {"passthrough", &on.Passthrough}} {
+	}{
+		{"quality", &on.Quality}, {"format", &on.Format}, {"passthrough", &on.Passthrough},
+		{"duration", &on.Duration}, {"framerate", &on.FrameRate},
+	} {
 		v := q.Get(f.name)
 		if v == "" {
 			continue

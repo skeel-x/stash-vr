@@ -75,7 +75,7 @@ Run it with `-h` to list all options. `config.json` is written to a `config` dir
 |---|---|---|---|
 | Browse sections (saved filters, smart and auto sections) | yes | yes | yes, as categories |
 | Covers (WebP/GIF converted), heatmaps for interactive scenes | yes | yes | yes |
-| Cover badges: quality, format, AR | yes | yes | yes |
+| Cover badges: quality, format, AR, duration, frame rate | yes | yes | yes |
 | Direct and transcoded streams | yes | yes | yes, incl. HLS |
 | Video rules: projection, stereo, lens, FOV | yes | yes | projection and stereo |
 | Passthrough (alpha-packed), eye swap, screen profiles | yes | no (force mono shows as stereo off) | no |
@@ -193,9 +193,9 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `FUNSCRIPT_INDEX_PATH`
   * Default: empty (off)
   * Absolute path to the timestampTrade plugin's `funscript_index.sqlite`; scripts it lists for a scene are offered as alternates in HereSphere. Runtime name: `funscript_index_path`.
-* `COVER_BADGE_QUALITY`, `COVER_BADGE_FORMAT`, `COVER_BADGE_PASSTHROUGH`
-  * Default: `true`, `false`, `true`
-  * Draw the quality, format and passthrough [cover badges](#cover-badges). Runtime name: `cover_badges`, an object with the booleans `quality`, `format` and `passthrough`.
+* `COVER_BADGE_QUALITY`, `COVER_BADGE_FORMAT`, `COVER_BADGE_PASSTHROUGH`, `COVER_BADGE_DURATION`, `COVER_BADGE_FRAMERATE`
+  * Default: `true`, `false`, `true`, `true`, `true`
+  * Draw the quality, format, passthrough, duration and frame rate [cover badges](#cover-badges). Runtime name: `cover_badges`, an object with the booleans `quality`, `format`, `passthrough`, `duration` and `framerate`.
 * `video_rules`
   * File only, edited on the Setup page. The ordered tag-to-format rules table. "Reset to defaults" on the Setup page restores the default rules.
 
@@ -222,6 +222,15 @@ switched on or off under Cover badges on the Setup page:
   example `FISHEYE 200`) or `FLAT 3D`. Flat 2D scenes get no label.
 * **Passthrough** (on by default): `AR` on scenes whose rules turn on
   passthrough (an alpha matte) or a chroma-key mask.
+* **Duration** (on by default): the running time of the scene's first
+  file, in minutes below an hour (`42 min`) and in hours and minutes from
+  one hour (`1 h 05`), in grey.
+* **Frame rate** (on by default): the frame rate of the first file,
+  rounded to whole frames (`60 fps` for 59.94, `30 fps` for 29.97), in
+  grey. Left out when Stash does not know it.
+
+Badges are drawn in that order, left to right; those that do not fit the
+cover width are left out.
 
 Badges are 7% of the cover height (at least 18 px), inset by 2% of the
 cover width, and sit just above the heatmap strip of interactive scenes. Covers with badges are re-encoded as

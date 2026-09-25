@@ -729,3 +729,38 @@ func TestCoverBadges_Any(t *testing.T) {
 		}
 	}
 }
+
+func TestCoverBadges_AnyCountsDurationAndFrameRate(t *testing.T) {
+	if (CoverBadges{}).Any() {
+		t.Fatal("no badge on must not count")
+	}
+	if !(CoverBadges{Duration: true}).Any() || !(CoverBadges{FrameRate: true}).Any() {
+		t.Fatal("the duration or frame rate badge alone must count")
+	}
+}
+
+func TestLoad_DurationAndFrameRateBadgesSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+	seed.CoverBadges = CoverBadges{Duration: true, FrameRate: true}
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"duration": true`) || !strings.Contains(string(data), `"framerate": true`) {
+		t.Fatalf("expected both badges persisted, got %s", data)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"cover_badges":{"duration":false}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := Application().CoverBadges; got.Duration || !got.FrameRate {
+		t.Fatalf("expected duration off from the file and frame rate kept from the seed, got %+v", got)
+	}
+}

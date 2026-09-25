@@ -53,7 +53,7 @@ func Fingerprint(on config.CoverBadges, rules []config.VideoRule) string {
 // format or passthrough badge is on, the rules.
 func fingerprint(on config.CoverBadges, rules []config.VideoRule, layout int) string {
 	h := fnv.New32a()
-	_, _ = fmt.Fprintf(h, "l%d q%t f%t p%t", layout, on.Quality, on.Format, on.Passthrough)
+	_, _ = fmt.Fprintf(h, "l%d q%t f%t p%t d%t r%t", layout, on.Quality, on.Format, on.Passthrough, on.Duration, on.FrameRate)
 	if on.Format || on.Passthrough {
 		b, _ := json.Marshal(rules)
 		_, _ = h.Write(b)

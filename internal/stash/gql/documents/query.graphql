@@ -275,6 +275,7 @@ fragment SceneParts on Scene {
   files {
     basename
     duration
+    frame_rate
     path
     width
     height
