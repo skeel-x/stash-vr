@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
 	"stash-vr/internal/config"
+	"stash-vr/internal/static"
 )
 
 // inspectStash answers FindScenes with the requested scenes that exist,
@@ -203,5 +205,41 @@ func TestInspect_ErrorsAndUnknown(t *testing.T) {
 	stash.findErr = errors.New("stash down")
 	if code, _ := get("11649"); code != http.StatusBadGateway {
 		t.Fatalf("stash error: %d", code)
+	}
+}
+
+func TestInspect_StudioProfile(t *testing.T) {
+	stash := &inspectStash{scenes: map[int]string{
+		30: `"title":"Tuned","studio":{"id":"s1","name":"One"},` + tagsJson("MKX200"),
+		31: `"title":"Same lens","studio":{"id":"s1","name":"One"},` + tagsJson("MKX200"),
+		32: `"title":"Other lens","studio":{"id":"s1","name":"One"},` + tagsJson("DOME"),
+	}}
+	lib, h := newEnv(t, &stash.fakeStash)
+	lib.SetStashClient(stash)
+	if err := lib.SaveProfile("30", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Application()
+	cfg.VideoRules = config.DefaultVideoRules()
+	cfg.LearnStudioProfiles = true
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	_, out := do(t, h, http.MethodGet, "/inspect?q=31", nil)
+	if p := scenesOf(t, out)[0]["profile"].(map[string]any); p["source"] != "studio" || p["scene"] != "30" || p["link"] != "http://example.com/hsp/scene/30" {
+		t.Fatalf("studio: %v", p)
+	}
+	_, out = do(t, h, http.MethodGet, "/inspect?q=32", nil)
+	if p := scenesOf(t, out)[0]["profile"].(map[string]any); p["source"] == "studio" {
+		t.Fatalf("another lens must not inherit: %v", p)
+	}
+
+	js, err := fs.ReadFile(static.Fs, "app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(js), "'studio (from scene ' + s.profile.scene + ')'") {
+		t.Fatal("app.js must label a learned profile as studio (from scene N)")
 	}
 }

@@ -67,28 +67,29 @@ func randomScenes(ctx context.Context, lib *library.Service, baseUrl string, n i
 // ConfigView is the settings as sent to the browser: the API key is replaced
 // by a flag.
 type ConfigView struct {
-	StashGraphQLUrl    string             `json:"stash_graphql_url"`
-	StashApiKeySet     bool               `json:"stash_api_key_set"`
-	FavoriteTag        string             `json:"favorite_tag"`
-	ExcludeSortName    string             `json:"exclude_sort_name"`
-	GenerateSummaryIds bool               `json:"generate_summary_ids"`
-	HeatmapHeightPx    int                `json:"heatmap_height_px"`
-	ForceHTTPS         bool               `json:"force_https"`
-	BasePath           string             `json:"base_path"`
-	DeovrAutoload      bool               `json:"deovr_autoload"`
-	PerformerFacets    bool               `json:"performer_facets"`
-	DateLookup         bool               `json:"date_lookup"`
-	DateWriteback      bool               `json:"date_writeback"`
-	FunscriptIndexPath string             `json:"funscript_index_path"`
-	LogLevel           string             `json:"log_level"`
-	SmartSectionSize   int                `json:"smart_section_size"`
-	AutoStudioMin      int                `json:"auto_studio_min"`
-	AutoPerformerMin   int                `json:"auto_performer_min"`
-	CoverBadges        config.CoverBadges `json:"cover_badges"`
-	ListenAddress      string             `json:"listen_address"`
-	ConfigPath         string             `json:"config_path"`
-	Filters            []config.Filter    `json:"filters"`
-	VideoRules         []config.VideoRule `json:"video_rules"`
+	StashGraphQLUrl     string             `json:"stash_graphql_url"`
+	StashApiKeySet      bool               `json:"stash_api_key_set"`
+	FavoriteTag         string             `json:"favorite_tag"`
+	ExcludeSortName     string             `json:"exclude_sort_name"`
+	GenerateSummaryIds  bool               `json:"generate_summary_ids"`
+	HeatmapHeightPx     int                `json:"heatmap_height_px"`
+	ForceHTTPS          bool               `json:"force_https"`
+	BasePath            string             `json:"base_path"`
+	DeovrAutoload       bool               `json:"deovr_autoload"`
+	PerformerFacets     bool               `json:"performer_facets"`
+	DateLookup          bool               `json:"date_lookup"`
+	DateWriteback       bool               `json:"date_writeback"`
+	FunscriptIndexPath  string             `json:"funscript_index_path"`
+	LogLevel            string             `json:"log_level"`
+	SmartSectionSize    int                `json:"smart_section_size"`
+	AutoStudioMin       int                `json:"auto_studio_min"`
+	AutoPerformerMin    int                `json:"auto_performer_min"`
+	CoverBadges         config.CoverBadges `json:"cover_badges"`
+	LearnStudioProfiles bool               `json:"learn_studio_profiles"`
+	ListenAddress       string             `json:"listen_address"`
+	ConfigPath          string             `json:"config_path"`
+	Filters             []config.Filter    `json:"filters"`
+	VideoRules          []config.VideoRule `json:"video_rules"`
 }
 
 // configInput is what PUT /config accepts. An empty StashApiKey keeps the
@@ -112,6 +113,7 @@ type configInput struct {
 	AutoStudioMin      *int              `json:"auto_studio_min"`
 	AutoPerformerMin   *int              `json:"auto_performer_min"`
 	CoverBadges        *coverBadgesInput `json:"cover_badges"`
+	LearnStudio        *bool             `json:"learn_studio_profiles"`
 }
 
 // coverBadgesInput is the cover_badges object of PUT /config; a missing
@@ -159,28 +161,29 @@ type testResult struct {
 
 func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 	return ConfigView{
-		StashGraphQLUrl:    cfg.StashGraphQLUrl,
-		StashApiKeySet:     cfg.StashApiKey != "",
-		FavoriteTag:        cfg.FavoriteTag,
-		ExcludeSortName:    cfg.ExcludeSortName,
-		GenerateSummaryIds: cfg.GenerateSummaryIds,
-		HeatmapHeightPx:    cfg.HeatmapHeightPx,
-		ForceHTTPS:         cfg.ForceHTTPS,
-		BasePath:           cfg.BasePath,
-		DeovrAutoload:      cfg.DeovrAutoload,
-		PerformerFacets:    cfg.PerformerFacets,
-		DateLookup:         cfg.DateLookup,
-		DateWriteback:      cfg.DateWriteback,
-		FunscriptIndexPath: cfg.FunscriptIndexPath,
-		LogLevel:           cfg.LogLevel,
-		SmartSectionSize:   cfg.SmartSectionSize,
-		AutoStudioMin:      cfg.AutoStudioMin,
-		AutoPerformerMin:   cfg.AutoPerformerMin,
-		CoverBadges:        cfg.CoverBadges,
-		ListenAddress:      cfg.ListenAddress,
-		ConfigPath:         config.FilePath(cfg),
-		Filters:            cfg.Filters,
-		VideoRules:         cfg.VideoRules,
+		StashGraphQLUrl:     cfg.StashGraphQLUrl,
+		StashApiKeySet:      cfg.StashApiKey != "",
+		FavoriteTag:         cfg.FavoriteTag,
+		ExcludeSortName:     cfg.ExcludeSortName,
+		GenerateSummaryIds:  cfg.GenerateSummaryIds,
+		HeatmapHeightPx:     cfg.HeatmapHeightPx,
+		ForceHTTPS:          cfg.ForceHTTPS,
+		BasePath:            cfg.BasePath,
+		DeovrAutoload:       cfg.DeovrAutoload,
+		PerformerFacets:     cfg.PerformerFacets,
+		DateLookup:          cfg.DateLookup,
+		DateWriteback:       cfg.DateWriteback,
+		FunscriptIndexPath:  cfg.FunscriptIndexPath,
+		LogLevel:            cfg.LogLevel,
+		SmartSectionSize:    cfg.SmartSectionSize,
+		AutoStudioMin:       cfg.AutoStudioMin,
+		AutoPerformerMin:    cfg.AutoPerformerMin,
+		CoverBadges:         cfg.CoverBadges,
+		LearnStudioProfiles: cfg.LearnStudioProfiles,
+		ListenAddress:       cfg.ListenAddress,
+		ConfigPath:          config.FilePath(cfg),
+		Filters:             cfg.Filters,
+		VideoRules:          cfg.VideoRules,
 	}
 }
 
@@ -355,6 +358,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 		next.AutoPerformerMin = *in.AutoPerformerMin
 	}
 	in.CoverBadges.apply(&next.CoverBadges)
+	if in.LearnStudio != nil {
+		next.LearnStudioProfiles = *in.LearnStudio
+	}
 
 	// Validate before the host rule so an unusable URL is reported as such
 	// rather than as a missing API key.

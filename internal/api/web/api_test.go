@@ -964,3 +964,23 @@ func TestGetRandom_CoverUrlCarriesBadgeFingerprint(t *testing.T) {
 		t.Fatalf("expected the cover url with a badge fingerprint, got %q", cover)
 	}
 }
+
+func TestPutConfig_LearnStudioProfiles(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"learn_studio_profiles": true,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || !config.Application().LearnStudioProfiles || out["learn_studio_profiles"] != true {
+		t.Fatalf("expected learning switched on and echoed, got %d %v", rec.Code, out["learn_studio_profiles"])
+	}
+	delete(body, "learn_studio_profiles")
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 || !config.Application().LearnStudioProfiles {
+		t.Fatal("expected the setting kept when the field is missing")
+	}
+}

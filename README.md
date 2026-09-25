@@ -10,7 +10,7 @@ This is an extended fork of [o-fl0w/stash-vr](https://github.com/o-fl0w/stash-vr
 
 * **A web UI** - Players page with one-tap links and library status, Sections, Setup (every runtime option, stored in `config.json`) and Log pages.
 * **Video rules** - an ordered table that maps Stash tags to projection, stereo layout, field of view, lens, eye swap, force mono and passthrough, shared by all players, with a scene inspector.
-* **HereSphere profiles** - per-scene screen settings saved from the headset and handed back on any headset, rule profiles and generated profiles.
+* **HereSphere profiles** - per-scene screen settings saved from the headset and handed back on any headset, optionally shared by the scenes of a studio with the same lens, rule profiles and generated profiles.
 * **Passthrough** - alpha-packed and chroma-key masks, passthrough backgrounds.
 * **Funscript variants** - alternate scripts next to the video or from the timestampTrade index show up in HereSphere's script picker.
 * **Watch history** - watched state and resume position tags, resume on any headset.
@@ -196,6 +196,9 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `COVER_BADGE_QUALITY`, `COVER_BADGE_FORMAT`, `COVER_BADGE_PASSTHROUGH`, `COVER_BADGE_DURATION`, `COVER_BADGE_FRAMERATE`
   * Default: `true`, `false`, `true`, `true`, `true`
   * Draw the quality, format, passthrough, duration and frame rate [cover badges](#cover-badges). Runtime name: `cover_badges`, an object with the booleans `quality`, `format`, `passthrough`, `duration` and `framerate`.
+* `LEARN_STUDIO_PROFILES`
+  * Default: `false`
+  * Give a scene without a HereSphere profile of its own the one saved last for a scene of the same studio with the same lens; see [Video rules and profiles](#video-rules-and-profiles). Runtime name: `learn_studio_profiles`.
 * `video_rules`
   * File only, edited on the Setup page. The ordered tag-to-format rules table. "Reset to defaults" on the Setup page restores the default rules.
 
@@ -426,10 +429,27 @@ tuned and saved in the headset. Earlier versions of saved profiles are
 kept in `hsp/history`. Generated profiles carry Stash's resume position
 and last played time, so a scene resumes where it was left on any headset.
 
+Studios tend to shoot a series with the same camera, so one tuned scene
+often fits the rest. With "Use a saved profile for other scenes from the
+same studio with the same lens" ticked under the rules (setting
+`learn_studio_profiles`, off by default), a scene without a profile of its
+own gets the one saved most recently for another scene of the same studio
+with the same lens: the same projection, lens and field of view the rules
+resolve to, so a 180 scene never inherits a fisheye profile. Scenes
+without a studio never inherit. The order is: the scene's own profile,
+then the learned studio profile, then the profile of the scene a rule
+names, then one generated from the rule's settings. The inherited file is
+served as it was saved, so the title and tags inside it belong to the
+scene it was saved for; HereSphere takes a scene's title and tags from
+the library data instead, so that does not show. The pairing of studio
+and lens to scene is worked out once from the stored profiles and kept
+until a new profile is saved, the rules change or the index is rebuilt.
+
 The scene inspector under the rules takes a scene id or part of a title
 and shows, for up to five scenes, which rules match (by position and tag),
 what they resolve to and where the HereSphere profile comes from: the
-scene's own, a rule's saved profile, generated, or none, with its link.
+scene's own, a studio profile ("studio (from scene N)"), a rule's saved
+profile, generated, or none, with its link.
 An id is always looked up; titles are matched against scenes a player has
 already loaded, so the search never queries the whole library.
 

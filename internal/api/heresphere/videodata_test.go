@@ -158,6 +158,21 @@ type fakeProfiles map[string]bool
 
 func (f fakeProfiles) HasProfile(id string) bool { return f[id] }
 
+func (fakeProfiles) StudioProfile(context.Context, *library.VideoData, *library.Format) string {
+	return ""
+}
+
+// learnedProfiles also learns the profile of scene learned for every
+// scene.
+type learnedProfiles struct {
+	fakeProfiles
+	learned string
+}
+
+func (l learnedProfiles) StudioProfile(context.Context, *library.VideoData, *library.Format) string {
+	return l.learned
+}
+
 func TestBuildVideoData_ProfileLinkPrecedence(t *testing.T) {
 	loadDefaultRules(t)
 	cfg := config.Application()
@@ -174,10 +189,12 @@ func TestBuildVideoData_ProfileLinkPrecedence(t *testing.T) {
 	cases := []struct {
 		name     string
 		id       string
-		profiles fakeProfiles
+		profiles profileLookup
 		want     string
 	}{
 		{"own profile wins", "9", fakeProfiles{"9": true, "11649": true}, "https://vr.example/hsp/scene/9"},
+		{"own beats studio", "9", learnedProfiles{fakeProfiles{"9": true, "11649": true, "20": true}, "20"}, "https://vr.example/hsp/scene/9"},
+		{"studio beats rule", "9", learnedProfiles{fakeProfiles{"11649": true, "20": true}, "20"}, "https://vr.example/hsp/scene/20"},
 		{"rule profile", "9", fakeProfiles{"11649": true}, "https://vr.example/hsp/scene/11649"},
 		{"none stored", "9", fakeProfiles{}, ""},
 	}

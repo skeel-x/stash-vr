@@ -79,6 +79,7 @@ func (libraryService *Service) SaveProfile(id string, data []byte) error {
 		_ = os.Remove(tmp.Name())
 		return err
 	}
+	libraryService.studios.saved(id)
 	return nil
 }
 
@@ -149,20 +150,29 @@ func (libraryService *Service) ListProfiles() []string {
 // Where a scene's HereSphere profile comes from.
 const (
 	ProfileOwn       = "own"       // stored for the scene itself
+	ProfileStudio    = "studio"    // learned from a scene of the same studio and lens
 	ProfileRule      = "rule"      // stored for the scene a matching rule names
 	ProfileGenerated = "generated" // generated from the rules' settings
 	ProfileNone      = "none"
 )
 
 // ProfileSourceFor picks the profile for scene id with resolved format f:
-// its own stored profile first, else the stored profile of the scene the
-// rules name, else a generated one when the rules ask for it. scene is the
-// id the profile is stored or served under, empty for none. A nil has
-// means no profile is stored.
-func ProfileSourceFor(id string, f Format, has func(string) bool) (source, scene string) {
-	switch {
-	case has != nil && has(id):
+// its own stored profile first, else the learned studio profile (the
+// scene learned names, see Service.StudioProfile), else the stored
+// profile of the scene the rules name, else a generated one when the
+// rules ask for it. scene is the id the profile is stored or served under,
+// empty for none. A nil has means no profile is stored; learned is only
+// called for a scene without its own profile, and nil means none.
+func ProfileSourceFor(id string, f Format, has func(string) bool, learned func() string) (source, scene string) {
+	if has != nil && has(id) {
 		return ProfileOwn, id
+	}
+	if has != nil && learned != nil {
+		if s := learned(); s != "" {
+			return ProfileStudio, s
+		}
+	}
+	switch {
 	case has != nil && f.ProfileScene != "" && has(f.ProfileScene):
 		return ProfileRule, f.ProfileScene
 	case f.Generated:

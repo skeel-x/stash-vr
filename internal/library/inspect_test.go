@@ -29,25 +29,41 @@ func TestProfileSourceFor_Precedence(t *testing.T) {
 			return false
 		}
 	}
+	studio := func(id string) func() string { return func() string { return id } }
 	cases := []struct {
-		name   string
-		f      Format
-		has    func(string) bool
-		source string
-		scene  string
+		name    string
+		f       Format
+		has     func(string) bool
+		learned func() string
+		source  string
+		scene   string
 	}{
-		{"own", Format{ProfileScene: "42", Generated: true}, has("9", "42"), ProfileOwn, "9"},
-		{"rule", Format{ProfileScene: "42", Generated: true}, has("42"), ProfileRule, "42"},
-		{"rule profile missing falls to generated", Format{ProfileScene: "42", Generated: true}, has(), ProfileGenerated, "9"},
-		{"generated", Format{Generated: true}, has(), ProfileGenerated, "9"},
-		{"none", Format{ProfileScene: "42"}, has(), ProfileNone, ""},
-		{"nil lookup", Format{Generated: true}, nil, ProfileGenerated, "9"},
+		{"own", Format{ProfileScene: "42", Generated: true}, has("9", "42", "7"), studio("7"), ProfileOwn, "9"},
+		{"studio beats rule", Format{ProfileScene: "42", Generated: true}, has("42", "7"), studio("7"), ProfileStudio, "7"},
+		{"studio beats generated", Format{Generated: true}, has("7"), studio("7"), ProfileStudio, "7"},
+		{"no studio profile", Format{ProfileScene: "42", Generated: true}, has("42"), studio(""), ProfileRule, "42"},
+		{"rule", Format{ProfileScene: "42", Generated: true}, has("42"), nil, ProfileRule, "42"},
+		{"rule profile missing falls to generated", Format{ProfileScene: "42", Generated: true}, has(), nil, ProfileGenerated, "9"},
+		{"generated", Format{Generated: true}, has(), nil, ProfileGenerated, "9"},
+		{"none", Format{ProfileScene: "42"}, has(), nil, ProfileNone, ""},
+		{"nil lookup", Format{Generated: true}, nil, nil, ProfileGenerated, "9"},
 	}
 	for _, c := range cases {
-		source, scene := ProfileSourceFor("9", c.f, c.has)
+		source, scene := ProfileSourceFor("9", c.f, c.has, c.learned)
 		if source != c.source || scene != c.scene {
 			t.Errorf("%s: got %s/%s want %s/%s", c.name, source, scene, c.source, c.scene)
 		}
+	}
+}
+
+func TestProfileSourceFor_LooksUpTheStudioProfileOnlyWithoutAnOwn(t *testing.T) {
+	called := false
+	learned := func() string { called = true; return "7" }
+
+	ProfileSourceFor("9", Format{}, func(id string) bool { return id == "9" }, learned)
+
+	if called {
+		t.Fatal("a scene with its own profile must not look up a studio profile")
 	}
 }
 

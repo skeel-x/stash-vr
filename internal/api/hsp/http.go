@@ -1,6 +1,6 @@
 // Package hsp serves HereSphere profiles: the one stored for a scene, else
-// the one captured for its video rule, else one generated from the rules'
-// screen settings.
+// the one learned from its studio and lens, else the one captured for its
+// video rule, else one generated from the rules' screen settings.
 package hsp
 
 import (
@@ -42,9 +42,11 @@ func Handler(libraryService *library.Service, generate Generator) http.HandlerFu
 			return
 		}
 		f := library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
-		source, scene := library.ProfileSourceFor(id, f, libraryService.HasProfile)
+		source, scene := library.ProfileSourceFor(id, f, libraryService.HasProfile, func() string {
+			return libraryService.StudioProfile(ctx, vd, &f)
+		})
 		switch {
-		case source == library.ProfileOwn || source == library.ProfileRule:
+		case source == library.ProfileOwn || source == library.ProfileStudio || source == library.ProfileRule:
 			serveStored(w, r, libraryService.ProfilePath(scene))
 		case source == library.ProfileGenerated && generate != nil:
 			data, err := generate(r, vd, f)

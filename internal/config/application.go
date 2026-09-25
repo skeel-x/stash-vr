@@ -34,6 +34,7 @@ const (
 	envKeyCoverBadgePass     = "COVER_BADGE_PASSTHROUGH"
 	envKeyCoverBadgeDuration = "COVER_BADGE_DURATION"
 	envKeyCoverBadgeRate     = "COVER_BADGE_FRAMERATE"
+	envKeyLearnStudio        = "LEARN_STUDIO_PROFILES"
 )
 
 type ApplicationConfig struct {
@@ -59,8 +60,11 @@ type ApplicationConfig struct {
 	ConfigPath         string
 	GenerateSummaryIds bool
 	CoverBadges        CoverBadges
-	Filters            []Filter
-	VideoRules         []VideoRule
+	// LearnStudioProfiles gives a scene without a HereSphere profile of
+	// its own the newest one saved for a scene of the same studio and lens.
+	LearnStudioProfiles bool
+	Filters             []Filter
+	VideoRules          []VideoRule
 }
 
 func Init() error {
@@ -142,6 +146,9 @@ func Init() error {
 	pflag.Bool(envKeyCoverBadgeRate, true, "Draw the frame rate onto scene covers")
 	_ = viper.BindPFlag(envKeyCoverBadgeRate, pflag.Lookup(envKeyCoverBadgeRate))
 
+	pflag.Bool(envKeyLearnStudio, false, "Use a saved HereSphere profile for other scenes from the same studio with the same lens")
+	_ = viper.BindPFlag(envKeyLearnStudio, pflag.Lookup(envKeyLearnStudio))
+
 	pflag.BoolP("help", "h", false, "Display usage information")
 	_ = viper.BindPFlag("help", pflag.Lookup("help"))
 
@@ -183,6 +190,7 @@ func Init() error {
 			Duration:    viper.GetBool(envKeyCoverBadgeDuration),
 			FrameRate:   viper.GetBool(envKeyCoverBadgeRate),
 		},
+		LearnStudioProfiles: viper.GetBool(envKeyLearnStudio),
 	}
 
 	return Load(seed)

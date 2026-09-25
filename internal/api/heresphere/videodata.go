@@ -70,8 +70,12 @@ type subtitleDto struct {
 	Url      string `json:"url,omitempty"`
 }
 
-// profileLookup answers whether a HereSphere profile is stored for a scene.
-type profileLookup interface{ HasProfile(id string) bool }
+// profileLookup answers whether a HereSphere profile is stored for a
+// scene and which scene's profile it learns from its studio and lens.
+type profileLookup interface {
+	HasProfile(id string) bool
+	StudioProfile(ctx context.Context, vd *library.VideoData, f *library.Format) string
+}
 
 func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, variants []library.ScriptVariant, profiles profileLookup) (*videoDataDto, error) {
 	videoId := vd.Id()
@@ -126,7 +130,7 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 
 	f := library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
 	setFormat(vd, &dto, f)
-	if link := profileLink(baseUrl, videoId, f, profiles); link != "" {
+	if link := profileLink(ctx, baseUrl, vd, f, profiles); link != "" {
 		dto.Hsp = util.Ptr(link)
 	}
 
@@ -220,11 +224,12 @@ func setFormat(vd *library.VideoData, dto *videoDataDto, f library.Format) {
 // profileLink picks the HereSphere profile for the scene (see
 // library.ProfileSourceFor); a generated profile is served under the
 // scene's own id.
-func profileLink(baseUrl, id string, f library.Format, profiles profileLookup) string {
+func profileLink(ctx context.Context, baseUrl string, vd *library.VideoData, f library.Format, profiles profileLookup) string {
 	if profiles == nil {
 		return ""
 	}
-	if _, scene := library.ProfileSourceFor(id, f, profiles.HasProfile); scene != "" {
+	learned := func() string { return profiles.StudioProfile(ctx, vd, &f) }
+	if _, scene := library.ProfileSourceFor(vd.Id(), f, profiles.HasProfile, learned); scene != "" {
 		return baseUrl + "/hsp/scene/" + scene
 	}
 	return ""

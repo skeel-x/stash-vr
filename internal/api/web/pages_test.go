@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 	"stash-vr/internal/config"
 	"stash-vr/internal/logger"
+	"stash-vr/internal/static"
 )
 
 func getPage(t *testing.T, h http.Handler, path string, headers map[string]string) *httptest.ResponseRecorder {
@@ -590,5 +592,33 @@ func TestSetup_RendersCoverBadgeCheckboxes(t *testing.T) {
 	rules := strings.Index(body, "<h2>Video rules</h2>")
 	if players < 0 || badges < players || badges > rules {
 		t.Fatal("the cover badge checkboxes belong to the Players group")
+	}
+}
+
+func TestSetup_RendersLearnStudioProfilesCheckbox(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.LearnStudioProfiles = true
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+
+	box := strings.Index(body, `<input name="learn_studio_profiles" type="checkbox" checked>`)
+	rules := strings.Index(body, "<h2>Video rules</h2>")
+	inspector := strings.Index(body, "<h3>Scene inspector</h3>")
+	if box < 0 || box < rules || box > inspector {
+		t.Fatal("the learn studio profiles checkbox belongs to the video rules area")
+	}
+	if !strings.Contains(body, "Use a saved profile for other scenes from the same studio with the same lens") {
+		t.Fatal("missing the checkbox label")
+	}
+	js, err := fs.ReadFile(static.Fs, "app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(js), "learn_studio_profiles: form.learn_studio_profiles.checked") {
+		t.Fatal("app.js must save the checkbox")
 	}
 }

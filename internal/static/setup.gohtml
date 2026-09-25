@@ -93,6 +93,8 @@
     <button type="button" id="reset-rules">Reset to defaults</button>
     <span class="msg" id="rules-msg"></span>
   </div>
+  <label class="check"><input name="learn_studio_profiles" type="checkbox" {{if .Config.LearnStudioProfiles}}checked{{end}}> Use a saved profile for other scenes from the same studio with the same lens</label>
+  <p class="lead">A scene without a profile of its own then gets the one saved last for a scene of its studio with the same projection, lens and field of view, before a rule's profile. Saved with Save changes.</p>
 
   <h3>Scene inspector</h3>
   <p class="lead">See which rules a scene matches, what they resolve to and where its HereSphere profile comes from. Uses the saved rules. Titles are searched among scenes a player has already loaded; an id always works.</p>

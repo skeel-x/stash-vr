@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -82,7 +83,7 @@ func viewFormat(f *library.Format) formatView {
 }
 
 // inspectScene resolves the rules for vd the way the players do.
-func (h *apiHandler) inspectScene(vd *library.VideoData, rules []config.VideoRule, baseUrl, stashUrl string) inspectedScene {
+func (h *apiHandler) inspectScene(ctx context.Context, vd *library.VideoData, rules []config.VideoRule, baseUrl, stashUrl string) inspectedScene {
 	id := vd.Id()
 	out := inspectedScene{ID: id, Title: vd.Title(), Stash: StashSceneUrl(stashUrl, id), Matched: []matchedRule{}}
 	for _, i := range library.MatchingRules(rules, vd.SceneParts.Tags) {
@@ -90,7 +91,9 @@ func (h *apiHandler) inspectScene(vd *library.VideoData, rules []config.VideoRul
 	}
 	f := library.ResolveFormat(rules, vd.SceneParts.Tags)
 	out.Format = viewFormat(&f)
-	source, scene := library.ProfileSourceFor(id, f, h.lib.HasProfile)
+	source, scene := library.ProfileSourceFor(id, f, h.lib.HasProfile, func() string {
+		return h.lib.StudioProfile(ctx, vd, &f)
+	})
 	out.Profile = profileSource{Source: source, Scene: scene}
 	if scene != "" {
 		out.Profile.Link = baseUrl + "/hsp/scene/" + scene
@@ -132,7 +135,7 @@ func (h *apiHandler) inspect(w http.ResponseWriter, r *http.Request) {
 	baseUrl := internal.GetBaseUrl(r)
 	out := make([]inspectedScene, 0, len(found))
 	for _, vd := range found {
-		out = append(out, h.inspectScene(vd, cfg.VideoRules, baseUrl, cfg.StashGraphQLUrl))
+		out = append(out, h.inspectScene(ctx, vd, cfg.VideoRules, baseUrl, cfg.StashGraphQLUrl))
 	}
 	writeJson(ctx, w, map[string]any{"scenes": out})
 }

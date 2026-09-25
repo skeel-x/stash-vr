@@ -102,6 +102,7 @@
       smart_section_size: Number(form.smart_section_size.value || 50),
       auto_studio_min: Number(form.auto_studio_min.value || 0),
       auto_performer_min: Number(form.auto_performer_min.value || 0),
+      learn_studio_profiles: form.learn_studio_profiles.checked,
       cover_badges: {
         quality: form.cover_badge_quality.checked,
         format: form.cover_badge_format.checked,
@@ -313,7 +314,8 @@
             tr.insertCell().textContent = describe(s.format);
             const prof = tr.insertCell();
             const label = sources[s.profile.source] || s.profile.source;
-            prof.textContent = s.profile.source === 'rule' ? label + s.profile.scene : label;
+            if (s.profile.source === 'studio') prof.textContent = 'studio (from scene ' + s.profile.scene + ')';
+            else prof.textContent = s.profile.source === 'rule' ? label + s.profile.scene : label;
             if (s.profile.link) {
               const l = el('a', 'link'); l.href = s.profile.link; l.target = '_blank'; l.rel = 'noopener';
               prof.append(' ', l);

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
@@ -19,7 +20,8 @@ import (
 )
 
 // fakeStash answers FindScenes: scene 7 and 9 are tagged Passthrough, 8
-// has no tags, 5 fails, anything else does not exist.
+// has no tags, 11 and 12 are Passthrough scenes of studio s1, 5 fails,
+// anything else does not exist.
 type fakeStash struct{}
 
 func (fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -28,22 +30,27 @@ func (fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *grap
 	}
 	b, _ := json.Marshal(req.Variables)
 	_ = json.Unmarshal(b, &vars)
-	if req.OpName != "FindScenes" || len(vars.Ids) != 1 {
+	if req.OpName != "FindScenes" {
 		return json.Unmarshal([]byte(`{}`), resp.Data)
 	}
-	id := vars.Ids[0]
-	tags := `[]`
-	switch id {
-	case 5:
-		return errors.New("stash is down")
-	case 7, 9:
-		tags = `[{"id":"1","name":"Passthrough","sort_name":"","aliases":[],"parents":[]}]`
-	case 8:
-	default:
-		return json.Unmarshal([]byte(`{"findScenes":{"scenes":[]}}`), resp.Data)
+	const passthrough = `[{"id":"1","name":"Passthrough","sort_name":"","aliases":[],"parents":[]}]`
+	var scenes []string
+	for _, id := range vars.Ids {
+		tags, studio := `[]`, `null`
+		switch id {
+		case 5:
+			return errors.New("stash is down")
+		case 7, 9:
+			tags = passthrough
+		case 11, 12:
+			tags, studio = passthrough, `{"id":"s1","name":"Studio One"}`
+		case 8:
+		default:
+			continue
+		}
+		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"Scene %d","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","height":1080}],"studio":%s,"tags":%s}`, id, id, studio, tags))
 	}
-	payload := fmt.Sprintf(`{"findScenes":{"scenes":[{"id":"%d","title":"Scene %d","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","height":1080}],"tags":%s}]}}`, id, id, tags)
-	return json.Unmarshal([]byte(payload), resp.Data)
+	return json.Unmarshal([]byte(`{"findScenes":{"scenes":[`+strings.Join(scenes, ",")+`]}}`), resp.Data)
 }
 
 func newRouter(t *testing.T, rules ...config.VideoRule) (*library.Service, http.Handler) {
@@ -176,5 +183,33 @@ func TestHandler_GeneratorFailureAndNilGenerator(t *testing.T) {
 	}
 	if rec := get(r, "/none/9"); rec.Code != 404 {
 		t.Fatalf("no generator: got %d", rec.Code)
+	}
+}
+
+func TestHandler_ServesLearnedStudioProfile(t *testing.T) {
+	lib, h := newRouter(t, geometryRules()...)
+	if err := lib.SaveProfile("100", []byte("rule profile")); err != nil {
+		t.Fatal(err)
+	}
+	if err := lib.SaveProfile("11", []byte("studio profile")); err != nil {
+		t.Fatal(err)
+	}
+
+	if rec := get(h, "/hsp/scene/12"); rec.Code != 200 || rec.Body.String() != "rule profile" {
+		t.Fatalf("learning off: expected the rule's profile, got %d %q", rec.Code, rec.Body.String())
+	}
+
+	cfg := config.Application()
+	cfg.LearnStudioProfiles = true
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	rec := get(h, "/hsp/scene/12")
+	if rec.Code != 200 || rec.Body.String() != "studio profile" {
+		t.Fatalf("expected the studio profile of scene 11, got %d %q", rec.Code, rec.Body.String())
+	}
+	checkHeaders(t, rec)
+	if rec := get(h, "/hsp/scene/9"); rec.Body.String() != "rule profile" {
+		t.Fatalf("a scene without a studio keeps the rule's profile, got %q", rec.Body.String())
 	}
 }

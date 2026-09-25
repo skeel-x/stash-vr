@@ -286,6 +286,7 @@ type fileConfig struct {
 	FunscriptIndexPath *string          `json:"funscript_index_path,omitempty"`
 	LogLevel           *string          `json:"log_level,omitempty"`
 	CoverBadges        *coverBadgesFile `json:"cover_badges,omitempty"`
+	LearnStudio        *bool            `json:"learn_studio_profiles,omitempty"`
 	Filters            []Filter         `json:"filters"`
 	VideoRules         []VideoRule      `json:"video_rules"`
 }
@@ -514,6 +515,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 			base.CoverBadges.FrameRate = *b.FrameRate
 		}
 	}
+	if fc.LearnStudio != nil {
+		base.LearnStudioProfiles = *fc.LearnStudio
+	}
 	if fc.Filters != nil {
 		base.Filters = fc.Filters
 	}
@@ -631,8 +635,9 @@ func write(path string, c ApplicationConfig) error {
 			Duration:    &c.CoverBadges.Duration,
 			FrameRate:   &c.CoverBadges.FrameRate,
 		},
-		Filters:    c.Filters,
-		VideoRules: c.VideoRules,
+		LearnStudio: &c.LearnStudioProfiles,
+		Filters:     c.Filters,
+		VideoRules:  c.VideoRules,
 	}
 	if fc.Filters == nil {
 		fc.Filters = []Filter{}

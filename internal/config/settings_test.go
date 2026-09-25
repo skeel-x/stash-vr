@@ -764,3 +764,28 @@ func TestLoad_DurationAndFrameRateBadgesSeedAndFile(t *testing.T) {
 		t.Fatalf("expected duration off from the file and frame rate kept from the seed, got %+v", got)
 	}
 }
+
+func TestLoad_LearnStudioProfilesSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"learn_studio_profiles": false`) {
+		t.Fatalf("expected the setting persisted off, got %s", data)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"learn_studio_profiles":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !Application().LearnStudioProfiles {
+		t.Fatal("expected the file to switch learning on")
+	}
+}

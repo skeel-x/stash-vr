@@ -57,6 +57,9 @@ type Service struct {
 	// now is the clock; tests replace it.
 	now func() time.Time
 
+	// studios is the learned studio profile index; see StudioProfile.
+	studios studioIndex
+
 	// resetHooks run after ResetCaches, so caches kept outside the
 	// library (rendered covers) are dropped with it.
 	muHooks    sync.Mutex
@@ -103,6 +106,7 @@ func (libraryService *Service) ResetCaches() {
 	libraryService.muRec.Unlock()
 
 	libraryService.ResetSections()
+	libraryService.studios.reset()
 
 	libraryService.muHooks.Lock()
 	hooks := slices.Clone(libraryService.resetHooks)
