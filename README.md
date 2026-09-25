@@ -301,7 +301,10 @@ later rules override earlier ones. The defaults react to the tags the
 measures from the file itself: DOME, SPHERE, FISHEYE, MKX200, RF52,
 CUBEMAP, EAC, FLAT, SBS and TB, the MKX220 and VRCA220 lenses (fisheye,
 220 degrees), MONO (stereo mono), RL (right eye first: eye swap), and
-Alpha, which switches passthrough on for alpha-packed videos. Labels that
+Alpha, which switches passthrough on for alpha-packed videos, and Chroma
+Key, which gives chroma-keyed videos a generated HereSphere profile with a
+passthrough background and a chroma-key mask (adjust the key colour in the
+headset and save to keep it). Labels that
 studios or stash-boxes attach (Passthrough, Augmented Reality, 180°, 360°)
 no longer change the format on their own. All three players read the same
 table.

@@ -508,7 +508,7 @@ func TestStatus_CarriesLibraryCounts(t *testing.T) {
 	}
 	_, out := do(t, h, http.MethodGet, "/status", nil)
 	// Of the default rules only RL (eye swap) generates profiles.
-	if out["profiles"] != float64(1) || out["generated_rules"] != float64(1) || out["auto_sections"] != float64(0) {
+	if out["profiles"] != float64(1) || out["generated_rules"] != float64(2) || out["auto_sections"] != float64(0) {
 		t.Fatalf("status %v", out)
 	}
 	dates, ok := out["release_dates"].(map[string]any)

@@ -129,3 +129,13 @@ func TestResolveFormat_EyeSwapAndForceMono(t *testing.T) {
 		t.Fatalf("a later rule turning eye swap off must win: %+v", got)
 	}
 }
+
+func TestResolveFormat_ChromaKeyGeneratesAProfileWithoutAlphaPacking(t *testing.T) {
+	f := ResolveFormat(config.DefaultVideoRules(), tags("FISHEYE", "SBS", "Chroma Key"))
+	if f.Passthrough {
+		t.Fatal("chroma key must not switch on alpha-packed passthrough")
+	}
+	if f.Background != "passthrough" || f.Mask != "chroma" || !f.Generated {
+		t.Fatalf("expected a generated profile with passthrough background and chroma mask, got %+v", f)
+	}
+}

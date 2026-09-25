@@ -150,6 +150,10 @@ func DefaultVideoRules() []VideoRule {
 		{Tag: "MONO", Stereo: "mono"},
 		{Tag: "RL", EyeSwap: &swap},
 		{Tag: "Alpha", Passthrough: true},
+		// Chroma-keyed passthrough is keyed by the player, not carried in the
+		// file, so it goes through a generated profile rather than
+		// alphaPackedSettings (which would look for a matte that is not there).
+		{Tag: "Chroma Key", Background: "passthrough", Mask: "chroma"},
 	}
 }
 
