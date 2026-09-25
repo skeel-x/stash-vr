@@ -75,6 +75,7 @@ Run it with `-h` to list all options. `config.json` is written to a `config` dir
 |---|---|---|---|
 | Browse sections (saved filters, smart and auto sections) | yes | yes | yes, as categories |
 | Covers (WebP/GIF converted), heatmaps for interactive scenes | yes | yes | yes |
+| Cover badges: quality, format, AR | yes | yes | yes |
 | Direct and transcoded streams | yes | yes | yes, incl. HLS |
 | Video rules: projection, stereo, lens, FOV | yes | yes | projection and stereo |
 | Passthrough (alpha-packed), eye swap, screen profiles | yes | no (force mono shows as stereo off) | no |
@@ -192,6 +193,9 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `FUNSCRIPT_INDEX_PATH`
   * Default: empty (off)
   * Absolute path to the timestampTrade plugin's `funscript_index.sqlite`; scripts it lists for a scene are offered as alternates in HereSphere. Runtime name: `funscript_index_path`.
+* `COVER_BADGE_QUALITY`, `COVER_BADGE_FORMAT`, `COVER_BADGE_PASSTHROUGH`
+  * Default: `true`, `false`, `true`
+  * Draw the quality, format and passthrough [cover badges](#cover-badges). Runtime name: `cover_badges`, an object with the booleans `quality`, `format` and `passthrough`.
 * `video_rules`
   * File only, edited on the Setup page. The ordered tag-to-format rules table. "Reset to defaults" on the Setup page restores the default rules.
 
@@ -200,6 +204,30 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 ## Usage
 
 Browse to `http://<host>:9666` using a supported video player. You'll be presented with your library within their respective native UI.
+
+### Cover badges
+
+Stash-VR can draw small labels in the top left corner of scene covers, so
+the library grid in the headset shows them at a glance. Each kind is
+switched on or off under Cover badges on the Setup page:
+
+* **Quality** (on by default): the tier tag the vrQualityTags plugin sets
+  (`8K` in gold, `7K` in silver, `6K HBR` in bronze; the `HQ` parent tag is
+  ignored). A scene without a tier tag shows the resolution of its file
+  instead, named by width from 4K up (`5K`, `6K`) and by height below
+  (`1080p`), in grey.
+* **Format** (off by default): the projection the video rules resolve to:
+  `180`, `360`, `FISHEYE` (with the field of view when a rule sets one, for
+  example `FISHEYE 200`) or `FLAT 3D`. Flat 2D scenes get no label.
+* **Passthrough** (on by default): `AR` on scenes whose rules turn on
+  passthrough (an alpha matte) or a chroma-key mask.
+
+Badges are 7% of the cover height (at least 18 px) and stay clear of the
+heatmap strip of interactive scenes. Covers with badges are re-encoded as
+JPEG and the last 500 are kept in memory; covers without any are served as
+Stash sends them. Headsets keep covers for a day, so while any badge is on
+the cover URLs carry a short fingerprint of the badge settings (`?b=...`),
+and changing them shows on the next library load.
 
 ### HereSphere
 
