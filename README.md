@@ -1,4 +1,8 @@
-# Stash-VR (skeel-x fork)
+<p align="center">
+  <img src="internal/static/icon.png" alt="Stash-VR logo" width="96" height="96">
+</p>
+
+<h1 align="center">Stash-VR (skeel-x fork)</h1>
 
 Watch your [Stash](https://github.com/stashapp/stash) library in VR. Stash-VR sits between your Stash instance and your VR video player, so you can browse, play and manage your scenes from the player's own VR interface. Flat/2D videos work as well as VR videos.
 
