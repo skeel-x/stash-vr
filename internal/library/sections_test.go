@@ -493,3 +493,77 @@ func TestGetSectionsFor_FallsBackWhenEverythingIsHidden(t *testing.T) {
 		t.Fatalf("expected all sets for the same reason, got %d", len(sets))
 	}
 }
+
+func rowIDs(rows []SectionRow) []string {
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.ID
+	}
+	return out
+}
+
+func TestSectionRows_SmartSectionWithAfterFollowsItsAnchor(t *testing.T) {
+	smart := []SmartSection{
+		{Key: "a", Name: "A", Default: true},
+		{Key: "b", Name: "B", Default: true},
+		{Key: "new", Name: "New", Default: true, After: "a"},
+		{Key: "c", Name: "C"},
+	}
+	saved := []gql.SavedFilterParts{{Id: "10", Name: "Landing"}}
+
+	// No overrides: the anchor is a default row, the new one follows it.
+	if got := rowIDs(sectionRows(saved, smart, nil, nil)); fmt.Sprint(got) != "[smart:a smart:new smart:b smart:c 10]" {
+		t.Fatalf("default rows = %v", got)
+	}
+
+	// Existing overrides: the landing row stays first, the new section
+	// follows its overridden anchor instead of jumping to the top.
+	overrides := []config.Filter{{ID: "10"}, {ID: "smart:b"}, {ID: "smart:a", Name: "Renamed"}, {ID: "smart:c", Disabled: true}}
+	rows := sectionRows(saved, smart, nil, overrides)
+	if got := rowIDs(rows); fmt.Sprint(got) != "[10 smart:b smart:a smart:new smart:c]" {
+		t.Fatalf("overridden rows = %v", got)
+	}
+	if r := rows[3]; r.Name != "New" || r.Disabled || !r.Smart {
+		t.Fatalf("placed row wrong: %+v", r)
+	}
+
+	// An override for the new section itself wins over After.
+	overrides = append([]config.Filter{{ID: "smart:new", Disabled: true}}, overrides...)
+	if got := rowIDs(sectionRows(saved, smart, nil, overrides)); fmt.Sprint(got) != "[smart:new 10 smart:b smart:a smart:c]" {
+		t.Fatalf("rows with override for new = %v", got)
+	}
+
+	// An anchor that does not exist falls back to the default placement.
+	smart[2].After = "missing"
+	if got := rowIDs(sectionRows(saved, smart, nil, overrides[1:])); fmt.Sprint(got) != "[smart:new 10 smart:b smart:a smart:c]" {
+		t.Fatalf("rows with missing anchor = %v", got)
+	}
+}
+
+func TestSectionRows_SeveralSectionsAfterOneAnchorKeepTheirOrder(t *testing.T) {
+	smart := []SmartSection{
+		{Key: "a", Name: "A", Default: true},
+		{Key: "x", Name: "X", Default: true, After: "a"},
+		{Key: "y", Name: "Y", Default: true, After: "a"},
+	}
+	overrides := []config.Filter{{ID: "smart:a"}}
+	if got := rowIDs(sectionRows(nil, smart, nil, overrides)); fmt.Sprint(got) != "[smart:a smart:x smart:y]" {
+		t.Fatalf("rows = %v", got)
+	}
+}
+
+func TestSectionRows_ChainedAfterFollowsPlacedAnchor(t *testing.T) {
+	smart := []SmartSection{
+		{Key: "a", Name: "A", Default: true},
+		{Key: "x", Name: "X", Default: true, After: "a"},
+		{Key: "y", Name: "Y", Default: true, After: "x"},
+		{Key: "z", Name: "Z", Default: true, After: "w"},
+		{Key: "w", Name: "W", Default: true, After: "a"},
+	}
+	overrides := []config.Filter{{ID: "10"}, {ID: "smart:a"}}
+	saved := []gql.SavedFilterParts{{Id: "10", Name: "Landing"}}
+	// z's anchor w is placed only after z, so z falls back to the top.
+	if got := rowIDs(sectionRows(saved, smart, nil, overrides)); fmt.Sprint(got) != "[smart:z 10 smart:a smart:x smart:y smart:w]" {
+		t.Fatalf("rows = %v", got)
+	}
+}

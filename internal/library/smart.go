@@ -11,7 +11,12 @@ type SmartSection struct {
 	Default bool // enabled when no override entry exists for it
 	// Playa lists this section as a category; Random is left out because
 	// Playa has its own randomiser.
-	Playa  bool
+	Playa bool
+	// After is the key of the smart section this one follows while it has
+	// no override row, so a section added in a later release lands next to
+	// a related one instead of on top of an existing order (the first row
+	// is the section HereSphere opens on). Empty keeps the default placement.
+	After  string
 	filter gql.SceneFilterType
 	sort   string
 }

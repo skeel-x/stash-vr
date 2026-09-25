@@ -259,7 +259,8 @@ func (libraryService *Service) GetSavedFilterSceneSetsFor(ctx context.Context, p
 // sectionRows applies the ordering rule: smart sections without an override
 // first (default state), then overrides in saved order, then remaining saved
 // filters in the given order, then auto sections without an override
-// (enabled).
+// (enabled). A smart section without an override whose After names another
+// smart section is placed directly after that section's row instead.
 func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []AutoSection, overrides []config.Filter) []SectionRow {
 	overridden := make(map[string]config.Filter, len(overrides))
 	for _, o := range overrides {
@@ -279,11 +280,16 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []Auto
 	}
 
 	rows := make([]SectionRow, 0, len(smart)+len(saved)+len(auto))
+	var placed []SmartSection
 	for _, s := range smart {
 		if _, ok := overridden[s.ID()]; ok {
 			continue
 		}
-		rows = append(rows, SectionRow{ID: s.ID(), SourceName: s.Name, Name: s.Name, Disabled: !s.Default, Smart: true})
+		if _, ok := smartByID[smartPrefix+s.After]; ok && s.After != "" {
+			placed = append(placed, s)
+			continue
+		}
+		rows = append(rows, defaultSmartRow(s))
 	}
 	seen := make(map[string]struct{}, len(overrides))
 	for _, o := range overrides {
@@ -324,7 +330,49 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []Auto
 		}
 		rows = append(rows, SectionRow{ID: a.ID, SourceName: a.Name, Name: a.Name, Auto: true})
 	}
+	return placeAfter(rows, placed)
+}
+
+// defaultSmartRow is the row of a smart section that has no override.
+func defaultSmartRow(s SmartSection) SectionRow {
+	return SectionRow{ID: s.ID(), SourceName: s.Name, Name: s.Name, Disabled: !s.Default, Smart: true}
+}
+
+// placeAfter inserts each section directly after the row of the smart
+// section its After names, behind any section already placed there, so
+// sections sharing an anchor keep their definition order. A section whose
+// anchor has no row yet (it is placed after a later one) goes to the top,
+// where smart sections without an override go by default.
+func placeAfter(rows []SectionRow, placed []SmartSection) []SectionRow {
+	anchorOf := make(map[string]string, len(placed))
+	front := 0
+	for _, s := range placed {
+		anchor := smartPrefix + s.After
+		at := slices.IndexFunc(rows, func(r SectionRow) bool { return r.ID == anchor })
+		if at < 0 {
+			rows = slices.Insert(rows, front, defaultSmartRow(s))
+			front++
+			continue
+		}
+		at++
+		for at < len(rows) && placedUnder(anchorOf, rows[at].ID, anchor) {
+			at++
+		}
+		rows = slices.Insert(rows, at, defaultSmartRow(s))
+		anchorOf[s.ID()] = anchor
+	}
 	return rows
+}
+
+// placedUnder reports whether the row id was placed after anchor, directly
+// or after a section that was.
+func placedUnder(anchorOf map[string]string, id, anchor string) bool {
+	for a, ok := anchorOf[id]; ok; a, ok = anchorOf[a] {
+		if a == anchor {
+			return true
+		}
+	}
+	return false
 }
 
 // sectionSource is one enabled row resolved to what produces its scene ids.
