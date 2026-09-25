@@ -48,6 +48,14 @@ type Service struct {
 	dateStore *dateStore
 	datesOnce sync.Once
 	sweeper   *dateSweeper
+
+	// rec caches the Recommended for you ids for recCacheTTL, independent
+	// of the index; recGen counts resets like setsGen does for the index.
+	muRec  sync.Mutex
+	rec    *recCache
+	recGen uint64
+	// now is the clock; tests replace it.
+	now func() time.Time
 }
 
 // clientBox wraps the client so different concrete client types can be
@@ -68,8 +76,8 @@ func (libraryService *Service) SetStashClient(client graphql.Client) {
 	libraryService.ResetCaches()
 }
 
-// ResetCaches drops cached scenes, tags and stats; the next index request
-// refetches everything.
+// ResetCaches drops cached scenes, tags, stats and recommendations; the
+// next index request refetches everything.
 func (libraryService *Service) ResetCaches() {
 	libraryService.muVdCache.Lock()
 	libraryService.vdCache = make(map[string]*VideoData)
@@ -83,6 +91,11 @@ func (libraryService *Service) ResetCaches() {
 	libraryService.muScripts.Lock()
 	libraryService.scriptCache = make(map[string]scriptEntry)
 	libraryService.muScripts.Unlock()
+
+	libraryService.muRec.Lock()
+	libraryService.rec = nil
+	libraryService.recGen++
+	libraryService.muRec.Unlock()
 
 	libraryService.ResetSections()
 }
@@ -110,6 +123,7 @@ func NewService(client graphql.Client) *Service {
 		vdCache:     make(map[string]*VideoData),
 		scriptCache: make(map[string]scriptEntry),
 		sweeper:     newDateSweeper(),
+		now:         time.Now,
 	}
 	s.client.Store(&clientBox{c: client})
 	return s

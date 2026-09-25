@@ -847,6 +847,153 @@ func (v *FindPerformerResponse) GetFindPerformer() *FindPerformerFindPerformer {
 	return v.FindPerformer
 }
 
+// FindRecommendationScenesFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
+type FindRecommendationScenesFindScenesFindScenesResultType struct {
+	Scenes []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
+}
+
+// GetScenes returns FindRecommendationScenesFindScenesFindScenesResultType.Scenes, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultType) GetScenes() []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene {
+	return v.Scenes
+}
+
+// FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene includes the requested fields of the GraphQL type Scene.
+type FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene struct {
+	Id         string                                                                                  `json:"id"`
+	Tags       []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag             `json:"tags"`
+	Performers []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer `json:"performers"`
+	Studio     *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneStudio                `json:"studio"`
+	// The number ot times a scene has been played
+	Play_count *int `json:"play_count"`
+	O_counter  *int `json:"o_counter"`
+	Rating100  *int `json:"rating100"`
+	// The last time play count was updated
+	Last_played_at *time.Time `json:"last_played_at"`
+	// The time index a scene was left at
+	Resume_time *float64                                                                           `json:"resume_time"`
+	Files       []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile `json:"files"`
+}
+
+// GetId returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Id, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetId() string {
+	return v.Id
+}
+
+// GetTags returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Tags, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetTags() []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag {
+	return v.Tags
+}
+
+// GetPerformers returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Performers, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetPerformers() []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer {
+	return v.Performers
+}
+
+// GetStudio returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Studio, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetStudio() *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneStudio {
+	return v.Studio
+}
+
+// GetPlay_count returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Play_count, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetPlay_count() *int {
+	return v.Play_count
+}
+
+// GetO_counter returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.O_counter, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetO_counter() *int {
+	return v.O_counter
+}
+
+// GetRating100 returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Rating100, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetRating100() *int {
+	return v.Rating100
+}
+
+// GetLast_played_at returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Last_played_at, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetLast_played_at() *time.Time {
+	return v.Last_played_at
+}
+
+// GetResume_time returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Resume_time, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetResume_time() *float64 {
+	return v.Resume_time
+}
+
+// GetFiles returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene.Files, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene) GetFiles() []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile {
+	return v.Files
+}
+
+// FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile includes the requested fields of the GraphQL type VideoFile.
+type FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
+// GetWidth returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile.Width, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile) GetWidth() int {
+	return v.Width
+}
+
+// GetHeight returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile.Height, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesVideoFile) GetHeight() int {
+	return v.Height
+}
+
+// FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer includes the requested fields of the GraphQL type Performer.
+type FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer struct {
+	Id string `json:"id"`
+}
+
+// GetId returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Id, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetId() string {
+	return v.Id
+}
+
+// FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneStudio includes the requested fields of the GraphQL type Studio.
+type FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneStudio struct {
+	Id string `json:"id"`
+}
+
+// GetId returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneStudio.Id, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneStudio) GetId() string {
+	return v.Id
+}
+
+// FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag includes the requested fields of the GraphQL type Tag.
+type FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+	// Value that does not appear in the UI but overrides name for sorting
+	Sort_name *string `json:"sort_name"`
+}
+
+// GetId returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag.Id, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag) GetId() string {
+	return v.Id
+}
+
+// GetName returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag.Name, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag) GetName() string {
+	return v.Name
+}
+
+// GetSort_name returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag.Sort_name, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneTagsTag) GetSort_name() *string {
+	return v.Sort_name
+}
+
+// FindRecommendationScenesResponse is returned by FindRecommendationScenes on success.
+type FindRecommendationScenesResponse struct {
+	// A function which queries Scene objects
+	FindScenes *FindRecommendationScenesFindScenesFindScenesResultType `json:"findScenes"`
+}
+
+// GetFindScenes returns FindRecommendationScenesResponse.FindScenes, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesResponse) GetFindScenes() *FindRecommendationScenesFindScenesFindScenesResultType {
+	return v.FindScenes
+}
+
 // FindSampleSceneCoverFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
 type FindSampleSceneCoverFindScenesFindScenesResultType struct {
 	Scenes []*FindSampleSceneCoverFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
@@ -5625,6 +5772,60 @@ func FindPerformerByName(
 	}
 
 	data_ = &FindPerformerByNameResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindRecommendationScenes.
+const FindRecommendationScenes_Operation = `
+query FindRecommendationScenes {
+	findScenes(filter: {per_page:-1,sort:"created_at",direction:DESC}) {
+		scenes {
+			id
+			tags {
+				id
+				name
+				sort_name
+			}
+			performers {
+				id
+			}
+			studio {
+				id
+			}
+			play_count
+			o_counter
+			rating100
+			last_played_at
+			resume_time
+			files {
+				width
+				height
+			}
+		}
+	}
+}
+`
+
+// Everything the Recommended for you section scores on, for every scene,
+// newest first so equal scores keep the newest scene first.
+func FindRecommendationScenes(
+	ctx_ context.Context,
+	client_ graphql.Client,
+) (data_ *FindRecommendationScenesResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindRecommendationScenes",
+		Query:  FindRecommendationScenes_Operation,
+	}
+
+	data_ = &FindRecommendationScenesResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
