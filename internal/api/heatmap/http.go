@@ -41,10 +41,7 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 
 		cfg := config.Application()
 		badges := coverbadge.ForScene(vd, cfg.CoverBadges, cfg.VideoRules)
-		heatmapUrl := ""
-		if vd.SceneParts.Interactive && p.Interactive_heatmap != nil && *p.Interactive_heatmap != "" {
-			heatmapUrl = stash.ApiKeyed(*p.Interactive_heatmap)
-		}
+		heatmapUrl := SceneHeatmapURL(vd)
 		if heatmapUrl != "" || len(badges) > 0 {
 			body, err := RenderCover(ctx, vd.Id(), stash.ApiKeyed(*p.Screenshot), heatmapUrl, badges)
 			if err != nil {
@@ -65,6 +62,19 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 		writeCover(ctx, w, ct, body)
 	}
 	return internal.LogRoute("cover", internal.LogVideoId(f))
+}
+
+// SceneHeatmapURL is the keyed address of the heatmap Stash generates for
+// an interactive scene, or "" when the scene has none.
+func SceneHeatmapURL(vd *library.VideoData) string {
+	if vd == nil || vd.SceneParts == nil || !vd.SceneParts.Interactive {
+		return ""
+	}
+	p := vd.SceneParts.Paths
+	if p == nil || p.Interactive_heatmap == nil || *p.Interactive_heatmap == "" {
+		return ""
+	}
+	return stash.ApiKeyed(*p.Interactive_heatmap)
 }
 
 // writeFailure answers a failed cover uncached: 404 for a missing

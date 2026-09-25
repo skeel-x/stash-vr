@@ -38,10 +38,7 @@ func buildPoster(ctx context.Context, vd *library.VideoData) ([]byte, error) {
 	}
 	cfg := config.Application()
 	badges := coverbadge.ForScene(vd, cfg.CoverBadges, cfg.VideoRules)
-	heatmapURL := ""
-	if vd.SceneParts.Interactive && paths.Interactive_heatmap != nil && *paths.Interactive_heatmap != "" {
-		heatmapURL = stash.ApiKeyed(*paths.Interactive_heatmap)
-	}
+	heatmapURL := heatmap.SceneHeatmapURL(vd)
 	if heatmapURL != "" || len(badges) > 0 {
 		b, err := heatmap.RenderCover(ctx, vd.Id(), stash.ApiKeyed(*paths.Screenshot), heatmapURL, badges)
 		return b, mapPosterError(err)

@@ -122,15 +122,45 @@ func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, bo
 // RenderCover returns a scene's cover as JPEG: the screenshot at coverUrl
 // with the heatmap at heatmapUrl across the bottom (when heatmapUrl is
 // set and the heatmap loads) and badges drawn in the bottom left corner,
-// above the heatmap strip.
-// Covers already rendered from the same screenshot, heatmap and badges
-// come from coverbadge.Rendered. A missing screenshot is
-// ErrImageNotFound.
+// above the heatmap strip. Covers already rendered from the same
+// screenshot, heatmap and badges come from coverbadge.Rendered. A missing
+// screenshot is ErrImageNotFound.
 func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
-	var (
-		shot, heat []byte
-		shotErr    error
-	)
+	shot, heat, err := fetchSources(ctx, coverUrl, heatmapUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	key := coverbadge.CacheKey(sceneId, badges, shot, heat)
+	if b, ok := coverbadge.Rendered.Get(key); ok {
+		log.Ctx(ctx).Trace().Msg("Rendered cover from cache")
+		return b, nil
+	}
+
+	b, err := renderJPEG(ctx, shot, heat, badges)
+	if err != nil {
+		return nil, err
+	}
+	coverbadge.Rendered.Add(key, b)
+	return b, nil
+}
+
+// RenderPreview renders a cover the way RenderCover does, but always
+// afresh and without adding it to coverbadge.Rendered: the Setup page
+// previews badge settings that are not saved yet.
+func RenderPreview(ctx context.Context, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
+	shot, heat, err := fetchSources(ctx, coverUrl, heatmapUrl)
+	if err != nil {
+		return nil, err
+	}
+	return renderJPEG(ctx, shot, heat, badges)
+}
+
+// fetchSources fetches the screenshot and, when heatmapUrl is set, the
+// heatmap in parallel. A heatmap that does not load is left out (heat is
+// nil); a screenshot that does not load is an error.
+func fetchSources(ctx context.Context, coverUrl string, heatmapUrl string) (shot, heat []byte, err error) {
+	var shotErr error
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		_, shot, shotErr = fetchBytes(gctx, coverUrl)
@@ -150,15 +180,13 @@ func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUr
 	}
 	_ = g.Wait()
 	if shotErr != nil {
-		return nil, fmt.Errorf("screenshot: %w", shotErr)
+		return nil, nil, fmt.Errorf("screenshot: %w", shotErr)
 	}
+	return shot, heat, nil
+}
 
-	key := coverbadge.CacheKey(sceneId, badges, shot, heat)
-	if b, ok := coverbadge.Rendered.Get(key); ok {
-		log.Ctx(ctx).Trace().Msg("Rendered cover from cache")
-		return b, nil
-	}
-
+// renderJPEG composes the cover and encodes it as JPEG.
+func renderJPEG(ctx context.Context, shot, heat []byte, badges []coverbadge.Badge) ([]byte, error) {
 	cover, err := composeCover(ctx, shot, heat, badges)
 	if err != nil {
 		return nil, err
@@ -167,7 +195,6 @@ func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUr
 	if err := jpeg.Encode(&buf, cover, &jpeg.Options{Quality: coverJPEGQuality}); err != nil {
 		return nil, fmt.Errorf("encode cover: %w", err)
 	}
-	coverbadge.Rendered.Add(key, buf.Bytes())
 	return buf.Bytes(), nil
 }
 

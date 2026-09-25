@@ -327,6 +327,56 @@
     q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
   }
 
+  // Setup page: cover badge preview. Redrawn on every badge checkbox
+  // change with the boxes as ticked, before saving; an empty scene id
+  // lets the server pick a scene that shows every badge kind.
+  const previewImg = $('#badge-preview-img');
+  if (previewImg) {
+    const sceneInput = $('#badge-preview-scene');
+    const previewMsg = $('#badge-preview-msg');
+    const previewTitle = $('#badge-preview-title');
+    const boxes = ['quality', 'format', 'passthrough'].map((k) => [k, document.querySelector('input[name="cover_badge_' + k + '"]')]);
+    let seq = 0;
+    let objectUrl = '';
+    const show = async () => {
+      const mine = ++seq;
+      const params = new URLSearchParams();
+      const scene = sceneInput.value.trim();
+      if (scene) params.set('scene', scene);
+      boxes.forEach(([k, box]) => params.set(k, box && box.checked ? '1' : '0'));
+      setMsg(previewMsg, 'Drawing');
+      try {
+        const res = await fetch(BASE + '/api/ui/badge-preview?' + params.toString());
+        if (!res.ok) {
+          let text = res.status + ' ' + res.statusText;
+          try { text = (await res.json()).error || text; } catch (e) { /* not JSON */ }
+          throw new Error(text);
+        }
+        const blob = await res.blob();
+        if (mine !== seq) return;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = URL.createObjectURL(blob);
+        previewImg.src = objectUrl;
+        previewImg.hidden = false;
+        const id = res.headers.get('X-Scene-Id') || '';
+        let title = res.headers.get('X-Scene-Title') || '';
+        try { title = decodeURIComponent(title); } catch (e) { /* keep as sent */ }
+        previewTitle.textContent = id ? id + ' ' + title : title;
+        setMsg(previewMsg, '');
+      } catch (e) {
+        if (mine !== seq) return;
+        previewImg.hidden = true;
+        previewTitle.textContent = '';
+        setMsg(previewMsg, 'No preview: ' + e.message, 'err');
+      }
+    };
+    boxes.forEach(([, box]) => { if (box) box.addEventListener('change', show); });
+    $('#badge-preview-show').addEventListener('click', show);
+    // Enter would otherwise submit the settings form around it.
+    sceneInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); show(); } });
+    show();
+  }
+
   // Setup page: format coverage. Loaded only when the button is pressed so
   // the page never waits on Stash for it.
   const coverageBtn = $('#coverage');

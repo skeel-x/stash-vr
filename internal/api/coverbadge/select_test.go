@@ -2,6 +2,7 @@ package coverbadge
 
 import (
 	"image/color"
+	"strings"
 	"testing"
 
 	"stash-vr/internal/config"
@@ -165,5 +166,16 @@ func TestKey_NamesTheBadgeSet(t *testing.T) {
 	}
 	if Key(nil) != "" {
 		t.Fatalf("no badges must key as empty, got %q", Key(nil))
+	}
+}
+
+func TestTierTags(t *testing.T) {
+	got := TierTags()
+	if strings.Join(got, ",") != "8K,7K,6K HBR" {
+		t.Fatalf("expected the tiers best first, got %v", got)
+	}
+	got[0] = "changed"
+	if TierTags()[0] != "8K" {
+		t.Fatal("TierTags must return a copy")
 	}
 }

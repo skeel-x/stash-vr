@@ -52,6 +52,15 @@ var tiers = []struct {
 	{"6K HBR", Bronze},
 }
 
+// TierTags returns the names of the tier tags, best first.
+func TierTags() []string {
+	out := make([]string, len(tiers))
+	for i := range tiers {
+		out[i] = tiers[i].tag
+	}
+	return out
+}
+
 // ForScene returns the badges a scene's cover gets under the switches in
 // on, in drawing order: quality, format, passthrough. rules are the video
 // rules the format and passthrough badges resolve through.

@@ -230,6 +230,13 @@ Stash sends them. Headsets keep covers for a day, so while any badge is on
 the cover URLs carry a short fingerprint of the badge settings and layout
 (`?b=...`), and changing them shows on the next library load.
 
+Under the checkboxes the Setup page previews a real cover with the badges
+as ticked, before saving, redrawn on every change. It picks a scene with a
+tier tag and, if Stash has one, the `Alpha` tag, so every kind of badge
+shows; enter a scene id and press Show to preview another scene. The
+preview uses the saved video rules and leaves the saved settings and the
+rendered cover cache alone.
+
 ### HereSphere
 
 ##### Two-way sync

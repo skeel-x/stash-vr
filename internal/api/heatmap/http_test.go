@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -570,5 +571,56 @@ func TestCover_IgnoresFingerprintQuery(t *testing.T) {
 
 	if rec := get(t, h, "/cover/10?b=abcd1234"); rec.Code != 200 {
 		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestRenderPreview_DrawsBadgesWithoutTouchingTheCache(t *testing.T) {
+	setBadges(t, config.CoverBadges{})
+	srv, _, _ := imageServer(t)
+	gold := []coverbadge.Badge{{Kind: coverbadge.KindQuality, Label: "8K", Fill: coverbadge.Gold, Text: coverbadge.Dark}}
+
+	b, err := RenderPreview(context.Background(), srv.URL+"/big", srv.URL+"/heatmap", gold)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	img := decodeJpeg(t, b)
+	if img.Bounds() != image.Rect(0, 0, bigW, bigH) {
+		t.Fatalf("the preview must keep the cover size, got %v", img.Bounds())
+	}
+	if !hasColour(img, image.Rect(0, 170, bigW/4, 188), coverbadge.Gold) {
+		t.Fatal("expected the gold badge above the heatmap")
+	}
+	if near(img.At(bigW/2, bigH-1), sky, 12) {
+		t.Fatal("expected the heatmap across the bottom")
+	}
+	if coverbadge.Rendered.Len() != 0 {
+		t.Fatal("a preview must not land in the rendered cover cache")
+	}
+}
+
+func TestRenderPreview_MissingScreenshot(t *testing.T) {
+	srv, _, _ := imageServer(t)
+
+	_, err := RenderPreview(context.Background(), srv.URL+"/missing", "", nil)
+
+	if !errors.Is(err, ErrImageNotFound()) {
+		t.Fatalf("expected ErrImageNotFound, got %v", err)
+	}
+}
+
+func TestSceneHeatmapURL(t *testing.T) {
+	lib := library.NewService(&sceneStash{base: "http://stash"})
+	for id, want := range map[string]string{"5": "http://stash/heatmap", "1": ""} {
+		vd, err := lib.GetScene(context.Background(), id, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := SceneHeatmapURL(vd); !strings.HasPrefix(got, want) || (want == "") != (got == "") {
+			t.Fatalf("scene %s: got %q, want %q", id, got, want)
+		}
+	}
+	if SceneHeatmapURL(nil) != "" {
+		t.Fatal("no scene has no heatmap")
 	}
 }

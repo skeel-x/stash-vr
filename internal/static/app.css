@@ -145,6 +145,11 @@ table.sections td input[type=checkbox]{width:26px;height:26px}
 .rule-fields .field input[type=color]{padding:4px;cursor:pointer}
 .rule-screen .copy-row{margin-top:12px;flex-wrap:wrap}
 .rule-screen .copy-profile{margin:0;min-height:44px;max-width:100%}
+.badge-preview{margin:4px 0 16px;max-width:480px}
+.badge-preview img{display:block;width:100%;height:auto;border-radius:6px;background:var(--raised)}
+.badge-preview-title{margin:6px 0 0;color:var(--muted);overflow-wrap:anywhere}
+.badge-preview-title:empty{display:none}
+#badge-preview-scene{width:9em;margin:0}
 .inspect-row #inspect-q{flex:1;width:auto;min-width:12em;margin:0}
 #inspect-out{overflow-x:auto;margin:8px 0 16px}
 table.inspect{width:100%;border-collapse:collapse;font-size:15px}
