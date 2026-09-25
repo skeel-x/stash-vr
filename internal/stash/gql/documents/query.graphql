@@ -132,6 +132,36 @@ query FindSceneGroupings {
   }
 }
 
+# Everything the Recommended for you section scores on, for every scene,
+# newest first so equal scores keep the newest scene first.
+query FindRecommendationScenes {
+  findScenes(filter: { per_page: -1, sort: "created_at", direction: DESC }) {
+    scenes {
+      id
+      tags {
+        id
+        name
+        sort_name
+      }
+      performers {
+        id
+      }
+      studio {
+        id
+      }
+      play_count
+      o_counter
+      rating100
+      last_played_at
+      resume_time
+      files {
+        width
+        height
+      }
+    }
+  }
+}
+
 query FindScenes($scene_ids: [Int!]) {
   findScenes(scene_ids: $scene_ids) {
     scenes {
