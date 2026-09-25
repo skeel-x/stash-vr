@@ -56,6 +56,11 @@ type Service struct {
 	recGen uint64
 	// now is the clock; tests replace it.
 	now func() time.Time
+
+	// resetHooks run after ResetCaches, so caches kept outside the
+	// library (rendered covers) are dropped with it.
+	muHooks    sync.Mutex
+	resetHooks []func()
 }
 
 // clientBox wraps the client so different concrete client types can be
@@ -98,6 +103,20 @@ func (libraryService *Service) ResetCaches() {
 	libraryService.muRec.Unlock()
 
 	libraryService.ResetSections()
+
+	libraryService.muHooks.Lock()
+	hooks := slices.Clone(libraryService.resetHooks)
+	libraryService.muHooks.Unlock()
+	for _, f := range hooks {
+		f()
+	}
+}
+
+// OnReset registers f to run after every ResetCaches.
+func (libraryService *Service) OnReset(f func()) {
+	libraryService.muHooks.Lock()
+	libraryService.resetHooks = append(libraryService.resetHooks, f)
+	libraryService.muHooks.Unlock()
 }
 
 // ResetSections drops the cached section sets and sections so the next

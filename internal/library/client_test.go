@@ -46,3 +46,17 @@ func TestResetCaches_RefetchesScene(t *testing.T) {
 		t.Fatalf("expected refetch after reset, got %v %v", vd, err)
 	}
 }
+
+func TestResetCaches_RunsResetHooks(t *testing.T) {
+	svc := NewService(&fakeGraphQL{})
+	calls := 0
+	svc.OnReset(func() { calls++ })
+	svc.OnReset(func() { calls += 10 })
+
+	svc.ResetCaches()
+	svc.SetStashClient(&fakeGraphQL{})
+
+	if calls != 22 {
+		t.Fatalf("expected both hooks on every reset, got %d", calls)
+	}
+}

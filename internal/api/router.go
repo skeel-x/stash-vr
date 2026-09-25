@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/api/deovr"
 	"stash-vr/internal/api/funscript"
 	"stash-vr/internal/api/heatmap"
@@ -22,6 +23,9 @@ import (
 
 func Router(libraryService *library.Service) *chi.Mux {
 	router := chi.NewRouter()
+
+	// Rendered covers go with the rest of the library caches.
+	libraryService.OnReset(coverbadge.ResetCache)
 
 	router.Use(requestLogger)
 	router.Use(middleware.Recoverer)
