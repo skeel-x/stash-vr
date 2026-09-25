@@ -181,6 +181,31 @@ func TestSections_RendersPage(t *testing.T) {
 	}
 }
 
+func TestSections_ShowsRecommendedAfterContinueWatching(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/sections", nil).Body.String()
+
+	start := strings.Index(body, `<tr data-id="smart:recommended">`)
+	if start < 0 {
+		t.Fatal("expected a Recommended for you row")
+	}
+	row := body[start : start+strings.Index(body[start:], "</tr>")]
+	if !strings.Contains(row, `<span class="src">Recommended for you</span><span class="badge">smart</span>`) {
+		t.Fatalf("expected the name with the smart badge, got %s", row)
+	}
+	if !strings.Contains(row, `class="show-heresphere" aria-label="Show Recommended for you in HereSphere" checked`) {
+		t.Fatalf("expected the row to be on by default, got %s", row)
+	}
+	// Its override-less default places it right after Continue watching.
+	cont := strings.Index(body, `<tr data-id="smart:continue">`)
+	recent := strings.Index(body, `<tr data-id="smart:recent">`)
+	if cont < 0 || recent < 0 || cont > start || start > recent {
+		t.Fatalf("expected continue < recommended < recent, got %d %d %d", cont, start, recent)
+	}
+}
+
 func TestPlayers_ShowsRejectedKeyWhenUnauthorized(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{versionErr: &graphql.HTTPError{StatusCode: 401}})
 	h := PagesRouter(lib)

@@ -2,11 +2,14 @@ package library
 
 import (
 	"cmp"
+	"context"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
 	"time"
 
+	"stash-vr/internal/config"
 	"stash-vr/internal/stash/gql"
 )
 
@@ -14,15 +17,15 @@ import (
 type recScene = gql.FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene
 
 const (
-	day = 24 * time.Hour
+	recDay = 24 * time.Hour
 	// recWindow is how far back the history reaches while at least
 	// recMinHistory scenes were played in it; with fewer it covers all time.
-	recWindow     = 90 * day
+	recWindow     = 90 * recDay
 	recMinHistory = 10
 	// recHalfLife halves a history scene's weight every 30 days since it
 	// was last played; scenes never played count as recUndatedAge old.
-	recHalfLife   = 30 * day
-	recUndatedAge = 60 * day
+	recHalfLife   = 30 * recDay
+	recUndatedAge = 60 * recDay
 	// recFinishedSlack is how much resume position, in seconds, still
 	// counts as watched to the end.
 	recFinishedSlack = 10.0
@@ -284,4 +287,48 @@ func recommend(scenes []*recScene, excludeSortName string, now time.Time, size i
 		out[i] = r.id
 	}
 	return out
+}
+
+// recCacheTTL bounds how often the whole library is fetched and scored;
+// taste moves slower than the 60 s index.
+const recCacheTTL = 30 * time.Minute
+
+// recCache is one computed recommendation and what it was computed for.
+type recCache struct {
+	ids             []string
+	at              time.Time
+	size            int
+	excludeSortName string
+}
+
+// recommendedIDs returns the Recommended for you ids, computing them at
+// most once per recCacheTTL (or when the size or excluded sort name
+// changes). An empty result is cached too; errors are not.
+func (libraryService *Service) recommendedIDs(ctx context.Context, size int) ([]string, error) {
+	exclude := config.Application().ExcludeSortName
+	now := libraryService.now()
+
+	libraryService.muRec.Lock()
+	c, gen := libraryService.rec, libraryService.recGen
+	libraryService.muRec.Unlock()
+	if c != nil && c.size == size && c.excludeSortName == exclude && now.Sub(c.at) < recCacheTTL {
+		return slices.Clone(c.ids), nil
+	}
+
+	resp, err := gql.FindRecommendationScenes(ctx, libraryService.Client())
+	if err != nil {
+		return nil, fmt.Errorf("FindRecommendationScenes: %w", err)
+	}
+	var scenes []*recScene
+	if resp.FindScenes != nil {
+		scenes = resp.FindScenes.Scenes
+	}
+	ids := recommend(scenes, exclude, now, size)
+
+	libraryService.muRec.Lock()
+	if libraryService.recGen == gen {
+		libraryService.rec = &recCache{ids: ids, at: now, size: size, excludeSortName: exclude}
+	}
+	libraryService.muRec.Unlock()
+	return slices.Clone(ids), nil
 }

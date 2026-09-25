@@ -102,16 +102,20 @@ func (libraryService *Service) index(ctx context.Context) (indexResult, error) {
 
 		var sets []SavedFilterSceneSet
 		var sections []Section
-		if len(sources) == 0 {
+		if len(sources) > 0 {
+			if sets, err = libraryService.resolveSections(ctx, sources); err != nil {
+				return nil, err
+			}
+		}
+		// A computed section is empty because of what was watched, not what
+		// the user chose: with nothing else enabled, fall back to All.
+		if len(sources) == 0 || len(sets) == 0 && onlyComputed(sources) {
 			log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
 			if sections, err = libraryService.getDefaultSections(ctx); err != nil {
 				return nil, err
 			}
 			sets = []SavedFilterSceneSet{}
 		} else {
-			if sets, err = libraryService.resolveSections(ctx, sources); err != nil {
-				return nil, err
-			}
 			sections = make([]Section, len(sets))
 			for i, set := range sets {
 				sections[i] = Section{ID: set.ID, Name: set.Name, Ids: slices.Clone(set.SceneIDs), HiddenIn: set.HiddenIn}
@@ -165,6 +169,17 @@ func (libraryService *Service) index(ctx context.Context) (indexResult, error) {
 		return indexResult{}, err
 	}
 	return res.(indexResult), nil
+}
+
+// onlyComputed reports whether every source is a smart section computed
+// in stash-vr.
+func onlyComputed(sources []sectionSource) bool {
+	for i := range sources {
+		if sources[i].smart == nil || sources[i].smart.ids == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // freshIndex returns the cached index if it exists and is still within
@@ -466,6 +481,21 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 		go func(i int, src sectionSource) {
 			defer wg.Done()
 			flog := log.Ctx(ctx).With().Str("sectionId", src.row.ID).Str("name", src.row.Name).Logger()
+
+			if src.smart != nil && src.smart.ids != nil {
+				ids, err := src.smart.ids(libraryService, ctx, size)
+				if err != nil {
+					flog.Err(err).Msg("Failed to compute section, skipping")
+					return
+				}
+				if len(ids) == 0 {
+					flog.Debug().Msg("Section skipped: 0 scenes")
+					return
+				}
+				sections[i] = SavedFilterSceneSet{ID: src.row.ID, Name: src.row.Name, SceneIDs: ids, HiddenIn: src.row.HiddenIn}
+				flog.Debug().Int("scenes", len(ids)).Msg("Section built")
+				return
+			}
 
 			var sceneFilter *gql.SceneFilterType
 			var opts *gql.FindFilterType

@@ -1,6 +1,10 @@
 package library
 
-import "stash-vr/internal/stash/gql"
+import (
+	"context"
+
+	"stash-vr/internal/stash/gql"
+)
 
 // SmartSection is a computed section: a fixed Stash query instead of a saved
 // filter. Users switch, order and rename them like saved filters through
@@ -19,6 +23,9 @@ type SmartSection struct {
 	After  string
 	filter gql.SceneFilterType
 	sort   string
+	// ids, when set, computes the section's scenes in stash-vr instead of
+	// querying Stash with filter and sort.
+	ids func(svc *Service, ctx context.Context, size int) ([]string, error)
 }
 
 // ForPlaya reports whether Playa should list this section as a category.
@@ -40,6 +47,8 @@ func smartSections() []SmartSection {
 	return []SmartSection{
 		{Key: "continue", Name: "Continue watching", Default: true, Playa: true, sort: "last_played_at",
 			filter: gql.SceneFilterType{Resume_time: intCriterion(0, gql.CriterionModifierGreaterThan)}},
+		{Key: "recommended", Name: "Recommended for you", Default: true, Playa: true, After: "continue",
+			ids: (*Service).recommendedIDs},
 		{Key: "recent", Name: "Recently added", Default: true, Playa: true, sort: "created_at"},
 		{Key: "unwatched", Name: "Unwatched", Playa: true, sort: "created_at",
 			filter: gql.SceneFilterType{Play_count: intCriterion(0, gql.CriterionModifierEquals)}},

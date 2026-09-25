@@ -10,7 +10,7 @@ This is an extended fork of [o-fl0w/stash-vr](https://github.com/o-fl0w/stash-vr
 * **Passthrough** - alpha-packed and chroma-key masks, passthrough backgrounds.
 * **Funscript variants** - alternate scripts next to the video or from the timestampTrade index show up in HereSphere's script picker.
 * **Watch history** - watched state and resume position tags, resume on any headset.
-* **Smart and auto sections** - Continue watching, Recently added, Random and more, plus generated per-studio and per-performer sections, ordered and shown per player.
+* **Smart and auto sections** - Continue watching, Recommended for you, Recently added, Random and more, plus generated per-studio and per-performer sections, ordered and shown per player.
 * **Release-date lookup** - missing scene dates looked up from your stash-boxes, optionally written back to Stash.
 * **Performer facets** - `Country:` and `Age:` tags for filtering.
 * **Playa** - native support for the [Playa VR video player](https://playavr.com/).
@@ -129,7 +129,7 @@ If your proxy cannot send the header, set the prefix as `base_path` on the Setup
 
 ### Settings and the web UI
 
-Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash, and lists the auto section count, release dates found, missing and unchecked, stored HereSphere profiles and how many video rules generate profiles. Smart sections (Continue watching, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, filterable by level and text, with optional auto-refresh.
+Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash, and lists the auto section count, release dates found, missing and unchecked, stored HereSphere profiles and how many video rules generate profiles. Smart sections (Continue watching, Recommended for you, Recently added, Random and more) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, filterable by level and text, with optional auto-refresh.
 
 `config.json` lives in the directory given by `CONFIG_PATH` (default: a `config` directory next to the binary). In Docker the image sets `CONFIG_PATH=/config`; mount a directory that is writable by uid 65532 (the image's non-root user). The environment variables and flags below only seed the file on first start; after that the file is the source of truth. `LISTEN_ADDRESS`, `DISABLE_LOG_COLOR` and `DISABLE_REDACT` are process settings and stay flags.
 
@@ -281,6 +281,34 @@ saved position, `Resume:12:34` tags. With `auto_studio_min` or
 `auto_performer_min` set, studios and performers with enough scenes become
 sections of their own; they show on the Sections page with an "auto" badge
 and can be ordered, renamed or hidden like any other section.
+
+#### Recommended for you
+
+The "Recommended for you" smart section suggests scenes you have not played
+yet, based on what you watched. It is on by default and, on an installation
+that already has a saved section order, first appears right after Continue
+watching so the section HereSphere opens on stays the same.
+
+* History: scenes played in the last 90 days, plus scenes with an o-count
+  or a rating of 80 or more from the same period (all time when fewer than
+  10 scenes were played in it). Each counts 1, plus 1 if watched to the
+  end, plus its o-count (at most 3), plus (rating - 60) / 20 above a
+  rating of 60, halved for every 30 days since it was last played.
+* Features: a scene's tags, performers (counted double) and studio, each
+  weighted by how rare it is in the library (inverse document frequency).
+  Tags with the excluded sort name and the format and quality tags of the
+  vrQualityTags plugin (DOME, SBS, 8K, `VRP:` and the like) are ignored.
+* Candidates are scenes never played, with a file, of the same kind as
+  most of the history: VR scenes (tagged DOME, SPHERE or FISHEYE, or at
+  least 3840 wide in 2:1 or 1:1) if most of what you watched was VR,
+  otherwise flat scenes. Each scores how much its features overlap the
+  history, divided by the square root of its feature count so heavily
+  tagged scenes do not win by volume; the best `smart_section_size` are
+  shown, newest first on equal scores.
+
+The whole library is fetched in one query and scored in Stash-VR; the
+result is kept for 30 minutes. With nothing watched yet the section is
+left out.
 
 #### Performer facets
 
