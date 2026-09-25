@@ -33,49 +33,91 @@ func rgba(img image.Image, x, y int) color.RGBA {
 	return color.RGBAModel.Convert(img.At(x, y)).(color.RGBA)
 }
 
+// unchanged fails the test when any pixel of want inside r differs in got.
+func unchanged(t *testing.T, got, want image.Image, r image.Rectangle, what string) {
+	t.Helper()
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			if rgba(got, x, y) != rgba(want, x, y) {
+				t.Fatalf("%s: pixel %d,%d changed to %v", what, x, y, rgba(got, x, y))
+			}
+		}
+	}
+}
+
+// hasNear reports whether any pixel in r is near c.
+func hasNear(img image.Image, r image.Rectangle, c color.RGBA, tol int) bool {
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			if near(rgba(img, x, y), c, tol) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+var heat = color.RGBA{R: 200, G: 30, B: 30, A: 255}
+
+// withStrip returns a w x h sky image whose bottom rows rows are heat, like
+// a cover with the heatmap overlaid.
+func withStrip(w, h, rows int) *image.RGBA {
+	img := solid(w, h, sky)
+	for y := h - rows; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.SetRGBA(x, y, heat)
+		}
+	}
+	return img
+}
+
 func TestDraw_KeepsSizeAndLeavesSourceAlone(t *testing.T) {
 	src := solid(640, 320, sky)
 
-	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}})
+	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}, 0)
 
 	if out.Bounds() != src.Bounds() {
 		t.Fatalf("size changed: %v -> %v", src.Bounds(), out.Bounds())
 	}
-	if rgba(src, 30, 20) != sky {
-		t.Fatal("Draw must not modify its input")
-	}
+	unchanged(t, src, solid(640, 320, sky), src.Bounds(), "Draw must not modify its input")
 }
 
-func TestDraw_PaintsTheBadgeTopLeft(t *testing.T) {
+func TestDraw_PaintsTheBadgeBottomLeft(t *testing.T) {
 	src := solid(1000, 500, sky)
 
-	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}})
+	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}, 0)
 
-	// Inset 2% of the width (20 px), height 7% of the cover (35 px).
-	h := 35
-	var gold, text bool
-	for y := 20; y < 20+h; y++ {
-		for x := 20; x < 120; x++ {
-			c := rgba(out, x, y)
-			gold = gold || near(c, Gold, 4)
-			text = text || near(c, Dark, 30)
-		}
+	// Inset 2% of the width (20 px), height 7% of the cover (35 px), so the
+	// badge spans rows 445 to 479.
+	badge := image.Rect(20, 445, 120, 480)
+	if !hasNear(out, badge, Gold, 4) {
+		t.Fatal("expected gold fill in the bottom left badge region")
 	}
-	if !gold {
-		t.Fatal("expected gold fill in the badge region")
-	}
-	if !text {
+	if !hasNear(out, badge, Dark, 30) {
 		t.Fatal("expected dark text inside the gold badge")
 	}
-	if c := rgba(out, 5, 5); c != sky {
-		t.Fatalf("the inset margin must stay untouched, got %v", c)
-	}
-	if c := rgba(out, 20+h/2, 20+h+6); c != sky {
-		t.Fatalf("below the badge must stay untouched, got %v", c)
+	unchanged(t, out, src, image.Rect(0, 480, 1000, 500), "the inset below the badge")
+	unchanged(t, out, src, image.Rect(0, 0, 20, 500), "the inset left of the badge")
+	unchanged(t, out, src, image.Rect(0, 0, 1000, 445), "everything above the badge")
+}
+
+func TestDraw_SitsAboveTheHeatmapStrip(t *testing.T) {
+	src := withStrip(1000, 500, 40)
+
+	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}, 40)
+
+	// The strip covers rows 460 to 499; the badge keeps the 20 px inset
+	// above it, rows 405 to 439.
+	unchanged(t, out, src, image.Rect(0, 460, 1000, 500), "the heatmap strip")
+	unchanged(t, out, src, image.Rect(0, 440, 1000, 460), "the inset between badge and strip")
+	unchanged(t, out, src, image.Rect(0, 0, 1000, 405), "everything above the badge")
+	if !hasNear(out, image.Rect(20, 405, 120, 440), Gold, 4) {
+		t.Fatal("expected the gold badge right above the strip")
 	}
 }
 
-func TestDraw_LeavesTheBottomStripAlone(t *testing.T) {
+func TestDraw_LeavesTheTopLeftAlone(t *testing.T) {
+	// HereSphere draws its own icons in the top left corner.
 	src := solid(400, 200, sky)
 	badges := []Badge{
 		{Kind: KindQuality, Label: "6K HBR", Fill: Bronze, Text: Dark},
@@ -83,16 +125,11 @@ func TestDraw_LeavesTheBottomStripAlone(t *testing.T) {
 		{Kind: KindPassthrough, Label: "AR", Fill: Accent, Text: White},
 	}
 
-	out := Draw(src, badges)
+	out := Draw(src, badges, 0)
 
-	// Everything below the top half, where the heatmap strip sits, is
-	// untouched.
-	for y := 100; y < 200; y++ {
-		for x := 0; x < 400; x++ {
-			if c := rgba(out, x, y); c != sky {
-				t.Fatalf("pixel %d,%d changed to %v", x, y, c)
-			}
-		}
+	unchanged(t, out, src, image.Rect(0, 0, 400, 100), "the top half")
+	if !hasNear(out, image.Rect(0, 100, 400, 200), Bronze, 4) {
+		t.Fatal("expected the badges in the bottom half")
 	}
 }
 
@@ -103,11 +140,11 @@ func TestDraw_StacksBadgesLeftToRight(t *testing.T) {
 		{Kind: KindPassthrough, Label: "AR", Fill: Accent, Text: White},
 	}
 
-	out := Draw(src, badges)
+	out := Draw(src, badges, 0)
 
-	// Scan along the top edge of the badges, below the rounded corners
-	// but above the text.
-	y := 24 + 4
+	// Inset 24 px, height 42 px: the badges span rows 534 to 575. Scan
+	// along their top edge, below the rounded corners but above the text.
+	y := 534 + 4
 	firstGold, firstAccent, gapAfterGold := -1, -1, false
 	for x := 0; x < 1200; x++ {
 		c := rgba(out, x, y)
@@ -129,33 +166,55 @@ func TestDraw_StacksBadgesLeftToRight(t *testing.T) {
 }
 
 func TestDraw_MinimumHeightOnSmallCovers(t *testing.T) {
-	// 7% of 200 is 14 px; the badge still gets 18.
+	// 7% of 200 is 14 px; the badge still gets 18, rows 174 to 191 above
+	// the 8 px inset.
 	src := solid(400, 200, sky)
 
-	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}})
+	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}, 0)
 
-	inset := 8
-	bottom := -1
-	for y := 0; y < 100; y++ {
-		if near(rgba(out, inset+9, y), Gold, 4) {
+	top, bottom := -1, -1
+	for y := 0; y < 200; y++ {
+		if near(rgba(out, 8+9, y), Gold, 4) {
+			if top < 0 {
+				top = y
+			}
 			bottom = y
 		}
 	}
-	if bottom < inset+17 {
-		t.Fatalf("expected the badge to reach at least 18 px high, bottom row %d", bottom)
+	if top != 174 || bottom != 191 {
+		t.Fatalf("expected the badge on rows 174 to 191, got %d to %d", top, bottom)
 	}
 }
 
 func TestDraw_NoBadgesAndTinyCovers(t *testing.T) {
 	src := solid(64, 32, sky)
-	if out := Draw(src, nil); out != image.Image(src) {
+	if out := Draw(src, nil, 0); out != image.Image(src) {
 		t.Fatal("no badges must return the input unchanged")
 	}
 	tiny := solid(16, 12, sky)
-	out := Draw(tiny, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}})
+	out := Draw(tiny, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}, 0)
 	if out.Bounds() != tiny.Bounds() {
 		t.Fatal("a tiny cover keeps its size")
 	}
+}
+
+func TestDraw_NoRoomAboveATallStrip(t *testing.T) {
+	src := withStrip(400, 200, 190)
+
+	out := Draw(src, []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}, 190)
+
+	if out != image.Image(src) {
+		t.Fatal("a strip leaving no room for a badge must leave the cover as it is")
+	}
+}
+
+func TestDraw_NegativeReserveCountsAsNone(t *testing.T) {
+	src := solid(400, 200, sky)
+	badges := []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}
+
+	a, b := Draw(src, badges, -30), Draw(src, badges, 0)
+
+	unchanged(t, a, b, src.Bounds(), "a negative reserve")
 }
 
 func TestDraw_SkipsBadgesThatDoNotFit(t *testing.T) {
@@ -165,11 +224,7 @@ func TestDraw_SkipsBadgesThatDoNotFit(t *testing.T) {
 		{Kind: KindFormat, Label: "FISHEYE 200", Fill: Neutral, Text: White},
 	}
 
-	out := Draw(src, badges)
+	out := Draw(src, badges, 0)
 
-	for y := 0; y < 400; y++ {
-		if c := rgba(out, 119, y); c != sky {
-			t.Fatalf("a badge must not run past the right edge, pixel at row %d is %v", y, c)
-		}
-	}
+	unchanged(t, out, src, image.Rect(119, 0, 120, 400), "a badge must not run past the right edge")
 }

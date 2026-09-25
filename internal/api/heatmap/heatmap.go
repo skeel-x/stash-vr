@@ -121,7 +121,8 @@ func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, bo
 
 // RenderCover returns a scene's cover as JPEG: the screenshot at coverUrl
 // with the heatmap at heatmapUrl across the bottom (when heatmapUrl is
-// set and the heatmap loads) and badges drawn in the top left corner.
+// set and the heatmap loads) and badges drawn in the bottom left corner,
+// above the heatmap strip.
 // Covers already rendered from the same screenshot, heatmap and badges
 // come from coverbadge.Rendered. A missing screenshot is
 // ErrImageNotFound.
@@ -171,13 +172,14 @@ func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUr
 }
 
 // composeCover decodes the screenshot, overlays the heatmap when heat is
-// set and decodes, and draws the badges.
+// set and decodes, and draws the badges above the heatmap strip.
 func composeCover(ctx context.Context, shot, heat []byte, badges []coverbadge.Badge) (image.Image, error) {
 	img, format, err := image.Decode(bytes.NewReader(shot))
 	if err != nil {
 		return nil, fmt.Errorf("decode screenshot: %w", err)
 	}
 	log.Ctx(ctx).Trace().Str("format", format).Msg("Decoded screenshot")
+	strip := 0
 	if heat != nil {
 		if heatmap, _, err := image.Decode(bytes.NewReader(heat)); err != nil {
 			log.Ctx(ctx).Debug().Err(err).Msg("Undecodable heatmap, leaving it out")
@@ -187,13 +189,15 @@ func composeCover(ctx context.Context, shot, heat []byte, badges []coverbadge.Ba
 				dest = image.NewRGBA(img.Bounds())
 				draw.Copy(dest, img.Bounds().Min, img, img.Bounds(), draw.Src, nil)
 			}
-			img = overlay(dest, heatmap)
+			img, strip = overlay(dest, heatmap)
 		}
 	}
-	return coverbadge.Draw(img, badges), nil
+	return coverbadge.Draw(img, badges, strip), nil
 }
 
-func overlay(dest draw.Image, heatmap image.Image) image.Image {
+// overlay scales heatmap across the bottom of dest and returns dest with
+// the height of the strip it covers.
+func overlay(dest draw.Image, heatmap image.Image) (image.Image, int) {
 	destSize := dest.Bounds().Size()
 	heatmapHeight := config.Application().HeatmapHeightPx
 	if heatmapHeight == 0 {
@@ -201,5 +205,5 @@ func overlay(dest draw.Image, heatmap image.Image) image.Image {
 	}
 	heatmapHeight = int(math.Min(float64(destSize.Y), float64(heatmapHeight)))
 	draw.NearestNeighbor.Scale(dest, image.Rect(0, destSize.Y, destSize.X, destSize.Y-heatmapHeight), heatmap, heatmap.Bounds(), draw.Src, nil)
-	return dest
+	return dest, heatmapHeight
 }

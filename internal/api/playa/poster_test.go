@@ -61,8 +61,10 @@ func posterEnv(t *testing.T, badges config.CoverBadges) httpHandler {
 	return httpHandler{libraryService: library.NewService(&posterStash{base: srv.URL})}
 }
 
+// goldCorner reports a gold badge in the bottom left corner of the 400 x
+// 200 poster.
 func goldCorner(img image.Image) bool {
-	for y := 0; y < 50; y++ {
+	for y := 150; y < 200; y++ {
 		for x := 0; x < 100; x++ {
 			r, g, b, _ := img.At(x, y).RGBA()
 			gold := coverbadge.Gold

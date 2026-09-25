@@ -434,8 +434,11 @@ func TestCover_QualityBadgeIsDrawn(t *testing.T) {
 	if img.Bounds() != image.Rect(0, 0, bigW, bigH) {
 		t.Fatalf("size changed: %v", img.Bounds())
 	}
-	if !hasColour(img, image.Rect(0, 0, bigW/4, bigH/4), coverbadge.Gold) {
-		t.Fatal("expected a gold 8K badge in the top left corner")
+	if !hasColour(img, image.Rect(0, bigH*3/4, bigW/4, bigH), coverbadge.Gold) {
+		t.Fatal("expected a gold 8K badge in the bottom left corner")
+	}
+	if hasColour(img, image.Rect(0, 0, bigW/4, bigH/4), coverbadge.Gold) {
+		t.Fatal("the top left corner belongs to HereSphere's icons")
 	}
 	if !near(img.At(bigW/2, bigH*3/4), sky, 12) {
 		t.Fatal("the rest of the cover must stay as it was")
@@ -474,8 +477,8 @@ func TestCover_FormatBadge(t *testing.T) {
 	if rec.Code != 200 || bytes.Equal(rec.Body.Bytes(), bigCover) {
 		t.Fatalf("expected a re-encoded cover, got %d", rec.Code)
 	}
-	if !hasColour(decodeJpeg(t, rec.Body.Bytes()), image.Rect(0, 0, bigW/4, bigH/4), coverbadge.Neutral) {
-		t.Fatal("expected the 180 badge in the top left corner")
+	if !hasColour(decodeJpeg(t, rec.Body.Bytes()), image.Rect(0, bigH*3/4, bigW/4, bigH), coverbadge.Neutral) {
+		t.Fatal("expected the 180 badge in the bottom left corner")
 	}
 }
 
@@ -510,8 +513,13 @@ func TestCover_BadgesOnHeatmapCover(t *testing.T) {
 		t.Fatalf("got %d", rec.Code)
 	}
 	img := decodeJpeg(t, rec.Body.Bytes())
-	if !hasColour(img, image.Rect(0, 0, bigW/4, bigH/4), coverbadge.Silver) {
-		t.Fatal("expected a silver 7K badge")
+	// The 4 px heatmap strip covers rows 196 to 199; the 18 px badge sits
+	// the 8 px inset above it, rows 170 to 187.
+	if !hasColour(img, image.Rect(0, 170, bigW/4, 188), coverbadge.Silver) {
+		t.Fatal("expected a silver 7K badge right above the heatmap")
+	}
+	if hasColour(img, image.Rect(0, 0, bigW/4, bigH/4), coverbadge.Silver) {
+		t.Fatal("the top left corner belongs to HereSphere's icons")
 	}
 	if near(img.At(bigW/2, bigH-1), sky, 12) {
 		t.Fatal("expected the heatmap across the bottom")

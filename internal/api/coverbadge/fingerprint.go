@@ -9,6 +9,11 @@ import (
 	"stash-vr/internal/config"
 )
 
+// LayoutVersion numbers where and how badges are drawn. It is part of the
+// fingerprint, so a new layout gives new cover URLs and headsets drop the
+// covers they keep. 2: bottom left, above the heatmap strip.
+const LayoutVersion = 2
+
 // fingerprintMemo keeps the last fingerprint: cover URLs are built per
 // scene, and the settings rarely change. rules is the first rule of the
 // slice it was computed for; config.Set always stores a fresh slice, and
@@ -21,7 +26,7 @@ var fingerprintMemo struct {
 	value string
 }
 
-// Fingerprint is a short hash of the badge settings and, when the format
+// Fingerprint is a short hash of the badge layout, the badge settings and, when the format
 // or passthrough badge is on, the video rules those badges resolve
 // through; "" when every badge is off. Cover URLs carry it so headsets,
 // which keep covers for a day, fetch them again when it changes.
@@ -39,15 +44,21 @@ func Fingerprint(on config.CoverBadges, rules []config.VideoRule) string {
 	if m.value != "" && m.on == on && m.rules == first && m.n == len(rules) {
 		return m.value
 	}
+	m.on, m.rules, m.n = on, first, len(rules)
+	m.value = fingerprint(on, rules, LayoutVersion)
+	return m.value
+}
+
+// fingerprint hashes the badge layout version, the switches and, when the
+// format or passthrough badge is on, the rules.
+func fingerprint(on config.CoverBadges, rules []config.VideoRule, layout int) string {
 	h := fnv.New32a()
-	_, _ = fmt.Fprintf(h, "q%t f%t p%t", on.Quality, on.Format, on.Passthrough)
+	_, _ = fmt.Fprintf(h, "l%d q%t f%t p%t", layout, on.Quality, on.Format, on.Passthrough)
 	if on.Format || on.Passthrough {
 		b, _ := json.Marshal(rules)
 		_, _ = h.Write(b)
 	}
-	m.on, m.rules, m.n = on, first, len(rules)
-	m.value = fmt.Sprintf("%08x", h.Sum32())
-	return m.value
+	return fmt.Sprintf("%08x", h.Sum32())
 }
 
 // URLQuery is "?b=<fingerprint>" for cover URLs, or "" with every badge

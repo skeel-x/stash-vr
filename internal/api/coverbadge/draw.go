@@ -21,8 +21,7 @@ const (
 	insetShare  = 0.02
 	// minHeight keeps badges legible in the headset on small covers.
 	minHeight = 18
-	// maxHeightShare caps the height on short covers so badges stay in the
-	// top quarter and never reach the heatmap strip at the bottom.
+	// maxHeightShare caps the height at a quarter of short covers.
 	maxHeightShare = 0.25
 	// minDrawable is the smallest height worth drawing; below it the
 	// cover is left as it is.
@@ -41,17 +40,25 @@ var boldFont = sync.OnceValues(func() (*sfnt.Font, error) {
 	return opentype.Parse(gobold.TTF)
 })
 
-// Draw returns a copy of img with badges drawn left to right in its top
-// left corner. The size is unchanged and img is not modified. Badges that
-// do not fit the width are dropped; with no badges, or a cover too small
-// to hold one, img is returned as it is.
-func Draw(img image.Image, badges []Badge) image.Image {
+// Draw returns a copy of img with badges drawn left to right in its bottom
+// left corner, clear of the top left corner where HereSphere draws its
+// own icons. bottomReserve is the height of the heatmap strip overlaid at
+// the bottom, 0 for none; the badges sit the inset above it. The size is
+// unchanged and img is not modified. Badges that do not fit the width
+// are dropped; with no badges, or no room for one, img is returned as it
+// is.
+func Draw(img image.Image, badges []Badge, bottomReserve int) image.Image {
 	if len(badges) == 0 {
 		return img
 	}
 	b := img.Bounds()
 	h := badgeHeight(b.Dy())
 	if h < minDrawable {
+		return img
+	}
+	inset := max(2, int(math.Round(float64(b.Dx())*insetShare)))
+	y := b.Max.Y - max(0, bottomReserve) - inset - h
+	if y < b.Min.Y {
 		return img
 	}
 	fnt, err := boldFont()
@@ -67,13 +74,12 @@ func Draw(img image.Image, badges []Badge) image.Image {
 	dst := image.NewRGBA(b)
 	draw.Draw(dst, b, img, b.Min, draw.Src)
 
-	inset := max(2, int(math.Round(float64(b.Dx())*insetShare)))
 	pad := int(math.Round(float64(h) * paddingShare))
 	gap := max(2, int(math.Round(float64(h)*gapShare)))
 	radius := float32(h) * radiusShare
 	baseline := textBaseline(face, h)
 
-	x, y := b.Min.X+inset, b.Min.Y+inset
+	x := b.Min.X + inset
 	for i := range badges {
 		bg := &badges[i]
 		w := font.MeasureString(face, bg.Label).Ceil() + 2*pad

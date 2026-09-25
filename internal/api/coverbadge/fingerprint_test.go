@@ -46,3 +46,18 @@ func TestURLQuery(t *testing.T) {
 		t.Fatalf("expected ?b=<fingerprint>, got %q", got)
 	}
 }
+
+func TestFingerprint_CarriesTheLayoutVersion(t *testing.T) {
+	on := config.CoverBadges{Quality: true}
+	rules := config.DefaultVideoRules()
+
+	if fingerprint(on, rules, 1) == fingerprint(on, rules, 2) {
+		t.Fatal("a new badge layout must change the fingerprint")
+	}
+	if Fingerprint(on, rules) != fingerprint(on, rules, LayoutVersion) {
+		t.Fatal("the fingerprint must be taken with the current layout version")
+	}
+	if LayoutVersion < 2 {
+		t.Fatal("badges moved to the bottom left corner in layout 2")
+	}
+}

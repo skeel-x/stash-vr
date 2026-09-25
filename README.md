@@ -207,8 +207,9 @@ Browse to `http://<host>:9666` using a supported video player. You'll be present
 
 ### Cover badges
 
-Stash-VR can draw small labels in the top left corner of scene covers, so
-the library grid in the headset shows them at a glance. Each kind is
+Stash-VR can draw small labels in the bottom left corner of scene covers,
+so the library grid in the headset shows them at a glance. The top left
+corner is left free for the icons HereSphere draws there. Each kind is
 switched on or off under Cover badges on the Setup page:
 
 * **Quality** (on by default): the tier tag the vrQualityTags plugin sets
@@ -222,12 +223,12 @@ switched on or off under Cover badges on the Setup page:
 * **Passthrough** (on by default): `AR` on scenes whose rules turn on
   passthrough (an alpha matte) or a chroma-key mask.
 
-Badges are 7% of the cover height (at least 18 px) and stay clear of the
-heatmap strip of interactive scenes. Covers with badges are re-encoded as
+Badges are 7% of the cover height (at least 18 px), inset by 2% of the
+cover width, and sit just above the heatmap strip of interactive scenes. Covers with badges are re-encoded as
 JPEG and the last 500 are kept in memory; covers without any are served as
 Stash sends them. Headsets keep covers for a day, so while any badge is on
-the cover URLs carry a short fingerprint of the badge settings (`?b=...`),
-and changing them shows on the next library load.
+the cover URLs carry a short fingerprint of the badge settings and layout
+(`?b=...`), and changing them shows on the next library load.
 
 ### HereSphere
 
