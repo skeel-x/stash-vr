@@ -1,0 +1,139 @@
+// Package coverbadge picks and draws the small labels stash-vr puts onto
+// scene covers: the quality tier or resolution, the projection and a
+// passthrough marker.
+package coverbadge
+
+import (
+	"fmt"
+	"image/color"
+	"strings"
+
+	"stash-vr/internal/config"
+	"stash-vr/internal/library"
+)
+
+// Kind says which setting a badge belongs to.
+type Kind string
+
+const (
+	KindQuality     Kind = "quality"
+	KindFormat      Kind = "format"
+	KindPassthrough Kind = "passthrough"
+)
+
+// Badge is one label drawn onto a cover.
+type Badge struct {
+	Kind  Kind
+	Label string
+	Fill  color.RGBA
+	Text  color.RGBA
+}
+
+// Badge colours: the quality tiers get metals with dark text, everything
+// else white text on a dark or accent fill.
+var (
+	Gold    = color.RGBA{R: 0xd4, G: 0xaf, B: 0x37, A: 0xff}
+	Silver  = color.RGBA{R: 0xc4, G: 0xc8, B: 0xcc, A: 0xff}
+	Bronze  = color.RGBA{R: 0xcd, G: 0x7f, B: 0x32, A: 0xff}
+	Neutral = color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}
+	Accent  = color.RGBA{R: 0x1e, G: 0x6e, B: 0xc8, A: 0xff}
+	White   = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	Dark    = color.RGBA{R: 0x14, G: 0x14, B: 0x14, A: 0xff}
+)
+
+// tiers are the vrQualityTags tier tags, best first. The HQ parent tag is
+// deliberately absent: it says a tier applies, not which.
+var tiers = []struct {
+	tag  string
+	fill color.RGBA
+}{
+	{"8K", Gold},
+	{"7K", Silver},
+	{"6K HBR", Bronze},
+}
+
+// ForScene returns the badges a scene's cover gets under the switches in
+// on, in drawing order: quality, format, passthrough. rules are the video
+// rules the format and passthrough badges resolve through.
+func ForScene(vd *library.VideoData, on config.CoverBadges, rules []config.VideoRule) []Badge {
+	if vd == nil || vd.SceneParts == nil || !on.Any() {
+		return nil
+	}
+	var out []Badge
+	if on.Quality {
+		if b, ok := qualityBadge(vd); ok {
+			out = append(out, b)
+		}
+	}
+	if on.Format || on.Passthrough {
+		f := library.ResolveFormat(rules, vd.SceneParts.Tags)
+		if on.Format {
+			if label := formatLabel(&f); label != "" {
+				out = append(out, Badge{Kind: KindFormat, Label: label, Fill: Neutral, Text: White})
+			}
+		}
+		if on.Passthrough && isPassthrough(&f) {
+			out = append(out, Badge{Kind: KindPassthrough, Label: "AR", Fill: Accent, Text: White})
+		}
+	}
+	return out
+}
+
+func qualityBadge(vd *library.VideoData) (Badge, bool) {
+	for _, tier := range tiers {
+		for _, t := range vd.SceneParts.Tags {
+			if t != nil && strings.EqualFold(strings.TrimSpace(t.Name), tier.tag) {
+				return Badge{Kind: KindQuality, Label: tier.tag, Fill: tier.fill, Text: Dark}, true
+			}
+		}
+	}
+	files := vd.SceneParts.Files
+	if len(files) == 0 || files[0] == nil {
+		return Badge{}, false
+	}
+	label := library.ResolutionLabel(files[0].Width, files[0].Height)
+	if label == "" {
+		return Badge{}, false
+	}
+	return Badge{Kind: KindQuality, Label: label, Fill: Neutral, Text: White}, true
+}
+
+// formatLabel names the projection; plain flat 2D and an unknown
+// projection get no label.
+func formatLabel(f *library.Format) string {
+	switch f.Projection {
+	case "equirectangular":
+		return "180"
+	case "equirectangular360", "cubemap", "equiangularCubemap":
+		return "360"
+	case "fisheye":
+		if f.Fov > 0 {
+			return fmt.Sprintf("FISHEYE %d", int(f.Fov+0.5))
+		}
+		return "FISHEYE"
+	case "perspective":
+		if f.Stereo == "sbs" || f.Stereo == "tb" {
+			return "FLAT 3D"
+		}
+	}
+	return ""
+}
+
+// isPassthrough reports an alpha matte or a chroma-key mask.
+func isPassthrough(f *library.Format) bool {
+	return f.Passthrough || f.Mask == "alpha" || f.Mask == "chroma"
+}
+
+// Key names a badge set for cache keys; "" for none.
+func Key(badges []Badge) string {
+	var b strings.Builder
+	for i := range badges {
+		if i > 0 {
+			b.WriteByte('|')
+		}
+		b.WriteString(string(badges[i].Kind))
+		b.WriteByte(':')
+		b.WriteString(badges[i].Label)
+	}
+	return b.String()
+}
