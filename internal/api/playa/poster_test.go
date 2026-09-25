@@ -120,3 +120,18 @@ func TestPosterHandler_WithoutBadges(t *testing.T) {
 		t.Fatal("badges switched off must leave the poster plain")
 	}
 }
+
+func TestPreviewImage_PosterUrlCarriesBadgeFingerprint(t *testing.T) {
+	h := posterEnv(t, config.CoverBadges{Quality: true})
+	vd, err := h.libraryService.GetScene(context.Background(), "1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := previewImage(vd, "https://vr.example")
+
+	want := "https://vr.example/api/playa/v2/poster/1" + coverbadge.URLQuery(config.Application().CoverBadges, config.Application().VideoRules)
+	if got == nil || *got != want || want == "https://vr.example/api/playa/v2/poster/1" {
+		t.Fatalf("expected %q, got %v", want, got)
+	}
+}

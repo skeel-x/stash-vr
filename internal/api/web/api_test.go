@@ -944,3 +944,23 @@ func TestGetConfig_IncludesCoverBadges(t *testing.T) {
 		t.Fatalf("expected cover_badges in the config view, got %v", out)
 	}
 }
+
+func TestGetRandom_CoverUrlCarriesBadgeFingerprint(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.CoverBadges = config.CoverBadges{Quality: true}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	_, out := do(t, h, http.MethodGet, "/random?n=1", nil)
+
+	scenes, _ := out["scenes"].([]any)
+	if len(scenes) == 0 {
+		t.Fatalf("expected a scene, got %v", out)
+	}
+	cover, _ := scenes[0].(map[string]any)["cover"].(string)
+	if !strings.Contains(cover, "/cover/") || !strings.Contains(cover, "?b=") {
+		t.Fatalf("expected the cover url with a badge fingerprint, got %q", cover)
+	}
+}

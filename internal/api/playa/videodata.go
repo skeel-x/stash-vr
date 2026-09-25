@@ -3,6 +3,7 @@ package playa
 import (
 	"fmt"
 	"slices"
+	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
@@ -421,7 +422,7 @@ func previewImage(vd *library.VideoData, baseURL string) *string {
 		return nil
 	}
 	if vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
-		posterURL := baseURL + "/api/playa/v2/poster/" + vd.Id()
+		posterURL := baseURL + "/api/playa/v2/poster/" + vd.Id() + coverbadge.CurrentURLQuery()
 		return &posterURL
 	}
 	return keyedURL(vd.SceneParts.Paths.Preview)

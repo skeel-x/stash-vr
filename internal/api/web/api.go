@@ -17,6 +17,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
+	"stash-vr/internal/api/heatmap"
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/config"
 	"stash-vr/internal/hsp"
@@ -58,7 +59,7 @@ func randomScenes(ctx context.Context, lib *library.Service, baseUrl string, n i
 	out := make([]RandomScene, len(vds))
 	for i, vd := range vds {
 		id := vd.Id()
-		out[i] = RandomScene{ID: id, Title: vd.Title(), Cover: baseUrl + "/cover/" + id, Stash: StashSceneUrl(stashUrl, id)}
+		out[i] = RandomScene{ID: id, Title: vd.Title(), Cover: heatmap.GetCoverUrl(baseUrl, id), Stash: StashSceneUrl(stashUrl, id)}
 	}
 	return out, nil
 }

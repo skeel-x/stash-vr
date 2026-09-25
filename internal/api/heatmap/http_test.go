@@ -529,3 +529,38 @@ func TestCover_BadgedSceneWithMissingScreenshotIs404(t *testing.T) {
 		t.Fatalf("expected an uncached 404, got %d %q", rec.Code, rec.Header().Get("Cache-Control"))
 	}
 }
+
+func TestGetCoverUrl_CarriesBadgeFingerprint(t *testing.T) {
+	setBadges(t, config.CoverBadges{})
+	if got := GetCoverUrl("https://vr.example", "9"); got != "https://vr.example/cover/9" {
+		t.Fatalf("badges off must keep the plain url, got %q", got)
+	}
+
+	cfg := config.Application()
+	cfg.CoverBadges = config.CoverBadges{Quality: true}
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	quality := GetCoverUrl("https://vr.example", "9")
+	if !strings.HasPrefix(quality, "https://vr.example/cover/9?b=") {
+		t.Fatalf("expected a badge fingerprint, got %q", quality)
+	}
+
+	cfg.CoverBadges.Format = true
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := GetCoverUrl("https://vr.example", "9"); got == quality {
+		t.Fatal("toggling a badge must change the cover url")
+	}
+}
+
+func TestCover_IgnoresFingerprintQuery(t *testing.T) {
+	setBadges(t, config.CoverBadges{Quality: true})
+	srv, _, _ := imageServer(t)
+	h := coverRouter(t, srv.URL)
+
+	if rec := get(t, h, "/cover/10?b=abcd1234"); rec.Code != 200 {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
