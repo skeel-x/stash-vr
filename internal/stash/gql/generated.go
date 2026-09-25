@@ -4102,6 +4102,7 @@ type ScenePartsFilesVideoFile struct {
 	Basename    string  `json:"basename"`
 	Duration    float64 `json:"duration"`
 	Path        string  `json:"path"`
+	Width       int     `json:"width"`
 	Height      int     `json:"height"`
 	Video_codec string  `json:"video_codec"`
 }
@@ -4114,6 +4115,9 @@ func (v *ScenePartsFilesVideoFile) GetDuration() float64 { return v.Duration }
 
 // GetPath returns ScenePartsFilesVideoFile.Path, and is useful for accessing the field via an interface.
 func (v *ScenePartsFilesVideoFile) GetPath() string { return v.Path }
+
+// GetWidth returns ScenePartsFilesVideoFile.Width, and is useful for accessing the field via an interface.
+func (v *ScenePartsFilesVideoFile) GetWidth() int { return v.Width }
 
 // GetHeight returns ScenePartsFilesVideoFile.Height, and is useful for accessing the field via an interface.
 func (v *ScenePartsFilesVideoFile) GetHeight() int { return v.Height }
@@ -6146,6 +6150,7 @@ fragment SceneParts on Scene {
 		basename
 		duration
 		path
+		width
 		height
 		video_codec
 	}

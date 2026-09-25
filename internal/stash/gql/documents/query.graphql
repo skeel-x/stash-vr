@@ -276,6 +276,7 @@ fragment SceneParts on Scene {
     basename
     duration
     path
+    width
     height
     video_codec
   }

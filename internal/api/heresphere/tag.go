@@ -241,7 +241,7 @@ func getFields(vd *library.VideoData) []tagDto {
 	}
 	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%d", internal.LegendMetaOCount, seperator, oCount)})
 
-	resolution, tier := nearestResolution(vd.SceneParts.Files[0].Height)
+	resolution, tier := library.NearestResolution(vd.SceneParts.Files[0].Height)
 	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%dp", internal.LegendMetaResolution, seperator, resolution)})
 	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%s", internal.LegendMetaResolution, seperator, tier)})
 
