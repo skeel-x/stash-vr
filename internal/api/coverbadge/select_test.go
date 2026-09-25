@@ -258,3 +258,49 @@ func TestForScene_AllFiveInOrder(t *testing.T) {
 		t.Fatalf("expected quality, format, AR, duration, frame rate, got %v", got)
 	}
 }
+
+func TestForScene_LowDetailMutesTheTier(t *testing.T) {
+	on := config.CoverBadges{Quality: true}
+	for _, c := range []struct {
+		tags []string
+		want string
+		fill color.RGBA
+		text color.RGBA
+	}{
+		{[]string{"8K"}, "8K", Gold, Dark},
+		{[]string{"8K", "Low Detail"}, "8K", Slate, White},
+		{[]string{"low detail", "7K"}, "7K", Slate, White},
+		{[]string{"6K HBR", " LOW DETAIL "}, "6K HBR", Slate, White},
+		{[]string{"7K", "Low"}, "7K", Silver, Dark},
+	} {
+		got := ForScene(scene(8192, 4096, c.tags...), on, nil)
+		if len(got) != 1 || got[0].Label != c.want || got[0].Fill != c.fill || got[0].Text != c.text {
+			t.Errorf("tags %v: got %+v, want %q in %v on %v", c.tags, got, c.want, c.text, c.fill)
+		}
+	}
+}
+
+func TestForScene_LowDetailMutesTheResolution(t *testing.T) {
+	on := config.CoverBadges{Quality: true}
+
+	got := ForScene(scene(5400, 2700, "Low Detail"), on, nil)
+
+	if len(got) != 1 || got[0].Label != "5K" || got[0].Fill != Slate || got[0].Text != White {
+		t.Fatalf("expected a slate 5K badge, got %+v", got)
+	}
+}
+
+func TestSlateIsTheLowDetailColour(t *testing.T) {
+	if Slate != (color.RGBA{R: 0x5b, G: 0x65, B: 0x73, A: 0xff}) {
+		t.Fatalf("Low Detail is slate #5b6573, got %v", Slate)
+	}
+}
+
+func TestKey_TellsAMutedTierApart(t *testing.T) {
+	on := config.CoverBadges{Quality: true}
+	gold := ForScene(scene(8192, 4096, "8K"), on, nil)
+	slate := ForScene(scene(8192, 4096, "8K", "Low Detail"), on, nil)
+	if Key(gold) == Key(slate) {
+		t.Fatal("a gold and a slate 8K must not share a rendered cover")
+	}
+}

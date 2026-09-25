@@ -410,3 +410,21 @@ func TestBadgePreview_DrawsDurationAndFrameRate(t *testing.T) {
 		t.Fatal("expected no badges with both off")
 	}
 }
+
+func TestSetup_RendersBadgeLegend(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+
+	legend := strings.Index(body, `class="badge-legend"`)
+	preview := strings.Index(body, `id="badge-preview-img"`)
+	rules := strings.Index(body, "<h2>Video rules</h2>")
+	if legend < 0 || legend < preview || legend > rules {
+		t.Fatal("the badge legend belongs under the preview")
+	}
+	for _, want := range []string{"#d4af37", "#c4c8cc", "#cd7f32", "#5b6573", ">8K<", ">7K<", ">6K HBR<", "Low Detail"} {
+		if !strings.Contains(body[legend:rules], want) {
+			t.Errorf("legend lacks %s", want)
+		}
+	}
+}

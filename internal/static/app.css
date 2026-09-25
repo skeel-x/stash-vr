@@ -150,6 +150,8 @@ table.sections td input[type=checkbox]{width:26px;height:26px}
 .badge-preview-title{margin:6px 0 0;color:var(--muted);overflow-wrap:anywhere}
 .badge-preview-title:empty{display:none}
 #badge-preview-scene{width:9em;margin:0}
+.badge-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 0;color:var(--muted);font-size:14px}
+.badge-legend .swatch{display:inline-block;padding:1px 7px;border-radius:4px;font-weight:700;font-size:13px}
 .inspect-row #inspect-q{flex:1;width:auto;min-width:12em;margin:0}
 #inspect-out{overflow-x:auto;margin:8px 0 16px}
 table.inspect{width:100%;border-collapse:collapse;font-size:15px}

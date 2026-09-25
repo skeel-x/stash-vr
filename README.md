@@ -217,6 +217,12 @@ switched on or off under Cover badges on the Setup page:
   ignored). A scene without a tier tag shows the resolution of its file
   instead, named by width from 4K up (`5K`, `6K`) and by height below
   (`1080p`), in grey.
+
+  When vrQualityTags also tags the scene `Low Detail` (its files do not
+  carry the detail their resolution claims: an upscale, or a bitrate too
+  low for the tier), the same label is drawn in slate grey with white
+  text instead of the metal or grey. So a gold `8K` is true 8K; a slate
+  `8K` has the pixels but not the detail.
 * **Format** (off by default): the projection the video rules resolve to:
   `180`, `360`, `FISHEYE` (with the field of view when a rule sets one, for
   example `FISHEYE 200`) or `FLAT 3D`. Flat 2D scenes get no label.
@@ -244,7 +250,8 @@ as ticked, before saving, redrawn on every change. It picks a scene with a
 tier tag and, if Stash has one, the `Alpha` tag, so every kind of badge
 shows; enter a scene id and press Show to preview another scene. The
 preview uses the saved video rules and leaves the saved settings and the
-rendered cover cache alone.
+rendered cover cache alone. A legend under it shows the tier colours:
+gold `8K`, silver `7K`, bronze `6K HBR`, and slate for Low Detail.
 
 ### HereSphere
 

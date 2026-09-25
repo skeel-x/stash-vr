@@ -33,11 +33,13 @@ type Badge struct {
 }
 
 // Badge colours: the quality tiers get metals with dark text, everything
-// else white text on a dark or accent fill.
+// else white text on a dark or accent fill. Slate replaces the metal, and
+// the grey of a resolution label, on scenes tagged Low Detail.
 var (
 	Gold    = color.RGBA{R: 0xd4, G: 0xaf, B: 0x37, A: 0xff}
 	Silver  = color.RGBA{R: 0xc4, G: 0xc8, B: 0xcc, A: 0xff}
 	Bronze  = color.RGBA{R: 0xcd, G: 0x7f, B: 0x32, A: 0xff}
+	Slate   = color.RGBA{R: 0x5b, G: 0x65, B: 0x73, A: 0xff}
 	Neutral = color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}
 	Accent  = color.RGBA{R: 0x1e, G: 0x6e, B: 0xc8, A: 0xff}
 	White   = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
@@ -54,6 +56,11 @@ var tiers = []struct {
 	{"7K", Silver},
 	{"6K HBR", Bronze},
 }
+
+// lowDetailTag is the tag vrQualityTags sets on scenes whose files do not
+// carry the detail their resolution claims: upscales, or a bitrate too
+// low for the tier.
+const lowDetailTag = "Low Detail"
 
 // TierTags returns the names of the tier tags, best first.
 func TierTags() []string {
@@ -139,12 +146,21 @@ func frameRateLabel(fps float64) string {
 	return fmt.Sprintf("%d fps", int(math.Round(fps)))
 }
 
+// qualityBadge is the best tier tag in its metal, else the resolution of
+// the primary file in grey; either turns slate when the scene is tagged
+// Low Detail.
 func qualityBadge(vd *library.VideoData) (Badge, bool) {
+	b, ok := tierOrResolution(vd)
+	if ok && hasTag(vd, lowDetailTag) {
+		b.Fill, b.Text = Slate, White
+	}
+	return b, ok
+}
+
+func tierOrResolution(vd *library.VideoData) (Badge, bool) {
 	for _, tier := range tiers {
-		for _, t := range vd.SceneParts.Tags {
-			if t != nil && strings.EqualFold(strings.TrimSpace(t.Name), tier.tag) {
-				return Badge{Kind: KindQuality, Label: tier.tag, Fill: tier.fill, Text: Dark}, true
-			}
+		if hasTag(vd, tier.tag) {
+			return Badge{Kind: KindQuality, Label: tier.tag, Fill: tier.fill, Text: Dark}, true
 		}
 	}
 	files := vd.SceneParts.Files
@@ -156,6 +172,17 @@ func qualityBadge(vd *library.VideoData) (Badge, bool) {
 		return Badge{}, false
 	}
 	return Badge{Kind: KindQuality, Label: label, Fill: Neutral, Text: White}, true
+}
+
+// hasTag reports a tag named name on the scene, ignoring case and
+// surrounding spaces.
+func hasTag(vd *library.VideoData, name string) bool {
+	for _, t := range vd.SceneParts.Tags {
+		if t != nil && strings.EqualFold(strings.TrimSpace(t.Name), name) {
+			return true
+		}
+	}
+	return false
 }
 
 // formatLabel names the projection; plain flat 2D and an unknown
@@ -184,16 +211,16 @@ func isPassthrough(f *library.Format) bool {
 	return f.Passthrough || f.Mask == "alpha" || f.Mask == "chroma"
 }
 
-// Key names a badge set for cache keys; "" for none.
+// Key names a badge set for cache keys, colours included so a tier that
+// turns slate is drawn afresh; "" for none.
 func Key(badges []Badge) string {
 	var b strings.Builder
 	for i := range badges {
 		if i > 0 {
 			b.WriteByte('|')
 		}
-		b.WriteString(string(badges[i].Kind))
-		b.WriteByte(':')
-		b.WriteString(badges[i].Label)
+		bg := &badges[i]
+		fmt.Fprintf(&b, "%s:%s#%02x%02x%02x", bg.Kind, bg.Label, bg.Fill.R, bg.Fill.G, bg.Fill.B)
 	}
 	return b.String()
 }

@@ -497,7 +497,7 @@ func TestCover_RenderedCoverIsCached(t *testing.T) {
 	if !bytes.Equal(first, second) || coverbadge.Rendered.Len() != 1 {
 		t.Fatal("expected the second request served from the cache")
 	}
-	key := coverbadge.CacheKey("10", []coverbadge.Badge{{Kind: coverbadge.KindQuality, Label: "8K"}}, bigCover, nil)
+	key := coverbadge.CacheKey("10", []coverbadge.Badge{{Kind: coverbadge.KindQuality, Label: "8K", Fill: coverbadge.Gold, Text: coverbadge.Dark}}, bigCover, nil)
 	if _, ok := coverbadge.Rendered.Get(key); !ok {
 		t.Fatal("expected the cover cached under scene, badges and screenshot digest")
 	}
