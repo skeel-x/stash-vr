@@ -128,6 +128,11 @@ func TestDefault_HasEverySection(t *testing.T) {
 	if p.Stitch[0].Scale != (Vec4{1, 1, 1, 1}) || p.Audio[0].Volume != 1 || p.Environment[0].Background != BackgroundGlobal {
 		t.Fatalf("default values %+v", p)
 	}
+	// HereSphere saves an untouched scene with a 6.5 cm camera separation;
+	// 0 would be clamped to 1 cm.
+	if p.Alignment[0] != (AlignmentKey{Position: Vec3{Y: 6.5}}) {
+		t.Fatalf("default alignment %+v", p.Alignment[0])
+	}
 	// Default must not share slices between calls.
 	p.Format[0].Zoom.X = 9
 	if Default().Format[0].Zoom.X != 1 {

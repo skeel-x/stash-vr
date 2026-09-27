@@ -26,8 +26,11 @@ func Default() *Profile {
 			TrueFOV:    180,
 			ExportFOV:  180,
 		}},
-		Stitch:      []StitchKey{{Scale: neutral}},
-		Alignment:   []AlignmentKey{{}},
+		Stitch: []StitchKey{{Scale: neutral}},
+		// Position.Y is HereSphere's camera stereo alignment "Right": the
+		// camera separation in cm (6.5 by default). 0 is not "unset", it is
+		// clamped to 1 cm, which shows the scene at the wrong scale.
+		Alignment:   []AlignmentKey{{Position: Vec3{Y: 6.5}}},
 		Orientation: []OrientationKey{{}},
 		Origin:      []OriginKey{{}},
 		Motion:      []MotionKey{{Distance: 200}},
