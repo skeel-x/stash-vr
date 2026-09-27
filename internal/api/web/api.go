@@ -86,6 +86,7 @@ type ConfigView struct {
 	AutoPerformerMin    int                `json:"auto_performer_min"`
 	CoverBadges         config.CoverBadges `json:"cover_badges"`
 	LearnStudioProfiles bool               `json:"learn_studio_profiles"`
+	CorrectVertical     bool               `json:"correct_vertical_stereo"`
 	ListenAddress       string             `json:"listen_address"`
 	ConfigPath          string             `json:"config_path"`
 	Filters             []config.Filter    `json:"filters"`
@@ -114,6 +115,7 @@ type configInput struct {
 	AutoPerformerMin   *int              `json:"auto_performer_min"`
 	CoverBadges        *coverBadgesInput `json:"cover_badges"`
 	LearnStudio        *bool             `json:"learn_studio_profiles"`
+	CorrectVertical    *bool             `json:"correct_vertical_stereo"`
 }
 
 // coverBadgesInput is the cover_badges object of PUT /config; a missing
@@ -180,6 +182,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		AutoPerformerMin:    cfg.AutoPerformerMin,
 		CoverBadges:         cfg.CoverBadges,
 		LearnStudioProfiles: cfg.LearnStudioProfiles,
+		CorrectVertical:     cfg.CorrectVerticalStereo,
 		ListenAddress:       cfg.ListenAddress,
 		ConfigPath:          config.FilePath(cfg),
 		Filters:             cfg.Filters,
@@ -360,6 +363,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	in.CoverBadges.apply(&next.CoverBadges)
 	if in.LearnStudio != nil {
 		next.LearnStudioProfiles = *in.LearnStudio
+	}
+	if in.CorrectVertical != nil {
+		next.CorrectVerticalStereo = *in.CorrectVertical
 	}
 
 	// Validate before the host rule so an unusable URL is reported as such

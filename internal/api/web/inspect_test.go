@@ -243,3 +243,101 @@ func TestInspect_StudioProfile(t *testing.T) {
 		t.Fatal("app.js must label a learned profile as studio (from scene N)")
 	}
 }
+
+func TestInspect_VerticalOffset(t *testing.T) {
+	stash := &inspectStash{scenes: map[int]string{
+		40: `"title":"Off",` + tagsJson("DOME") + `,"custom_fields":{"vr_vertical_offset":-0.62}`,
+		41: `"title":"Small",` + tagsJson("DOME") + `,"custom_fields":{"vr_vertical_offset":"0.1"}`,
+		42: `"title":"Flat",` + tagsJson("FLAT") + `,"custom_fields":{"vr_vertical_offset":0.8}`,
+		43: `"title":"Garbage",` + tagsJson("DOME") + `,"custom_fields":{"vr_vertical_offset":"n/a"}`,
+		44: `"title":"None",` + tagsJson("DOME"),
+		45: `"title":"Large",` + tagsJson("DOME") + `,"custom_fields":{"vr_vertical_offset":2.4}`,
+	}}
+	lib, h := newEnv(t, &stash.fakeStash)
+	lib.SetStashClient(stash)
+	set := func(on bool) {
+		cfg := config.Application()
+		cfg.VideoRules = config.DefaultVideoRules()
+		cfg.CorrectVerticalStereo = on
+		if _, err := config.Set(cfg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	inspect := func(id string) map[string]any {
+		_, out := do(t, h, http.MethodGet, "/inspect?q="+id, nil)
+		return scenesOf(t, out)[0]
+	}
+	set(true)
+
+	s := inspect("40")
+	v := s["vertical"].(map[string]any)
+	if v["offset"] != -0.62 || v["applied"] != true || v["reason"] != "applied" {
+		t.Fatalf("applied: %v", v)
+	}
+	if p := s["profile"].(map[string]any); p["source"] != "generated" || p["link"] != "http://example.com/hsp/scene/40" {
+		t.Fatalf("profile %v", p)
+	}
+	if g := s["format"].(map[string]any)["geometry"].(map[string]any); g["pitch"] != -0.62 {
+		t.Fatalf("geometry %v", g)
+	}
+
+	for id, want := range map[string]map[string]any{
+		"41": {"offset": 0.1, "reason": "too_small"},
+		"42": {"offset": 0.8, "reason": "not_stereo"},
+		"43": {"offset": nil, "reason": "invalid"},
+		"44": {"offset": nil, "reason": "not_measured"},
+		"45": {"offset": 2.4, "reason": "too_large"},
+	} {
+		v := inspect(id)["vertical"].(map[string]any)
+		if v["offset"] != want["offset"] || v["reason"] != want["reason"] || v["applied"] != false {
+			t.Fatalf("%s: %v", id, v)
+		}
+	}
+
+	// A stored profile wins over the correction.
+	if err := lib.SaveProfile("40", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if v := inspect("40")["vertical"].(map[string]any); v["applied"] != false || v["reason"] != "profile_wins" || v["offset"] != -0.62 {
+		t.Fatalf("profile wins: %v", v)
+	}
+
+	set(false)
+	s = inspect("41")
+	if v := s["vertical"].(map[string]any); v["reason"] != "off" || v["offset"] != 0.1 {
+		t.Fatalf("off: %v", v)
+	}
+
+	js, err := fs.ReadFile(static.Fs, "app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, reason := range []string{"applied", "profile_wins", "not_measured", "invalid", "off", "not_stereo", "rule_pitch", "too_small", "too_large"} {
+		if !strings.Contains(string(js), reason+":") {
+			t.Fatalf("app.js has no text for vertical reason %s", reason)
+		}
+	}
+}
+
+func TestInspect_VerticalRulePitch(t *testing.T) {
+	stash := &inspectStash{scenes: map[int]string{
+		50: `"title":"Pitched",` + tagsJson("DOME") + `,"custom_fields":{"vr_vertical_offset":0.5}`,
+	}}
+	lib, h := newEnv(t, &stash.fakeStash)
+	lib.SetStashClient(stash)
+	pitch := 1.0
+	cfg := config.Application()
+	cfg.VideoRules = append(config.DefaultVideoRules(), config.VideoRule{Tag: "DOME", Pitch: &pitch})
+	cfg.CorrectVerticalStereo = true
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	_, out := do(t, h, http.MethodGet, "/inspect?q=50", nil)
+	s := scenesOf(t, out)[0]
+	if v := s["vertical"].(map[string]any); v["reason"] != "rule_pitch" || v["applied"] != false {
+		t.Fatalf("rule pitch: %v", v)
+	}
+	if g := s["format"].(map[string]any)["geometry"].(map[string]any); g["pitch"] != 1.0 {
+		t.Fatalf("rule pitch overwritten: %v", g)
+	}
+}

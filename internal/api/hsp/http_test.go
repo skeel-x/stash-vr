@@ -1,6 +1,7 @@
 package hsp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,7 +22,8 @@ import (
 
 // fakeStash answers FindScenes: scene 7 and 9 are tagged Passthrough, 8
 // has no tags, 11 and 12 are Passthrough scenes of studio s1, 5 fails,
-// anything else does not exist.
+// 20 is an SBS scene measured -0.62 degrees vertically off, 21 one
+// measured 0.1, anything else does not exist.
 type fakeStash struct{}
 
 func (fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -36,7 +38,7 @@ func (fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *grap
 	const passthrough = `[{"id":"1","name":"Passthrough","sort_name":"","aliases":[],"parents":[]}]`
 	var scenes []string
 	for _, id := range vars.Ids {
-		tags, studio := `[]`, `null`
+		tags, studio, custom := `[]`, `null`, `{}`
 		switch id {
 		case 5:
 			return errors.New("stash is down")
@@ -44,11 +46,17 @@ func (fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *grap
 			tags = passthrough
 		case 11, 12:
 			tags, studio = passthrough, `{"id":"s1","name":"Studio One"}`
+		case 20, 21:
+			tags = `[{"id":"2","name":"SBS","sort_name":"","aliases":[],"parents":[]}]`
+			custom = `{"vr_vertical_offset":-0.62}`
+			if id == 21 {
+				custom = `{"vr_vertical_offset":"0.1"}`
+			}
 		case 8:
 		default:
 			continue
 		}
-		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"Scene %d","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","height":1080}],"studio":%s,"tags":%s}`, id, id, studio, tags))
+		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"Scene %d","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","height":1080}],"studio":%s,"tags":%s,"custom_fields":%s}`, id, id, studio, tags, custom))
 	}
 	return json.Unmarshal([]byte(`{"findScenes":{"scenes":[`+strings.Join(scenes, ",")+`]}}`), resp.Data)
 }
@@ -211,5 +219,56 @@ func TestHandler_ServesLearnedStudioProfile(t *testing.T) {
 	checkHeaders(t, rec)
 	if rec := get(h, "/hsp/scene/9"); rec.Body.String() != "rule profile" {
 		t.Fatalf("a scene without a studio keeps the rule's profile, got %q", rec.Body.String())
+	}
+}
+
+func setCorrectVertical(t *testing.T, on bool) {
+	t.Helper()
+	cfg := config.Application()
+	cfg.CorrectVerticalStereo = on
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHandler_GeneratesVerticalCorrection(t *testing.T) {
+	lib, h := newRouter(t)
+	setCorrectVertical(t, true)
+
+	rec := get(h, "/hsp/scene/20")
+	if rec.Code != 200 {
+		t.Fatalf("corrected scene: got %d", rec.Code)
+	}
+	p, err := hspfile.Decode(rec.Body.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Alignment[0].Rotation.Pitch != float32(-0.62) || p.Format[0].Stereo != hspfile.StereoSideBySide {
+		t.Fatalf("expected pitch -0.62 on an SBS profile, got %+v %+v", p.Alignment[0], p.Format[0])
+	}
+	// Generation is deterministic.
+	if again := get(h, "/hsp/scene/20"); !bytes.Equal(again.Body.Bytes(), rec.Body.Bytes()) {
+		t.Fatal("generated profile differs between requests")
+	}
+
+	// Too small to correct: nothing to serve.
+	if rec := get(h, "/hsp/scene/21"); rec.Code != 404 {
+		t.Fatalf("small offset: got %d", rec.Code)
+	}
+
+	// The scene's own profile still wins.
+	if err := lib.SaveProfile("20", []byte("own")); err != nil {
+		t.Fatal(err)
+	}
+	if rec := get(h, "/hsp/scene/20"); rec.Body.String() != "own" {
+		t.Fatalf("own: got %q", rec.Body.String())
+	}
+}
+
+func TestHandler_VerticalCorrectionOff(t *testing.T) {
+	_, h := newRouter(t)
+	setCorrectVertical(t, false)
+	if rec := get(h, "/hsp/scene/20"); rec.Code != 404 {
+		t.Fatalf("setting off: got %d", rec.Code)
 	}
 }

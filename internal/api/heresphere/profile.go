@@ -15,7 +15,8 @@ import (
 var errNoFiles = errors.New("scene has no files")
 
 // GenerateProfile encodes the HereSphere profile stash-vr generates for a
-// scene whose video rules set screen geometry, background or mask.
+// scene whose video rules set screen geometry, background or mask, or
+// whose measured vertical stereo offset is corrected (library.SceneFormat).
 func GenerateProfile(r *http.Request, vd *library.VideoData, f library.Format) ([]byte, error) {
 	return generateProfile(vd, internal.GetBaseUrl(r), f)
 }

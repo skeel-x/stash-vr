@@ -1,6 +1,7 @@
 // Package hsp serves HereSphere profiles: the one stored for a scene, else
 // the one learned from its studio and lens, else the one captured for its
-// video rule, else one generated from the rules' screen settings.
+// video rule, else one generated from the rules' screen settings and the
+// scene's measured vertical stereo offset.
 package hsp
 
 import (
@@ -41,7 +42,8 @@ func Handler(libraryService *library.Service, generate Generator) http.HandlerFu
 			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
-		f := library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
+		cfg := config.Application()
+		f, _ := library.SceneFormat(cfg.VideoRules, vd, cfg.CorrectVerticalStereo)
 		source, scene := library.ProfileSourceFor(id, f, libraryService.HasProfile, func() string {
 			return libraryService.StudioProfile(ctx, vd, &f)
 		})

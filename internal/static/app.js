@@ -103,6 +103,7 @@
       auto_studio_min: Number(form.auto_studio_min.value || 0),
       auto_performer_min: Number(form.auto_performer_min.value || 0),
       learn_studio_profiles: form.learn_studio_profiles.checked,
+      correct_vertical_stereo: form.correct_vertical_stereo.checked,
       cover_badges: {
         quality: form.cover_badge_quality.checked,
         format: form.cover_badge_format.checked,
@@ -289,6 +290,22 @@
       return parts.length ? parts.join(', ') : 'player defaults';
     };
     const sources = { own: 'own profile', rule: 'rule profile of scene ', generated: 'generated', none: 'none' };
+    // The vertical stereo offset vrQualityTags measured and what became of it.
+    const verticalReasons = {
+      applied: 'corrected in the generated profile',
+      profile_wins: 'not corrected: a saved profile is used instead',
+      not_measured: 'not measured',
+      invalid: 'vr_vertical_offset is not a number',
+      off: 'not corrected: the setting is off',
+      not_stereo: 'not corrected: not an SBS or TB scene',
+      rule_pitch: 'not corrected: a rule sets the pitch',
+      too_small: 'not corrected: below 0.25°',
+      too_large: 'not corrected: above 1.5°, not trusted as a pure offset',
+    };
+    const vertical = (v) => {
+      const reason = verticalReasons[v.reason] || v.reason;
+      return v.offset === undefined ? reason : (v.offset > 0 ? '+' : '') + v.offset.toFixed(2) + '°, ' + reason;
+    };
     const run = async () => {
       const query = q.value.trim();
       if (!query) { setMsg($('#inspect-msg'), 'Enter a scene id or part of a title', 'err'); return; }
@@ -303,7 +320,7 @@
           setMsg($('#inspect-msg'), '', 'ok');
           const table = el('table', undefined, 'inspect');
           const head = table.createTHead().insertRow();
-          ['Scene', 'Matching rules', 'Result', 'Profile'].forEach((h) => head.appendChild(el('th', h)));
+          ['Scene', 'Matching rules', 'Result', 'Profile', 'Vertical offset'].forEach((h) => head.appendChild(el('th', h)));
           const body = table.createTBody();
           r.scenes.forEach((s) => {
             const tr = body.insertRow();
@@ -320,6 +337,7 @@
               const l = el('a', 'link'); l.href = s.profile.link; l.target = '_blank'; l.rel = 'noopener';
               prof.append(' ', l);
             }
+            tr.insertCell().textContent = vertical(s.vertical);
           });
           out.appendChild(table);
         }

@@ -304,3 +304,14 @@ func TestKey_TellsAMutedTierApart(t *testing.T) {
 		t.Fatal("a gold and a slate 8K must not share a rendered cover")
 	}
 }
+
+func TestForScene_IgnoresVerticalOffset(t *testing.T) {
+	rules := config.DefaultVideoRules()
+	plain := scene(5760, 2880, "DOME", "Alpha", "SBS")
+	measured := scene(5760, 2880, "DOME", "Alpha", "SBS")
+	measured.SceneParts.Custom_fields = map[string]any{library.VerticalOffsetField: 0.8}
+	a, b := ForScene(plain, all, rules), ForScene(measured, all, rules)
+	if !equal(labels(a), labels(b)) || Key(a) != Key(b) {
+		t.Fatalf("the vertical offset changed the badges: %v vs %v", labels(a), labels(b))
+	}
+}

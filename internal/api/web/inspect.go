@@ -22,6 +22,37 @@ type inspectedScene struct {
 	Matched []matchedRule `json:"matched"`
 	Format  formatView    `json:"format"`
 	Profile profileSource `json:"profile"`
+	// Vertical is the measured vertical stereo offset and what became of
+	// it.
+	Vertical verticalView `json:"vertical"`
+}
+
+// verticalView is a library.VerticalCorrection: Offset is the measured
+// offset in degrees (absent when the scene has none or it is unusable),
+// Applied whether the generated profile carries it and Reason a
+// library.Vertical* value. Applied with a stored profile picked means the
+// correction is in the generated profile HereSphere does not get; Reason
+// is then "profile_wins".
+type verticalView struct {
+	Offset  *float64 `json:"offset,omitempty"`
+	Applied bool     `json:"applied"`
+	Reason  string   `json:"reason"`
+}
+
+// verticalProfileWins is the verticalView reason for a correction that is
+// set up but not served because a stored profile is picked instead.
+const verticalProfileWins = "profile_wins"
+
+func viewVertical(c *library.VerticalCorrection, source string) verticalView {
+	v := verticalView{Applied: c.Applied, Reason: c.Reason}
+	if c.Measured {
+		off := c.Offset
+		v.Offset = &off
+	}
+	if c.Applied && source != library.ProfileGenerated {
+		v.Applied, v.Reason = false, verticalProfileWins
+	}
+	return v
 }
 
 // matchedRule is a rule that applies to the scene, by its position in the
@@ -82,19 +113,21 @@ func viewFormat(f *library.Format) formatView {
 	return v
 }
 
-// inspectScene resolves the rules for vd the way the players do.
-func (h *apiHandler) inspectScene(ctx context.Context, vd *library.VideoData, rules []config.VideoRule, baseUrl, stashUrl string) inspectedScene {
+// inspectScene resolves the rules for vd the way the players do; correct
+// is the vertical stereo correction setting.
+func (h *apiHandler) inspectScene(ctx context.Context, vd *library.VideoData, rules []config.VideoRule, correct bool, baseUrl, stashUrl string) inspectedScene {
 	id := vd.Id()
 	out := inspectedScene{ID: id, Title: vd.Title(), Stash: StashSceneUrl(stashUrl, id), Matched: []matchedRule{}}
 	for _, i := range library.MatchingRules(rules, vd.SceneParts.Tags) {
 		out.Matched = append(out.Matched, matchedRule{Index: i, Tag: rules[i].Tag})
 	}
-	f := library.ResolveFormat(rules, vd.SceneParts.Tags)
+	f, vertical := library.SceneFormat(rules, vd, correct)
 	out.Format = viewFormat(&f)
 	source, scene := library.ProfileSourceFor(id, f, h.lib.HasProfile, func() string {
 		return h.lib.StudioProfile(ctx, vd, &f)
 	})
 	out.Profile = profileSource{Source: source, Scene: scene}
+	out.Vertical = viewVertical(&vertical, source)
 	if scene != "" {
 		out.Profile.Link = baseUrl + "/hsp/scene/" + scene
 	}
@@ -135,7 +168,7 @@ func (h *apiHandler) inspect(w http.ResponseWriter, r *http.Request) {
 	baseUrl := internal.GetBaseUrl(r)
 	out := make([]inspectedScene, 0, len(found))
 	for _, vd := range found {
-		out = append(out, h.inspectScene(ctx, vd, cfg.VideoRules, baseUrl, cfg.StashGraphQLUrl))
+		out = append(out, h.inspectScene(ctx, vd, cfg.VideoRules, cfg.CorrectVerticalStereo, baseUrl, cfg.StashGraphQLUrl))
 	}
 	writeJson(ctx, w, map[string]any{"scenes": out})
 }

@@ -789,3 +789,40 @@ func TestLoad_LearnStudioProfilesSeedAndFile(t *testing.T) {
 		t.Fatal("expected the file to switch learning on")
 	}
 }
+
+func TestLoad_CorrectVerticalStereoSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+	seed.CorrectVerticalStereo = true
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"correct_vertical_stereo": true`) {
+		t.Fatalf("expected the setting persisted on, got %s", data)
+	}
+
+	// A file from before the setting keeps the seed (on by default).
+	if err := os.WriteFile(FilePath(seed), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !Application().CorrectVerticalStereo {
+		t.Fatal("expected the seed to keep the correction on")
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"correct_vertical_stereo":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if Application().CorrectVerticalStereo {
+		t.Fatal("expected the file to switch the correction off")
+	}
+}

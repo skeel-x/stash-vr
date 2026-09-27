@@ -984,3 +984,27 @@ func TestPutConfig_LearnStudioProfiles(t *testing.T) {
 		t.Fatal("expected the setting kept when the field is missing")
 	}
 }
+
+func TestPutConfig_CorrectVerticalStereo(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"correct_vertical_stereo": true,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || !config.Application().CorrectVerticalStereo || out["correct_vertical_stereo"] != true {
+		t.Fatalf("expected the correction switched on and echoed, got %d %v", rec.Code, out["correct_vertical_stereo"])
+	}
+	delete(body, "correct_vertical_stereo")
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 || !config.Application().CorrectVerticalStereo {
+		t.Fatal("expected the setting kept when the field is missing")
+	}
+	body["correct_vertical_stereo"] = false
+	if rec, out := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 || config.Application().CorrectVerticalStereo || out["correct_vertical_stereo"] != false {
+		t.Fatal("expected the correction switched off")
+	}
+}

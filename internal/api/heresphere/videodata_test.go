@@ -212,3 +212,47 @@ func TestBuildVideoData_ProfileLinkPrecedence(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildVideoData_VerticalCorrectionLinksGeneratedProfile(t *testing.T) {
+	loadDefaultRules(t)
+	scene := func(offset any, tag string) *library.VideoData {
+		return &library.VideoData{SceneParts: &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			Files:         []*gql.ScenePartsFilesVideoFile{{Basename: "x.mp4"}},
+			Paths:         &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")},
+			Custom_fields: map[string]any{library.VerticalOffsetField: offset},
+			TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: tag}}}}}}
+	}
+	hsp := func(vd *library.VideoData, profiles profileLookup) string {
+		dto, err := buildVideoData(context.Background(), vd, "https://vr.example", nil, profiles)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dto.Hsp == nil {
+			return ""
+		}
+		return *dto.Hsp
+	}
+	for _, on := range []bool{true, false} {
+		cfg := config.Application()
+		cfg.CorrectVerticalStereo = on
+		if _, err := config.Set(cfg); err != nil {
+			t.Fatal(err)
+		}
+		want := ""
+		if on {
+			want = "https://vr.example/hsp/scene/9"
+		}
+		if got := hsp(scene(0.8, "DOME"), fakeProfiles{}); got != want {
+			t.Errorf("on=%v: hsp = %q want %q", on, got, want)
+		}
+		if got := hsp(scene(0.8, "FLAT"), fakeProfiles{}); got != "" {
+			t.Errorf("on=%v: flat scene got a profile %q", on, got)
+		}
+		if got := hsp(scene(0.1, "DOME"), fakeProfiles{}); got != "" {
+			t.Errorf("on=%v: small offset got a profile %q", on, got)
+		}
+		if got := hsp(scene(0.8, "DOME"), learnedProfiles{fakeProfiles{"20": true}, "20"}); got != "https://vr.example/hsp/scene/20" {
+			t.Errorf("on=%v: studio profile should win, got %q", on, got)
+		}
+	}
+}

@@ -287,6 +287,7 @@ type fileConfig struct {
 	LogLevel           *string          `json:"log_level,omitempty"`
 	CoverBadges        *coverBadgesFile `json:"cover_badges,omitempty"`
 	LearnStudio        *bool            `json:"learn_studio_profiles,omitempty"`
+	CorrectVertical    *bool            `json:"correct_vertical_stereo,omitempty"`
 	Filters            []Filter         `json:"filters"`
 	VideoRules         []VideoRule      `json:"video_rules"`
 }
@@ -518,6 +519,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.LearnStudio != nil {
 		base.LearnStudioProfiles = *fc.LearnStudio
 	}
+	if fc.CorrectVertical != nil {
+		base.CorrectVerticalStereo = *fc.CorrectVertical
+	}
 	if fc.Filters != nil {
 		base.Filters = fc.Filters
 	}
@@ -635,9 +639,10 @@ func write(path string, c ApplicationConfig) error {
 			Duration:    &c.CoverBadges.Duration,
 			FrameRate:   &c.CoverBadges.FrameRate,
 		},
-		LearnStudio: &c.LearnStudioProfiles,
-		Filters:     c.Filters,
-		VideoRules:  c.VideoRules,
+		LearnStudio:     &c.LearnStudioProfiles,
+		CorrectVertical: &c.CorrectVerticalStereo,
+		Filters:         c.Filters,
+		VideoRules:      c.VideoRules,
 	}
 	if fc.Filters == nil {
 		fc.Filters = []Filter{}

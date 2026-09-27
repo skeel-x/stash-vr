@@ -35,6 +35,7 @@ const (
 	envKeyCoverBadgeDuration = "COVER_BADGE_DURATION"
 	envKeyCoverBadgeRate     = "COVER_BADGE_FRAMERATE"
 	envKeyLearnStudio        = "LEARN_STUDIO_PROFILES"
+	envKeyCorrectVertical    = "CORRECT_VERTICAL_STEREO"
 )
 
 type ApplicationConfig struct {
@@ -63,8 +64,11 @@ type ApplicationConfig struct {
 	// LearnStudioProfiles gives a scene without a HereSphere profile of
 	// its own the newest one saved for a scene of the same studio and lens.
 	LearnStudioProfiles bool
-	Filters             []Filter
-	VideoRules          []VideoRule
+	// CorrectVerticalStereo pitches one eye in generated HereSphere
+	// profiles by the vertical offset vrQualityTags measured for a scene.
+	CorrectVerticalStereo bool
+	Filters               []Filter
+	VideoRules            []VideoRule
 }
 
 func Init() error {
@@ -149,6 +153,9 @@ func Init() error {
 	pflag.Bool(envKeyLearnStudio, false, "Use a saved HereSphere profile for other scenes from the same studio with the same lens")
 	_ = viper.BindPFlag(envKeyLearnStudio, pflag.Lookup(envKeyLearnStudio))
 
+	pflag.Bool(envKeyCorrectVertical, true, "Correct the vertical misalignment vrQualityTags measured between the eyes in generated HereSphere profiles")
+	_ = viper.BindPFlag(envKeyCorrectVertical, pflag.Lookup(envKeyCorrectVertical))
+
 	pflag.BoolP("help", "h", false, "Display usage information")
 	_ = viper.BindPFlag("help", pflag.Lookup("help"))
 
@@ -190,7 +197,8 @@ func Init() error {
 			Duration:    viper.GetBool(envKeyCoverBadgeDuration),
 			FrameRate:   viper.GetBool(envKeyCoverBadgeRate),
 		},
-		LearnStudioProfiles: viper.GetBool(envKeyLearnStudio),
+		LearnStudioProfiles:   viper.GetBool(envKeyLearnStudio),
+		CorrectVerticalStereo: viper.GetBool(envKeyCorrectVertical),
 	}
 
 	return Load(seed)

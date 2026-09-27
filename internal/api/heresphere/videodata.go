@@ -128,7 +128,8 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 
 	setMediaSources(vd, &dto)
 
-	f := library.ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
+	cfg := config.Application()
+	f, _ := library.SceneFormat(cfg.VideoRules, vd, cfg.CorrectVerticalStereo)
 	setFormat(vd, &dto, f)
 	if link := profileLink(ctx, baseUrl, vd, f, profiles); link != "" {
 		dto.Hsp = util.Ptr(link)

@@ -326,6 +326,7 @@ fragment SceneParts on Scene {
   }
 
   interactive
+  custom_fields
   ...TagPartsArray
 }
 

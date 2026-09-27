@@ -199,6 +199,9 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `LEARN_STUDIO_PROFILES`
   * Default: `false`
   * Give a scene without a HereSphere profile of its own the one saved last for a scene of the same studio with the same lens; see [Video rules and profiles](#video-rules-and-profiles). Runtime name: `learn_studio_profiles`.
+* `CORRECT_VERTICAL_STEREO`
+  * Default: `true`
+  * Correct the vertical misalignment between the eyes that vrQualityTags measured for a scene, in the generated HereSphere profile; see [Vertical stereo correction](#vertical-stereo-correction). Runtime name: `correct_vertical_stereo`.
 * `video_rules`
   * File only, edited on the Setup page. The ordered tag-to-format rules table. "Reset to defaults" on the Setup page restores the default rules.
 
@@ -261,6 +264,15 @@ gold `8K`, silver `7K`, bronze `6K HBR`, and slate for Low Detail.
 ##### Two-way sync
 
 To enable two-way sync with Stash the relevant toggles (`Overwrite tags` etc.) in the cogwheel at the bottom right of preview view in HereSphere needs to be on.
+
+##### Server profiles
+
+HereSphere only loads the profiles Stash-VR serves (saved, learned,
+rule and generated ones, including the
+[vertical stereo correction](#vertical-stereo-correction)) by itself when
+"Always Load HSP" is enabled in HereSphere's web API view (the cogwheel
+at the bottom right). Without it a server profile is only used when you load it
+manually for a scene.
 
 #### Manage metadata
 
@@ -445,11 +457,45 @@ the library data instead, so that does not show. The pairing of studio
 and lens to scene is worked out once from the stored profiles and kept
 until a new profile is saved, the rules change or the index is rebuilt.
 
+##### Vertical stereo correction
+
+Many stereo videos have one eye sitting slightly higher than the other,
+from a camera rig that is not quite level or lenses that are not quite
+aligned. The eyes cannot fuse that comfortably, and from about a quarter
+of a degree it causes eye strain. The vrQualityTags plugin measures this
+misalignment and stores it on the scene as the custom field
+`vr_vertical_offset`, in degrees with two decimals; the sign says which
+eye is higher.
+
+With "Correct vertical stereo misalignment" ticked under the rules
+(setting `correct_vertical_stereo`, on by default), Stash-VR sets the
+alignment pitch of a generated HereSphere profile, which rotates one eye,
+to exactly the measured offset, sign included. That happens only when:
+
+* the rules make the scene stereo (SBS or TB, and force mono is not on),
+* no matching rule sets the pitch itself (the rule wins), and
+* the offset is between 0.25 and 1.5 degrees either way. Below 0.25
+  degrees the misalignment is not noticeable; above 1.5 degrees the
+  measurement is not trusted to be a pure offset between the eyes, so the
+  scene is left alone.
+
+A scene that qualifies gets a generated profile even when no rule asks for
+one. The usual order still applies: the scene's own saved profile, a
+learned studio profile and a rule's saved profile all win over the
+generated one, so a scene you have tuned and saved yourself is never
+changed. The correction only affects HereSphere; DeoVR and Playa and the
+cover badges are unaffected. HereSphere must have "Always Load HSP" on
+for the profile to load by itself (see [Server profiles](#server-profiles)).
+
 The scene inspector under the rules takes a scene id or part of a title
 and shows, for up to five scenes, which rules match (by position and tag),
 what they resolve to and where the HereSphere profile comes from: the
 scene's own, a studio profile ("studio (from scene N)"), a rule's saved
-profile, generated, or none, with its link.
+profile, generated, or none, with its link. It also shows the measured
+vertical offset and whether it is corrected, and if not, why: not
+measured, not a number, the setting is off, not a stereo scene, a rule
+sets the pitch, outside the 0.25 to 1.5 degree range, or a saved profile
+is used instead.
 An id is always looked up; titles are matched against scenes a player has
 already loaded, so the search never queries the whole library.
 

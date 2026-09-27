@@ -1570,6 +1570,11 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetInteractive() b
 	return v.SceneParts.Interactive
 }
 
+// GetCustom_fields returns FindScenesFindScenesFindScenesResultTypeScenesScene.Custom_fields, and is useful for accessing the field via an interface.
+func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetCustom_fields() map[string]interface{} {
+	return v.SceneParts.Custom_fields
+}
+
 // GetTags returns FindScenesFindScenesFindScenesResultTypeScenesScene.Tags, and is useful for accessing the field via an interface.
 func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetTags() []*TagPartsArrayTagsTag {
 	return v.SceneParts.TagPartsArray.Tags
@@ -1639,6 +1644,8 @@ type __premarshalFindScenesFindScenesFindScenesResultTypeScenesScene struct {
 
 	Interactive bool `json:"interactive"`
 
+	Custom_fields map[string]interface{} `json:"custom_fields"`
+
 	Tags []*TagPartsArrayTagsTag `json:"tags"`
 }
 
@@ -1672,6 +1679,7 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) __premarshalJSON()
 	retval.SceneStreams = v.SceneParts.SceneStreams
 	retval.Captions = v.SceneParts.Captions
 	retval.Interactive = v.SceneParts.Interactive
+	retval.Custom_fields = v.SceneParts.Custom_fields
 	retval.Tags = v.SceneParts.TagPartsArray.Tags
 	return &retval, nil
 }
@@ -3919,6 +3927,7 @@ type SceneParts struct {
 	SceneStreams  []*ScenePartsSceneStreamsSceneStreamEndpoint `json:"sceneStreams"`
 	Captions      []*ScenePartsCaptionsVideoCaption            `json:"captions"`
 	Interactive   bool                                         `json:"interactive"`
+	Custom_fields map[string]interface{}                       `json:"custom_fields"`
 	TagPartsArray `json:"-"`
 }
 
@@ -3980,6 +3989,9 @@ func (v *SceneParts) GetCaptions() []*ScenePartsCaptionsVideoCaption { return v.
 
 // GetInteractive returns SceneParts.Interactive, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetInteractive() bool { return v.Interactive }
+
+// GetCustom_fields returns SceneParts.Custom_fields, and is useful for accessing the field via an interface.
+func (v *SceneParts) GetCustom_fields() map[string]interface{} { return v.Custom_fields }
 
 // GetTags returns SceneParts.Tags, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetTags() []*TagPartsArrayTagsTag { return v.TagPartsArray.Tags }
@@ -4048,6 +4060,8 @@ type __premarshalSceneParts struct {
 
 	Interactive bool `json:"interactive"`
 
+	Custom_fields map[string]interface{} `json:"custom_fields"`
+
 	Tags []*TagPartsArrayTagsTag `json:"tags"`
 }
 
@@ -4081,6 +4095,7 @@ func (v *SceneParts) __premarshalJSON() (*__premarshalSceneParts, error) {
 	retval.SceneStreams = v.SceneStreams
 	retval.Captions = v.Captions
 	retval.Interactive = v.Interactive
+	retval.Custom_fields = v.Custom_fields
 	retval.Tags = v.TagPartsArray.Tags
 	return &retval, nil
 }
@@ -6203,6 +6218,7 @@ fragment SceneParts on Scene {
 		language_code
 	}
 	interactive
+	custom_fields
 	... TagPartsArray
 }
 fragment SceneMarkerParts on SceneMarker {

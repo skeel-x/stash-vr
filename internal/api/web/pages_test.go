@@ -622,3 +622,42 @@ func TestSetup_RendersLearnStudioProfilesCheckbox(t *testing.T) {
 		t.Fatal("app.js must save the checkbox")
 	}
 }
+
+func TestSetup_RendersCorrectVerticalStereoCheckbox(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.CorrectVerticalStereo = true
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+
+	box := strings.Index(body, `<input name="correct_vertical_stereo" type="checkbox" checked>`)
+	rules := strings.Index(body, "<h2>Video rules</h2>")
+	inspector := strings.Index(body, "<h3>Scene inspector</h3>")
+	if box < 0 || box < rules || box > inspector {
+		t.Fatal("the vertical correction checkbox belongs to the video rules area")
+	}
+	for _, s := range []string{"Correct vertical stereo misalignment", "vr_vertical_offset", "Always Load HSP"} {
+		if !strings.Contains(body, s) {
+			t.Fatalf("missing %q in the setup page", s)
+		}
+	}
+	js, err := fs.ReadFile(static.Fs, "app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(js), "correct_vertical_stereo: form.correct_vertical_stereo.checked") {
+		t.Fatal("app.js must save the checkbox")
+	}
+
+	cfg.CorrectVerticalStereo = false
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body = getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+	if !strings.Contains(body, `<input name="correct_vertical_stereo" type="checkbox" >`) {
+		t.Fatal("expected the checkbox unticked")
+	}
+}
