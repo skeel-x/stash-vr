@@ -49,6 +49,27 @@ func TestBuildVideoData_FormatFromRules(t *testing.T) {
 	}
 }
 
+func TestBuildVideoData_LenslessFisheyeGetsLinearLens(t *testing.T) {
+	loadDefaultRules(t)
+	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		Files:         []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4", Duration: 100, Height: 1080}},
+		Paths:         &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")},
+		TagPartsArray: gql.TagPartsArray{Tags: []*gql.TagPartsArrayTagsTag{{TagParts: gql.TagParts{Id: "1", Name: "RF52"}}, {TagParts: gql.TagParts{Id: "2", Name: "SBS"}}}},
+	}
+	dto, err := buildVideoData(context.Background(), &library.VideoData{SceneParts: sp}, "https://vr.example", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The RF52 rule sets fov 190 but no lens; HereSphere ignores the fov
+	// unless a lens is named, so it must default to the linear lens.
+	if dto.Projection != "fisheye" || dto.Fov != 190 || dto.Lens != "Linear" {
+		t.Fatalf("format = %s/%s/%v lens=%q, want fisheye fov=190 lens=Linear", dto.Projection, dto.Stereo, dto.Fov, dto.Lens)
+	}
+	if b, _ := json.Marshal(dto); !strings.Contains(string(b), `"lens":"Linear"`) {
+		t.Fatalf("expected lens in JSON, got %s", b)
+	}
+}
+
 func TestBuildVideoData_NoAlphaWithoutPassthrough(t *testing.T) {
 	loadDefaultRules(t)
 	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),

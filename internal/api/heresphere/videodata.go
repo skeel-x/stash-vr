@@ -217,6 +217,13 @@ func setFormat(vd *library.VideoData, dto *videoDataDto, f library.Format) {
 	dto.Stereo = f.Stereo
 	dto.Lens = f.Lens
 	dto.Fov = f.Fov
+	// HereSphere only applies a fisheye scene's fov when the response also
+	// names a lens; without one it silently falls back to 180. Rules like
+	// RF52 set a fov (190) but no lens, so default to the linear lens to
+	// honour the fov. Lensed rules (MKX200 etc.) keep their own lens.
+	if dto.Projection == "fisheye" && dto.Lens == "" && dto.Fov != 0 {
+		dto.Lens = "Linear"
+	}
 	if f.Passthrough {
 		dto.AlphaPackedSettings = &alphaPackedDto{DefaultSettings: true}
 	}
