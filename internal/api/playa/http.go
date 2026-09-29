@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/library"
+	"stash-vr/internal/util"
 	"strconv"
 	"strings"
 	"sync"
@@ -128,12 +129,17 @@ func (h httpHandler) videoHandler(w http.ResponseWriter, req *http.Request) {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
+	// These run outside the handler goroutine, so chi's recoverer cannot
+	// catch a panic in them; recover here and let the nil checks below
+	// answer the request.
 	go func() {
 		defer wg.Done()
+		defer util.RecoverLog(ctx, "load video "+videoID)
 		vd, sceneErr = h.libraryService.GetScene(ctx, videoID, false)
 	}()
 	go func() {
 		defer wg.Done()
+		defer util.RecoverLog(ctx, "load saved filters for video "+videoID)
 		savedFilters, filterErr = h.libraryService.GetSavedFilterSceneSetsFor(ctx, "playa")
 	}()
 	wg.Wait()

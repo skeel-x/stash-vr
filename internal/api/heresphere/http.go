@@ -11,6 +11,7 @@ import (
 	"stash-vr/internal/api/internal"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
+	"stash-vr/internal/util"
 	"strings"
 	"time"
 )
@@ -38,6 +39,7 @@ func (h *httpHandler) indexHandler(w http.ResponseWriter, req *http.Request) {
 
 	go func() {
 		ctx := context.Background()
+		defer util.RecoverLog(ctx, "prefetch scenes for the index")
 		_, err := h.libraryService.GetScenes(ctx)
 		if err != nil {
 			log.Ctx(ctx).Error().Err(err).Msg("failed to get scenes")
@@ -97,20 +99,19 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if vdReq, err := internal.UnmarshalBody[videoDataRequestDto](req); err != nil {
-		log.Ctx(ctx).Warn().Err(err).Msg("Failed to parse request body")
-	} else {
-		if vdReq.DeleteFile != nil && *vdReq.DeleteFile {
-			if err = h.libraryService.Delete(ctx, videoId); err != nil {
-				log.Ctx(ctx).Warn().Err(err).Msg("Failed to delete scene")
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-			return
+	vdReq, reqErr := internal.UnmarshalBody[videoDataRequestDto](req)
+	if reqErr != nil {
+		log.Ctx(ctx).Warn().Err(reqErr).Msg("Failed to parse request body")
+	} else if vdReq.DeleteFile != nil && *vdReq.DeleteFile {
+		if err = h.libraryService.Delete(ctx, videoId); err != nil {
+			log.Ctx(ctx).Warn().Err(err).Msg("Failed to delete scene")
+			w.WriteHeader(http.StatusInternalServerError)
 		}
-
-		go h.processUpdates(videoId, vdReq)
+		return
 	}
 
+	// Resolve the scene before acting on the request: updates for a scene
+	// that does not exist are not worth a background job.
 	vd, err := h.libraryService.GetScene(ctx, videoId, false)
 	if err != nil {
 		if errors.Is(err, library.ErrSceneNotFound) {
@@ -121,6 +122,10 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	if reqErr == nil {
+		go h.processUpdates(videoId, vdReq)
+	}
+
 	if vd.ReleaseDate() == "" {
 		// Look the date up ahead of the sweep so the next open shows it.
 		h.libraryService.RequestDate(videoId)
@@ -139,6 +144,7 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 
 func (h *httpHandler) processUpdates(videoId string, vdReq videoDataRequestDto) {
 	ctx := context.Background()
+	defer util.RecoverLog(ctx, "process updates for scene "+videoId)
 	needsRefetch := false
 	if vdReq.Rating != nil {
 		if err := h.libraryService.UpdateRating(ctx, videoId, vdReq.Rating); err != nil {

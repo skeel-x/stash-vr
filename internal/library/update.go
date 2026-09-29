@@ -43,6 +43,9 @@ func (libraryService *Service) UpdateFavorite(ctx context.Context, id string, is
 	if err != nil {
 		return fmt.Errorf("FindSceneTags: %w", err)
 	}
+	if response.FindScene == nil {
+		return fmt.Errorf("%w: %s", ErrSceneNotFound, id)
+	}
 
 	newTagIds := make([]string, 0, len(response.FindScene.Tags)+1)
 
