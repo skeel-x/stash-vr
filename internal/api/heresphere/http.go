@@ -23,6 +23,17 @@ type httpHandler struct {
 
 var minPlayFraction *float64
 
+const (
+	// prefetchTimeout bounds the scene prefetch an index request starts. It
+	// runs detached from the request, so a headset dropping the connection
+	// does not abort it, and bounded, so a silent Stash cannot pin it until
+	// the process restarts.
+	prefetchTimeout = 5 * time.Minute
+	// updateTimeout bounds the write-back of one scene's rating, tags and
+	// favourite state plus the refetch that follows, for the same reasons.
+	updateTimeout = time.Minute
+)
+
 func (h *httpHandler) indexHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	baseUrl := internal.GetBaseUrl(req)
@@ -38,7 +49,8 @@ func (h *httpHandler) indexHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	go func() {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(req.Context()), prefetchTimeout)
+		defer cancel()
 		defer util.RecoverLog(ctx, "prefetch scenes for the index")
 		_, err := h.libraryService.GetScenes(ctx)
 		if err != nil {
@@ -123,7 +135,7 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 	if reqErr == nil {
-		go h.processUpdates(videoId, vdReq)
+		go h.processUpdates(ctx, videoId, vdReq)
 	}
 
 	if vd.ReleaseDate() == "" {
@@ -142,8 +154,12 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 	}
 }
 
-func (h *httpHandler) processUpdates(videoId string, vdReq videoDataRequestDto) {
-	ctx := context.Background()
+// processUpdates writes the request's changes to Stash. It runs after the
+// response is sent, detached from the request's cancellation but bounded by
+// updateTimeout; reqCtx is the request context it keeps the values of.
+func (h *httpHandler) processUpdates(reqCtx context.Context, videoId string, vdReq videoDataRequestDto) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), updateTimeout)
+	defer cancel()
 	defer util.RecoverLog(ctx, "process updates for scene "+videoId)
 	needsRefetch := false
 	if vdReq.Rating != nil {

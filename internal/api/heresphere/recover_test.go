@@ -21,12 +21,24 @@ type explodingStash struct {
 	mu      sync.Mutex
 	panicOn map[string]bool
 	seen    []string
+	// ctxs records, per operation seen, the state of the context it was
+	// made with, for the tests that check the detached background work.
+	ctxs    []ctxState
 	noScene bool
 }
 
-func (e *explodingStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
+// ctxState is what a fake observed of one request's context.
+type ctxState struct {
+	op          string
+	err         error
+	hasDeadline bool
+}
+
+func (e *explodingStash) MakeRequest(ctx context.Context, req *graphql.Request, resp *graphql.Response) error {
+	_, hasDeadline := ctx.Deadline()
 	e.mu.Lock()
 	e.seen = append(e.seen, req.OpName)
+	e.ctxs = append(e.ctxs, ctxState{op: req.OpName, err: ctx.Err(), hasDeadline: hasDeadline})
 	boom := e.panicOn[req.OpName]
 	e.mu.Unlock()
 	if boom {
@@ -52,6 +64,18 @@ func (e *explodingStash) MakeRequest(_ context.Context, req *graphql.Request, re
 		payload = `{}`
 	}
 	return json.Unmarshal([]byte(payload), resp.Data)
+}
+
+// ctxOf returns the context state of the first request for op.
+func (e *explodingStash) ctxOf(op string) (ctxState, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, c := range e.ctxs {
+		if c.op == op {
+			return c, true
+		}
+	}
+	return ctxState{}, false
 }
 
 func (e *explodingStash) sawOp(name string) bool {
