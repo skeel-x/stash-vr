@@ -99,7 +99,7 @@ func videoDataRequest(t *testing.T, id string, body map[string]any) *http.Reques
 func TestVideoData_UnknownSceneSkipsUpdates(t *testing.T) {
 	loadDefaultRules(t)
 	stash := &explodingStash{noScene: true}
-	h := &httpHandler{libraryService: library.NewService(stash)}
+	h := newHttpHandler(library.NewService(stash))
 	rec := httptest.NewRecorder()
 
 	h.videoDataHandler(rec, videoDataRequest(t, "999999", map[string]any{"rating": 4.5}))
@@ -116,7 +116,7 @@ func TestVideoData_UnknownSceneSkipsUpdates(t *testing.T) {
 func TestVideoData_PanicInUpdatesIsRecovered(t *testing.T) {
 	loadDefaultRules(t)
 	stash := &explodingStash{panicOn: map[string]bool{"SceneUpdateRating100": true}}
-	h := &httpHandler{libraryService: library.NewService(stash)}
+	h := newHttpHandler(library.NewService(stash))
 	rec := httptest.NewRecorder()
 
 	h.videoDataHandler(rec, videoDataRequest(t, "7", map[string]any{"rating": 4.5}))
@@ -137,7 +137,7 @@ func TestVideoData_PanicInUpdatesIsRecovered(t *testing.T) {
 func TestIndex_PanicInScenePrefetchIsRecovered(t *testing.T) {
 	loadDefaultRules(t)
 	stash := &explodingStash{panicOn: map[string]bool{"FindScenes": true}}
-	h := &httpHandler{libraryService: library.NewService(stash)}
+	h := newHttpHandler(library.NewService(stash))
 	rec := httptest.NewRecorder()
 
 	h.indexHandler(rec, httptest.NewRequest(http.MethodGet, "/", nil))

@@ -11,7 +11,7 @@ import (
 )
 
 func Router(libraryService *library.Service) http.Handler {
-	httpHandler := httpHandler{libraryService: libraryService}
+	httpHandler := newHttpHandler(libraryService)
 	r := chi.NewRouter()
 	r.Use(middleware.SetHeader("HereSphere-JSON-Version", "1"))
 	r.Post("/", internal.LogRoute("index", httpHandler.indexHandler))

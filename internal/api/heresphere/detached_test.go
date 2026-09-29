@@ -43,7 +43,7 @@ func TestBackgroundWork_DetachedFromRequestButBounded(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			loadDefaultRules(t)
 			stash := &explodingStash{}
-			h := &httpHandler{libraryService: library.NewService(stash)}
+			h := newHttpHandler(library.NewService(stash))
 
 			// The request is already gone when the work runs.
 			reqCtx, cancel := context.WithCancel(context.Background())

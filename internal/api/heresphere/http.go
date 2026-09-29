@@ -18,7 +18,12 @@ import (
 
 type httpHandler struct {
 	libraryService *library.Service
-	ps             *playbackState
+	// playback tracks what every client is playing; see playbackTracker.
+	playback *playbackTracker
+}
+
+func newHttpHandler(libraryService *library.Service) *httpHandler {
+	return &httpHandler{libraryService: libraryService, playback: newPlaybackTracker()}
 }
 
 var minPlayFraction *float64
@@ -280,33 +285,45 @@ func (h *httpHandler) eventsHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Ctx(ctx).Debug().Str("id", ev.Id).Str("event", ev.Event.String()).Send()
+	key := clientKey(req, &ev)
+	log.Ctx(ctx).Debug().Str("id", ev.Id).Str("event", ev.Event.String()).Str("client", key).Send()
 
 	switch ev.Event {
 	case evPlay:
-		if h.ps == nil {
-			h.ps = newPlayback(vd)
-		} else if h.ps.videoId != videoId {
-			// Another scene started: report what was played of the previous
-			// one; its resume position is unknown here, so leave it as is.
-			played := h.ps.handleStop(ctx, h.libraryService, minPlayFraction)
-			h.saveActivity(h.ps.videoId, playedPtr(played), nil)
-			h.ps = newPlayback(vd)
-		} else {
-			h.ps.handleResume()
+		if prev := h.playback.play(key, vd, minPlayFraction); prev != nil {
+			h.reportStop(ctx, prev, nil)
 		}
 	case evPause, evClose:
-		var played *float64
-		if h.ps != nil {
-			played = playedPtr(h.ps.handleStop(ctx, h.libraryService, minPlayFraction))
-		}
+		stop := h.playback.stop(key, videoId, minPlayFraction)
 		if len(vd.SceneParts.Files) == 0 || vd.SceneParts.Files[0] == nil {
+			if stop != nil {
+				h.reportStop(ctx, stop, nil)
+			}
 			return
 		}
 		resume := resumePosition(vd.SceneParts.Files[0].Duration, float64(ev.Time))
-		h.saveActivity(vd.Id(), played, &resume)
+		if stop == nil {
+			// The client was not playing this scene here (a stop without a
+			// start, or for another scene): nothing was played, but the
+			// position is still worth keeping.
+			stop = &playbackStop{videoId: vd.Id()}
+		}
+		h.reportStop(ctx, stop, &resume)
 	default:
 	}
+}
+
+// reportStop writes one playback stop to Stash: the play count when the
+// stop crossed the threshold, then the seconds played and the resume
+// position (nil leaves Stash's stored position unchanged).
+func (h *httpHandler) reportStop(ctx context.Context, stop *playbackStop, resume *float64) {
+	if stop.countPlay {
+		log.Ctx(ctx).Debug().Str("id", stop.videoId).Msg("Incrementing play count")
+		if err := h.libraryService.IncrementPlayCount(ctx, stop.videoId); err != nil {
+			log.Ctx(ctx).Warn().Err(err).Str("id", stop.videoId).Msg("Failed to increment play count")
+		}
+	}
+	h.saveActivity(stop.videoId, playedPtr(stop.played), resume)
 }
 
 // saveActivity reports a playback stop to Stash on a detached context so a

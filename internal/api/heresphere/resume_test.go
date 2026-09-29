@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -18,32 +19,49 @@ import (
 	"stash-vr/internal/library"
 )
 
-// fakeStash answers the scene lookup and records every activity save: each
-// resume position saved (skipping saves that carried none), and how many
-// saves also carried played seconds.
+// fakeStash answers the scene lookup for any id (every scene lasts 1000 s)
+// and records every activity save: each resume position saved (skipping
+// saves that carried none), how many saves also carried played seconds,
+// the seconds played per scene and the play count increments per scene.
 type fakeStash struct {
 	mu          sync.Mutex
 	resumes     []float64
 	withSeconds int
+	seconds     map[string]float64
+	playCounts  map[string]int
 }
 
 func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
-	var payload string
-	switch req.OpName {
-	case "FindScenes":
-		payload = `{"findScenes":{"scenes":[{"id":"7","title":"Seven","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"seven.mp4","duration":1000,"path":"/seven.mp4","height":1080,"video_codec":"h264"}],"paths":{"stream":"http://stash/scene/7/stream"},"tags":[]}]}}`
-	case "SceneSaveActivity":
-		// req.Variables is *gql.__SceneSaveActivityInput, which is unexported
-		// and unreachable from this package, so decode it structurally instead.
-		var in struct {
-			Seconds *float64 `json:"seconds"`
-			Resume  *float64 `json:"resume"`
-		}
+	// req.Variables is genqlient's unexported input struct, unreachable
+	// from this package, so decode it structurally instead.
+	vars := func(into any) error {
 		b, err := json.Marshal(req.Variables)
 		if err != nil {
 			return err
 		}
-		if err := json.Unmarshal(b, &in); err != nil {
+		return json.Unmarshal(b, into)
+	}
+	var payload string
+	switch req.OpName {
+	case "FindScenes":
+		var in struct {
+			Ids []int `json:"scene_ids"`
+		}
+		if err := vars(&in); err != nil {
+			return err
+		}
+		scenes := make([]string, 0, len(in.Ids))
+		for _, id := range in.Ids {
+			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"Scene %d","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s%d.mp4","duration":1000,"path":"/s%d.mp4","height":1080,"video_codec":"h264"}],"paths":{"stream":"http://stash/scene/%d/stream"},"tags":[]}`, id, id, id, id, id))
+		}
+		payload = `{"findScenes":{"scenes":[` + strings.Join(scenes, ",") + `]}}`
+	case "SceneSaveActivity":
+		var in struct {
+			Id      string   `json:"id"`
+			Seconds *float64 `json:"seconds"`
+			Resume  *float64 `json:"resume"`
+		}
+		if err := vars(&in); err != nil {
 			return err
 		}
 		f.mu.Lock()
@@ -52,13 +70,45 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 		}
 		if in.Seconds != nil {
 			f.withSeconds++
+			if f.seconds == nil {
+				f.seconds = map[string]float64{}
+			}
+			f.seconds[in.Id] += *in.Seconds
 		}
 		f.mu.Unlock()
 		payload = `{"sceneSaveActivity":true}`
+	case "SceneIncrementPlayCount":
+		var in struct {
+			Id string `json:"id"`
+		}
+		if err := vars(&in); err != nil {
+			return err
+		}
+		f.mu.Lock()
+		if f.playCounts == nil {
+			f.playCounts = map[string]int{}
+		}
+		f.playCounts[in.Id]++
+		f.mu.Unlock()
+		payload = `{"sceneAddPlay":null}`
 	default:
 		payload = `{"sceneSaveActivity":true}`
 	}
 	return json.Unmarshal([]byte(payload), resp.Data)
+}
+
+// playedSeconds is the seconds reported for scene id so far.
+func (f *fakeStash) playedSeconds(id string) float64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.seconds[id]
+}
+
+// playCount is how often the play count of scene id was incremented.
+func (f *fakeStash) playCount(id string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.playCounts[id]
 }
 
 func TestResumePosition(t *testing.T) {
@@ -87,7 +137,7 @@ func postEvent(t *testing.T, h *httpHandler, ev event, at float64) *httptest.Res
 
 func TestEvents_PauseAndCloseSaveResumePosition(t *testing.T) {
 	stash := &fakeStash{}
-	h := &httpHandler{libraryService: library.NewService(stash)}
+	h := newHttpHandler(library.NewService(stash))
 
 	postEvent(t, h, evPause, 600)
 	postEvent(t, h, evClose, 990)
@@ -106,7 +156,7 @@ func TestEvents_PauseAndCloseSaveResumePosition(t *testing.T) {
 
 func TestEvents_PlayDoesNotSaveResumePosition(t *testing.T) {
 	stash := &fakeStash{}
-	h := &httpHandler{libraryService: library.NewService(stash)}
+	h := newHttpHandler(library.NewService(stash))
 
 	postEvent(t, h, evPlay, 120)
 
@@ -119,7 +169,7 @@ func TestEvents_PlayDoesNotSaveResumePosition(t *testing.T) {
 // not a goroutine), the fake sees the call before postEvent returns.
 func TestEvents_PlayThenPauseReportsDurationAndResumeTogether(t *testing.T) {
 	stash := &fakeStash{}
-	h := &httpHandler{libraryService: library.NewService(stash)}
+	h := newHttpHandler(library.NewService(stash))
 
 	postEvent(t, h, evPlay, 100)
 	postEvent(t, h, evPause, 600)
@@ -134,7 +184,7 @@ func TestEvents_PlayThenPauseReportsDurationAndResumeTogether(t *testing.T) {
 
 func TestVideoData_StoresProfileFromRequest(t *testing.T) {
 	loadDefaultRules(t)
-	h := &httpHandler{libraryService: library.NewService(&fakeStash{})}
+	h := newHttpHandler(library.NewService(&fakeStash{}))
 	body, _ := json.Marshal(map[string]any{"hsp": base64.StdEncoding.EncodeToString([]byte("profile-bytes"))})
 	req := httptest.NewRequest(http.MethodPost, "/7", bytes.NewReader(body))
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"videoId"}, Values: []string{"7"}}}))
@@ -173,7 +223,7 @@ func waitFor(t *testing.T, cond func() bool) {
 
 func TestVideoData_OversizedBodyIsIgnored(t *testing.T) {
 	loadDefaultRules(t)
-	h := &httpHandler{libraryService: library.NewService(&fakeStash{})}
+	h := newHttpHandler(library.NewService(&fakeStash{}))
 	huge := strings.Repeat("A", maxVideoDataBody+1024)
 	body, _ := json.Marshal(map[string]any{"hsp": huge})
 	req := httptest.NewRequest(http.MethodPost, "/7", bytes.NewReader(body))
