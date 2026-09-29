@@ -21,6 +21,27 @@
     el.className = 'msg' + (kind ? ' ' + kind : '');
   }
 
+  // confirmClick makes btn a two-step button: the first click arms it and
+  // shows its data-confirm text in place; a second click within a few
+  // seconds runs action, else the button disarms by itself. There is no
+  // dialog to dismiss, which matters in a headset browser.
+  const confirmArmMs = 6000;
+  function confirmClick(btn, action) {
+    const label = btn.textContent;
+    let timer = null;
+    const disarm = () => { clearTimeout(timer); timer = null; btn.textContent = label; btn.classList.remove('armed'); };
+    btn.addEventListener('click', () => {
+      if (timer === null) {
+        btn.textContent = btn.dataset.confirm || 'Click again to confirm';
+        btn.classList.add('armed');
+        timer = setTimeout(disarm, confirmArmMs);
+        return;
+      }
+      disarm();
+      action();
+    });
+  }
+
   // Players page: health details, headset check, copy, reindex.
   const toggle = $('#health-toggle');
   const detail = $('#health-detail');
@@ -357,7 +378,7 @@
     });
     // The table is redrawn in place rather than reloaded, so edits made
     // elsewhere on the page survive the reset.
-    $('#reset-rules').addEventListener('click', async () => {
+    confirmClick($('#reset-rules'), async () => {
       setMsg($('#rules-msg'), 'Resetting');
       try {
         await api('PUT', '/video-rules', []);
@@ -586,7 +607,7 @@
       try { await api('PUT', '/filters', list); setMsg($('#filters-msg'), 'Saved. Players pick it up on their next index load.', 'ok'); }
       catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
     });
-    $('#reset-filters').addEventListener('click', async () => {
+    confirmClick($('#reset-filters'), async () => {
       setMsg($('#filters-msg'), 'Resetting');
       try { await api('PUT', '/filters', []); location.reload(); }
       catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }

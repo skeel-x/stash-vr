@@ -92,8 +92,10 @@
     <select id="add-preset" aria-label="Add a preset"><option value="">Add a preset</option>{{range $i, $p := .PresetRows}}<option value="{{$i}}">{{$p.Label}}</option>{{end}}</select>
     <button type="button" id="add-defaults" title="Appends the default rules whose tag is not in the table yet; existing rules are left as they are">Add missing default rules</button>
     <button type="button" id="save-rules" class="primary">Save rules</button>
-    <button type="button" id="reset-rules">Reset to defaults</button>
     <span class="msg" id="rules-msg"></span>
+  </div>
+  <div class="row reset-row">
+    <button type="button" data-confirm="Replace every rule with the defaults? Click again" id="reset-rules">Reset to defaults</button>
   </div>
   <label class="check"><input name="learn_studio_profiles" type="checkbox" {{if .Config.LearnStudioProfiles}}checked{{end}}> Use a saved profile for other scenes from the same studio with the same lens</label>
   <p class="lead">A scene without a profile of its own then gets the one saved last for a scene of its studio with the same projection, lens and field of view, before a rule's profile. Saved with Save changes.</p>

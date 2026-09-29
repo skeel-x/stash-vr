@@ -23,8 +23,10 @@
   </table>
   <div class="row">
     <button type="button" id="save-filters" class="primary"{{if $blocked}} disabled{{end}}>Save order</button>
-    <button type="button" id="reset-filters"{{if $blocked}} disabled{{end}}>Reset to Stash order</button>
     <span class="msg{{if $blocked}} warn{{end}}" id="filters-msg">{{if $blocked}}Nothing to save: the sections could not be loaded. Reload this page once Stash is reachable; the saved order and names are kept until then.{{end}}</span>
+  </div>
+  <div class="row reset-row">
+    <button type="button" data-confirm="Drop the saved order and names? Click again" id="reset-filters"{{if $blocked}} disabled{{end}}>Reset to Stash order</button>
   </div>
 </section>
 {{end}}

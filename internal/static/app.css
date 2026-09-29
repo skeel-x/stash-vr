@@ -95,6 +95,10 @@ button.small{min-height:44px;padding:0 14px;font-size:16px}
 .health button.small{min-height:56px}
 .button.big{font-size:22px;min-height:64px}
 button:disabled{opacity:.6;cursor:default}
+/* An armed two-step button (see confirmClick) shows its confirm text. */
+button.armed{border-color:var(--warn);color:var(--warn)}
+/* Reset buttons sit on a row of their own, away from Save. */
+.row.reset-row{justify-content:flex-end;margin-top:20px}
 .copy{flex:none;min-width:96px}
 
 /* forms */

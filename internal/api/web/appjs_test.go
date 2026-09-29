@@ -66,6 +66,37 @@ func TestAppJS_SetupFormGuards(t *testing.T) {
 	}
 }
 
+func TestAppJS_ResetButtonsNeedASecondClick(t *testing.T) {
+	js := appJS(t)
+	start := strings.Index(js, "function confirmClick(btn, action)")
+	if start < 0 {
+		t.Fatal("expected a confirmClick helper")
+	}
+	helper := js[start : strings.Index(js[start:], "\n  }\n")+start]
+	for _, want := range []string{
+		// First click arms and shows the confirm text; a timer disarms.
+		"btn.textContent = btn.dataset.confirm || 'Click again to confirm';",
+		"btn.classList.add('armed');",
+		"timer = setTimeout(disarm, confirmArmMs);",
+		// Second click runs the action and disarms.
+		"disarm();\n      action();",
+	} {
+		if !strings.Contains(helper, want) {
+			t.Errorf("confirmClick missing %q", want)
+		}
+	}
+	for _, want := range []string{"confirmClick($('#reset-rules'), async () => {", "confirmClick($('#reset-filters'), async () => {"} {
+		if !strings.Contains(js, want) {
+			t.Errorf("app.js missing %q", want)
+		}
+	}
+	for _, stale := range []string{"$('#reset-rules').addEventListener('click'", "$('#reset-filters').addEventListener('click'"} {
+		if strings.Contains(js, stale) {
+			t.Errorf("a reset button must not act on a single click: %q", stale)
+		}
+	}
+}
+
 func TestAppJS_CopyFallsBackToExecCommandOffSecureOrigins(t *testing.T) {
 	js := appJS(t)
 	start := strings.Index(js, "async function copyText")

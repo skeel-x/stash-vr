@@ -214,6 +214,34 @@ func TestSections_BlocksSaveAndResetWhenRowsCannotLoad(t *testing.T) {
 	}
 }
 
+// The reset buttons need a second click and sit on a row of their own,
+// so a stray tap on the Save row cannot land on them.
+func TestResetButtons_SitApartFromSaveAndAskTwice(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+	cases := []struct{ path, save, reset string }{
+		{"/setup", `id="save-rules"`, `id="reset-rules"`},
+		{"/sections", `id="save-filters"`, `id="reset-filters"`},
+	}
+	for _, c := range cases {
+		t.Run(c.path, func(t *testing.T) {
+			body := getPage(t, h, c.path, nil).Body.String()
+			save, reset := strings.Index(body, c.save), strings.Index(body, c.reset)
+			if save < 0 || reset < 0 {
+				t.Fatalf("missing %s or %s", c.save, c.reset)
+			}
+			between := body[save:reset]
+			if !strings.Contains(between, `<div class="row reset-row">`) || strings.Count(between, "</div>") < 1 {
+				t.Fatalf("expected the reset button in its own reset-row after the save row, got %q", between)
+			}
+			tag := body[strings.LastIndex(body[:reset], "<button"):reset]
+			if !strings.Contains(tag, `data-confirm="`) || !strings.Contains(tag, "Click again") {
+				t.Fatalf("expected a data-confirm text on the reset button, got %q", tag)
+			}
+		})
+	}
+}
+
 func TestSections_ShowsRecommendedAfterContinueWatching(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)
