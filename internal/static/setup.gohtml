@@ -80,7 +80,7 @@
   </div>
 
   <h2>Video rules</h2>
-  <p class="lead">Tags decide how a scene is shown. Rules apply top to bottom; a later rule overrides an earlier one. Profiles stored: {{len .Profiles}}. Tune a scene in HereSphere and save it there; it then shows up here and can back a rule.</p>
+  <p class="lead">Tags decide how a scene is shown. Rules apply top to bottom; a later rule overrides an earlier one. Profiles stored: {{len .Profiles}}. Tune a scene in HereSphere and save it there; it then shows up here and can back a rule. Save rules saves the table alone; Save changes at the bottom saves it along with everything else.</p>
   <div class="rules" id="rules">
     {{range .VideoRules}}{{template "rule-row" ($.Row .)}}{{end}}
   </div>

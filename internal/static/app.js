@@ -102,15 +102,41 @@
     });
   }
 
+  // Setup page: the rules table's readers, set up below with the table;
+  // the settings form saves the rules along with everything else.
+  let ruleRows = null;
+  let showDefaultRules = null;
+  // Setup page: unsaved edits, kept apart so "Save rules" clears only the
+  // table's; leaving the page with either set asks first.
+  let settingsDirty = false;
+  let rulesDirty = false;
+  const markDirty = (target) => {
+    // The inspector, the badge preview and the coverage check are tools
+    // inside the form, not settings.
+    if (target.closest('#inspect-q, #badge-preview-scene, #coverage-panel')) return;
+    if (target.closest('#rules, #add-preset')) rulesDirty = true;
+    else settingsDirty = true;
+  };
+
   // Setup form.
   const form = $('#setup');
   if (form) {
+    form.addEventListener('input', (e) => markDirty(e.target));
+    form.addEventListener('change', (e) => markDirty(e.target));
+    window.addEventListener('beforeunload', (e) => {
+      if (!settingsDirty && !rulesDirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
     // The key is left out to keep the stored one, sent empty to clear it
     // ("No API key" ticked), else sent as typed.
     const apiKey = () => (form.stash_no_api_key.checked ? '' : (form.stash_api_key.value.trim() || undefined));
     form.stash_api_key.addEventListener('input', () => { if (form.stash_api_key.value.trim()) form.stash_no_api_key.checked = false; });
     form.stash_no_api_key.addEventListener('change', () => { if (form.stash_no_api_key.checked) form.stash_api_key.value = ''; });
+    // The rules table is sent along when the page has one, so "Save
+    // changes" saves everything on the page.
     const read = () => ({
+      video_rules: ruleRows ? ruleRows() : undefined,
       stash_graphql_url: form.stash_graphql_url.value.trim(),
       stash_api_key: apiKey(),
       stash_tls_insecure: form.stash_tls_insecure.checked,
@@ -151,13 +177,19 @@
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       setMsg($('#save-msg'), 'Saving');
+      const body = read();
       try {
-        const cfg = await api('PUT', '/config', read());
+        const cfg = await api('PUT', '/config', body);
         form.stash_graphql_url.value = cfg.stash_graphql_url;
         form.stash_api_key.value = '';
         form.stash_api_key.placeholder = cfg.stash_api_key_set ? 'set, leave blank to keep' : 'paste the key from Stash, Settings, Security';
         form.stash_no_api_key.checked = !cfg.stash_api_key_set;
-        setMsg($('#save-msg'), 'Saved and applied', 'ok');
+        settingsDirty = false;
+        rulesDirty = false;
+        if (body.video_rules && !body.video_rules.length) {
+          showDefaultRules();
+          setMsg($('#save-msg'), 'Saved and applied. The rules table was empty, so the default rules were restored.', 'ok');
+        } else setMsg($('#save-msg'), 'Saved and applied', 'ok');
       } catch (e) { setMsg($('#save-msg'), e.message, 'err'); }
     });
   }
@@ -212,8 +244,17 @@
   const rulesBody = $('#rules');
   if (rulesBody) {
     makeSortable(rulesBody);
+    // Enter in a rule input would submit the settings form around the
+    // table (its implicit submission), saving everything mid-edit.
+    rulesBody.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.matches('input')) e.preventDefault();
+    });
+    // Reordering, adding and removing rules change the table without an
+    // input event.
+    rulesBody.addEventListener('dragend', () => { rulesDirty = true; });
+    rulesBody.addEventListener('touchend', () => { rulesDirty = true; });
     // Blank screen fields are left out, so the rule keeps them unset.
-    const ruleRows = () => Array.from(rulesBody.querySelectorAll('[data-rule]')).map((tr) => {
+    ruleRows = () => Array.from(rulesBody.querySelectorAll('[data-rule]')).map((tr) => {
       const rule = {
         tag: tr.querySelector('.tag').value.trim(),
         projection: tr.querySelector('.projection').value,
@@ -262,10 +303,11 @@
     });
     rulesBody.addEventListener('click', (e) => {
       const btn = e.target.closest('.remove');
-      if (btn) btn.closest('[data-rule]').remove();
+      if (btn) { btn.closest('[data-rule]').remove(); rulesDirty = true; }
     });
     $('#add-rule').addEventListener('click', () => {
       rulesBody.appendChild($('#rule-template').content.firstElementChild.cloneNode(true));
+      rulesDirty = true;
     });
     // "Add a preset" appends a filled rule card to edit; nothing is saved
     // until "Save rules".
@@ -277,6 +319,7 @@
       const added = card.cloneNode(true);
       rulesBody.appendChild(added);
       added.querySelector('.tag').focus();
+      rulesDirty = true;
       setMsg($('#rules-msg'), 'Preset added at the end. Adjust it, then save rules.', 'ok');
     });
     // Appends the default rules whose tag no rule in the table has yet
@@ -292,11 +335,12 @@
         have.add(tag);
         added++;
       });
+      if (added) rulesDirty = true;
       setMsg($('#rules-msg'), added ? 'Added ' + added + (added === 1 ? ' rule' : ' rules') + '. Save rules to keep them.' : 'Every default rule is already in the table.', 'ok');
     });
     // showDefaultRules replaces the table with the default rules, as the
     // server stores them when it is sent an empty list.
-    const showDefaultRules = () => {
+    showDefaultRules = () => {
       rulesBody.replaceChildren(...Array.from($('#default-rules').content.querySelectorAll('[data-rule]')).map((card) => card.cloneNode(true)));
     };
     $('#save-rules').addEventListener('click', async () => {
@@ -304,16 +348,23 @@
       setMsg($('#rules-msg'), 'Saving');
       try {
         await api('PUT', '/video-rules', list);
+        rulesDirty = false;
         if (!list.length) {
           showDefaultRules();
           setMsg($('#rules-msg'), 'Defaults restored: the table was empty, so the default rules were saved instead.', 'ok');
         } else setMsg($('#rules-msg'), 'Saved. Scenes use the new rules when opened next.', 'ok');
       } catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
     });
+    // The table is redrawn in place rather than reloaded, so edits made
+    // elsewhere on the page survive the reset.
     $('#reset-rules').addEventListener('click', async () => {
       setMsg($('#rules-msg'), 'Resetting');
-      try { await api('PUT', '/video-rules', []); location.reload(); }
-      catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
+      try {
+        await api('PUT', '/video-rules', []);
+        showDefaultRules();
+        rulesDirty = false;
+        setMsg($('#rules-msg'), 'Defaults restored.', 'ok');
+      } catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
     });
   }
 

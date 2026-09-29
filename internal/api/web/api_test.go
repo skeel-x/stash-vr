@@ -718,6 +718,59 @@ func TestPutVideoRules_RoundTripAndValidation(t *testing.T) {
 	}
 }
 
+func TestPutConfig_VideoRulesAreOptional(t *testing.T) {
+	base := func() map[string]any {
+		return map[string]any{
+			"stash_graphql_url": "http://stash:9999/graphql",
+			"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "log_level": "info",
+		}
+	}
+	two := []map[string]any{{"tag": "DOME", "projection": "equirectangular"}, {"tag": "FLAT", "projection": "perspective", "stereo": "mono"}}
+	cases := []struct {
+		name      string
+		rules     any // nil leaves the field out
+		wantCode  int
+		wantTags  []string
+		wantCount int
+	}{
+		{name: "given rules replace the table", rules: two, wantCode: 200, wantTags: []string{"DOME", "FLAT"}},
+		{name: "a missing field keeps the table", rules: nil, wantCode: 200, wantTags: []string{"DOME", "FLAT"}},
+		{name: "an empty list restores the defaults", rules: []any{}, wantCode: 200, wantCount: len(config.DefaultVideoRules())},
+		{name: "a bad rule is refused and the table kept", rules: []map[string]any{{"tag": "X", "projection": "dome"}}, wantCode: 400, wantCount: len(config.DefaultVideoRules())},
+	}
+	_, h := newEnv(t, &fakeStash{})
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			body := base()
+			if c.rules != nil {
+				body["video_rules"] = c.rules
+			}
+			rec, out := do(t, h, http.MethodPut, "/config", body)
+			if rec.Code != c.wantCode {
+				t.Fatalf("expected %d, got %d %s", c.wantCode, rec.Code, rec.Body.String())
+			}
+			got := config.Application().VideoRules
+			if c.wantTags != nil {
+				if len(got) != len(c.wantTags) {
+					t.Fatalf("expected %v stored, got %+v", c.wantTags, got)
+				}
+				for i, tag := range c.wantTags {
+					if got[i].Tag != tag {
+						t.Fatalf("rule %d: expected %s, got %+v", i, tag, got[i])
+					}
+				}
+			} else if len(got) != c.wantCount {
+				t.Fatalf("expected %d rules stored, got %+v", c.wantCount, got)
+			}
+			if rec.Code == 200 {
+				if echoed, _ := out["video_rules"].([]any); len(echoed) != len(got) {
+					t.Fatalf("expected the stored rules echoed, got %v", out["video_rules"])
+				}
+			}
+		})
+	}
+}
+
 func TestGetLog_ReturnsTailWithClamp(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	for i := 0; i < 3; i++ {

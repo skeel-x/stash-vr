@@ -98,28 +98,31 @@ type ConfigView struct {
 
 // configInput is what PUT /config accepts. A missing stash_api_key keeps
 // the current key; an empty one clears it (a Stash without authentication).
+// A missing video_rules keeps the rules table; one given replaces it, as
+// PUT /video-rules does, so "Save changes" can save the rules too.
 type configInput struct {
-	StashGraphQLUrl    string            `json:"stash_graphql_url"`
-	StashApiKey        *string           `json:"stash_api_key"`
-	StashTLSInsecure   *bool             `json:"stash_tls_insecure"`
-	FavoriteTag        string            `json:"favorite_tag"`
-	ExcludeSortName    string            `json:"exclude_sort_name"`
-	GenerateSummaryIds bool              `json:"generate_summary_ids"`
-	HeatmapHeightPx    int               `json:"heatmap_height_px"`
-	ForceHTTPS         bool              `json:"force_https"`
-	BasePath           *string           `json:"base_path"`
-	DeovrAutoload      *bool             `json:"deovr_autoload"`
-	PerformerFacets    *bool             `json:"performer_facets"`
-	DateLookup         *bool             `json:"date_lookup"`
-	DateWriteback      *bool             `json:"date_writeback"`
-	FunscriptIndexPath *string           `json:"funscript_index_path"`
-	LogLevel           string            `json:"log_level"`
-	SmartSectionSize   *int              `json:"smart_section_size"`
-	AutoStudioMin      *int              `json:"auto_studio_min"`
-	AutoPerformerMin   *int              `json:"auto_performer_min"`
-	CoverBadges        *coverBadgesInput `json:"cover_badges"`
-	LearnStudio        *bool             `json:"learn_studio_profiles"`
-	CorrectVertical    *bool             `json:"correct_vertical_stereo"`
+	StashGraphQLUrl    string              `json:"stash_graphql_url"`
+	StashApiKey        *string             `json:"stash_api_key"`
+	StashTLSInsecure   *bool               `json:"stash_tls_insecure"`
+	FavoriteTag        string              `json:"favorite_tag"`
+	ExcludeSortName    string              `json:"exclude_sort_name"`
+	GenerateSummaryIds bool                `json:"generate_summary_ids"`
+	HeatmapHeightPx    int                 `json:"heatmap_height_px"`
+	ForceHTTPS         bool                `json:"force_https"`
+	BasePath           *string             `json:"base_path"`
+	DeovrAutoload      *bool               `json:"deovr_autoload"`
+	PerformerFacets    *bool               `json:"performer_facets"`
+	DateLookup         *bool               `json:"date_lookup"`
+	DateWriteback      *bool               `json:"date_writeback"`
+	FunscriptIndexPath *string             `json:"funscript_index_path"`
+	LogLevel           string              `json:"log_level"`
+	SmartSectionSize   *int                `json:"smart_section_size"`
+	AutoStudioMin      *int                `json:"auto_studio_min"`
+	AutoPerformerMin   *int                `json:"auto_performer_min"`
+	CoverBadges        *coverBadgesInput   `json:"cover_badges"`
+	LearnStudio        *bool               `json:"learn_studio_profiles"`
+	CorrectVertical    *bool               `json:"correct_vertical_stereo"`
+	VideoRules         *[]config.VideoRule `json:"video_rules"`
 }
 
 // coverBadgesInput is the cover_badges object of PUT /config; a missing
@@ -421,6 +424,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	if in.CorrectVertical != nil {
 		next.CorrectVerticalStereo = *in.CorrectVertical
 	}
+	if in.VideoRules != nil {
+		next.VideoRules = rulesOrDefaults(*in.VideoRules)
+	}
 
 	// Validate before the host rule so an unusable URL is reported as such
 	// rather than as a missing API key.
@@ -504,8 +510,17 @@ func (h *apiHandler) putFilters(w http.ResponseWriter, r *http.Request) {
 	writeJson(ctx, w, map[string]any{"filters": saved.Filters})
 }
 
-// putVideoRules replaces the rules table. An empty list restores the
-// defaults so "Reset to defaults" needs no separate endpoint.
+// rulesOrDefaults is the rules table to store for a list sent by the page:
+// an empty list restores the defaults, so "Reset to defaults" needs no
+// separate endpoint.
+func rulesOrDefaults(in []config.VideoRule) []config.VideoRule {
+	if len(in) == 0 {
+		return config.DefaultVideoRules()
+	}
+	return in
+}
+
+// putVideoRules replaces the rules table (see rulesOrDefaults).
 func (h *apiHandler) putVideoRules(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, err := internal.UnmarshalBody[[]config.VideoRule](r)
@@ -513,14 +528,11 @@ func (h *apiHandler) putVideoRules(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
 		return
 	}
-	if len(in) == 0 {
-		in = config.DefaultVideoRules()
-	}
 	h.writeMu.Lock()
 	defer h.writeMu.Unlock()
 
 	cfg := config.Application()
-	cfg.VideoRules = in
+	cfg.VideoRules = rulesOrDefaults(in)
 	saved, err := config.Set(cfg)
 	if err != nil {
 		writeError(ctx, w, settingsErrorCode(err), err.Error())
