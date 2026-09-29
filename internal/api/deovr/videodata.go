@@ -120,13 +120,22 @@ func setFormat(dto *videoDataDto, f library.Format) {
 	case "equirectangular360", "cubemap", "equiangularCubemap":
 		dto.ScreenType = "sphere"
 	case "fisheye":
-		switch {
-		case f.Lens == "MKX200":
+		// The official DeoVR doc lists only flat/dome/sphere/fisheye/mkx200/
+		// rf52. "mkx220" and "vrca220" still need confirming in a DeoVR
+		// headset; if DeoVR rejects them, "fisheye" is the fallback.
+		switch f.Lens {
+		case "MKX200":
 			dto.ScreenType = "mkx200"
-		case f.Fov == 190:
-			dto.ScreenType = "rf52"
+		case "MKX220":
+			dto.ScreenType = "mkx220"
+		case "VRCA220":
+			dto.ScreenType = "vrca220"
 		default:
-			dto.ScreenType = "fisheye"
+			if f.Fov == 190 {
+				dto.ScreenType = "rf52"
+			} else {
+				dto.ScreenType = "fisheye"
+			}
 		}
 	case "perspective":
 		dto.ScreenType = "flat"

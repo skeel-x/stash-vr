@@ -16,6 +16,8 @@ func TestSetFormat_MapsResolvedFormatToDeoVR(t *testing.T) {
 		{library.Format{Projection: "equirectangular", Stereo: "sbs"}, "dome", "sbs", true},
 		{library.Format{Projection: "equirectangular360", Stereo: "tb"}, "sphere", "tb", true},
 		{library.Format{Projection: "fisheye", Stereo: "sbs", Lens: "MKX200", Fov: 200}, "mkx200", "sbs", true},
+		{library.Format{Projection: "fisheye", Stereo: "sbs", Lens: "MKX220", Fov: 220}, "mkx220", "sbs", true},
+		{library.Format{Projection: "fisheye", Stereo: "sbs", Lens: "VRCA220", Fov: 220}, "vrca220", "sbs", true},
 		{library.Format{Projection: "fisheye", Stereo: "sbs", Fov: 190}, "rf52", "cuv", true},
 		{library.Format{Projection: "fisheye", Stereo: "sbs"}, "fisheye", "sbs", true},
 		{library.Format{Projection: "perspective", Stereo: "mono"}, "flat", "off", true},
