@@ -18,10 +18,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// warmupTimeout bounds the startup probe of Stash: the version log and the
-// first index build. A Stash that never answers must not hold a goroutine
-// for the life of the process.
-const warmupTimeout = 5 * time.Minute
+const (
+	// warmupTimeout bounds the startup probe of Stash: the version log and
+	// the first index build. A Stash that never answers must not hold a
+	// goroutine for the life of the process.
+	warmupTimeout = 5 * time.Minute
+	// sweeperStopTimeout bounds the wait for the date sweeper's final
+	// dates.json flush once the server has stopped.
+	sweeperStopTimeout = 5 * time.Second
+)
 
 func Run(ctx context.Context) error {
 	var seedNotPersisted error
@@ -56,12 +61,23 @@ func Run(ctx context.Context) error {
 // needs to be configured).
 func serve(ctx context.Context, listenAddress string, stashClient graphql.Client, libraryService *library.Service) error {
 	// Started either way: it idles until an index exists and walks it after
-	// every build.
-	libraryService.StartDateSweeper(ctx)
+	// every build. It gets its own context so it is also stopped, and its
+	// store flushed, when the server fails rather than the process ending.
+	sweepCtx, stopSweeper := context.WithCancel(ctx)
+	defer stopSweeper()
+	libraryService.StartDateSweeper(sweepCtx)
 
 	go warmup(ctx, stashClient, libraryService)
 
-	if err := server.Listen(ctx, listenAddress, libraryService); err != nil {
+	err := server.Listen(ctx, listenAddress, libraryService)
+
+	// The sweeper's final dates.json write must not be lost to the exit.
+	stopSweeper()
+	if !libraryService.WaitDateSweeper(sweeperStopTimeout) {
+		log.Ctx(ctx).Warn().Msg("Release dates: sweeper did not stop in time, its last changes may be lost")
+	}
+
+	if err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
 	return nil

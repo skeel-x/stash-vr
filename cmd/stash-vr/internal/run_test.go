@@ -120,6 +120,11 @@ func TestServe_SetupPageReachableWhileStashHangs(t *testing.T) {
 	case <-time.After(15 * time.Second):
 		t.Fatal("serve did not return after the context ended")
 	}
+	// The sweeper was joined before serve returned, so its final flush is
+	// already on disk by the time the process exits.
+	if !lib.WaitDateSweeper(0) {
+		t.Fatal("serve returned before the date sweeper stopped")
+	}
 }
 
 func TestServe_ListenFailureIsReported(t *testing.T) {
@@ -135,8 +140,9 @@ func TestServe_ListenFailureIsReported(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	stash := &hungStash{}
+	lib := library.NewService(stash)
 	done := make(chan error, 1)
-	go func() { done <- serve(ctx, addr, stash, library.NewService(stash)) }()
+	go func() { done <- serve(ctx, addr, stash, lib) }()
 
 	select {
 	case err := <-done:
@@ -145,5 +151,9 @@ func TestServe_ListenFailureIsReported(t *testing.T) {
 		}
 	case <-time.After(15 * time.Second):
 		t.Fatal("serve did not return after the listen failure")
+	}
+	// The sweeper is stopped with the server, not left to the process exit.
+	if !lib.WaitDateSweeper(0) {
+		t.Fatal("serve returned before the date sweeper stopped")
 	}
 }

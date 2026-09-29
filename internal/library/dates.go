@@ -289,6 +289,8 @@ type dateSweeper struct {
 	boxesOK  bool
 	warned   map[string]time.Time
 	started  bool
+	// done is closed once the sweeper has returned and flushed the store.
+	done chan struct{}
 }
 
 func newDateSweeper() *dateSweeper {
@@ -297,6 +299,7 @@ func newDateSweeper() *dateSweeper {
 		queued: map[string]struct{}{},
 		warned: map[string]time.Time{},
 		rescan: true,
+		done:   make(chan struct{}),
 	}
 }
 
@@ -572,11 +575,40 @@ func (libraryService *Service) StartDateSweeper(ctx context.Context) {
 	go libraryService.runDateSweeper(ctx)
 }
 
+// WaitDateSweeper waits up to timeout for the sweeper to finish after its
+// context ended, so its final dates.json flush is not lost on shutdown. It
+// reports whether the sweeper is done; one never started counts as done.
+func (libraryService *Service) WaitDateSweeper(timeout time.Duration) bool {
+	sw := libraryService.sweeper
+	sw.mu.Lock()
+	started := sw.started
+	sw.mu.Unlock()
+	if !started {
+		return true
+	}
+	// Already done wins over an already expired timeout.
+	select {
+	case <-sw.done:
+		return true
+	default:
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-sw.done:
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
 // runDateSweeper looks up one scene per dateSweepInterval: requested scenes
 // first, then the undated scenes of the index. It walks the index again after
-// every index build and idles when there is nothing to do.
+// every index build and idles when there is nothing to do. It flushes the
+// store and closes done on the way out.
 func (libraryService *Service) runDateSweeper(ctx context.Context) {
 	sw := libraryService.sweeper
+	defer close(sw.done)
 	defer libraryService.flushDates()
 	var queue []string
 	for {

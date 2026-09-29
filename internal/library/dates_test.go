@@ -552,6 +552,66 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
+func TestWaitDateSweeper(t *testing.T) {
+	cases := []struct {
+		name string
+		// run prepares the sweeper and returns the timeout to wait with.
+		run func(svc *Service) time.Duration
+		// wantDone is the expected result; wantFlushed expects the entry
+		// "1" put during run to be on disk afterwards.
+		wantDone    bool
+		wantFlushed bool
+	}{
+		{
+			name:     "never started counts as done",
+			run:      func(_ *Service) time.Duration { return time.Millisecond },
+			wantDone: true,
+		},
+		{
+			name: "started and stopped flushes the store first",
+			run: func(svc *Service) time.Duration {
+				ctx, cancel := context.WithCancel(context.Background())
+				svc.StartDateSweeper(ctx)
+				// An unsaved change made while the sweeper idles is only
+				// written by its final flush.
+				svc.dates().put("1", dateEntry{Date: "2020-01-02", Checked: time.Now()})
+				cancel()
+				return 5 * time.Second
+			},
+			wantDone:    true,
+			wantFlushed: true,
+		},
+		{
+			name: "still running past the bound",
+			run: func(svc *Service) time.Duration {
+				// Marked started but never run: done is never closed.
+				svc.sweeper.mu.Lock()
+				svc.sweeper.started = true
+				svc.sweeper.mu.Unlock()
+				return 20 * time.Millisecond
+			},
+			wantDone: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			loadDateConfig(t, true, false)
+			svc := NewService(&dateStash{})
+
+			timeout := c.run(svc)
+			if got := svc.WaitDateSweeper(timeout); got != c.wantDone {
+				t.Fatalf("WaitDateSweeper = %v, want %v", got, c.wantDone)
+			}
+			if !c.wantFlushed {
+				return
+			}
+			if e, ok := loadDateStore(datesPath()).get("1"); !ok || e.Date != "2020-01-02" {
+				t.Fatalf("expected the final flush on disk, got %+v %v", e, ok)
+			}
+		})
+	}
+}
+
 func TestDateSweeper_LooksUpUndatedScenesOnly(t *testing.T) {
 	loadDateConfig(t, true, false)
 	stash := &dateStash{
