@@ -54,8 +54,9 @@ func videoDataToScanDataDto(ctx context.Context, vd *library.VideoData, baseUrl 
 		Link:      getVideoDataUrl(baseUrl, id),
 		Title:     vd.Title(),
 		DateAdded: vd.SceneParts.Created_at.Format(time.DateOnly),
-		Duration:  vd.SceneParts.Files[0].Duration,
-		Tags:      getTags(vd),
+		// Milliseconds, like the scene document's duration.
+		Duration: vd.SceneParts.Files[0].Duration * 1000,
+		Tags:     getTags(vd),
 	}
 	if vd.SceneParts.Date != nil {
 		scanData.DateReleased = util.Ptr(util.NormalizeDate(*vd.SceneParts.Date))

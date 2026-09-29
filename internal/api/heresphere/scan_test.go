@@ -44,6 +44,24 @@ func TestBuildScan_SkipsScenesWithoutAFile(t *testing.T) {
 	}
 }
 
+func TestScanDuration_MatchesVideoDataDuration(t *testing.T) {
+	loadDefaultRules(t)
+	vd := sceneWithFile("7", 1234.5)
+
+	scan := videoDataToScanDataDto(context.Background(), vd, "https://vr.example")
+	doc, err := buildVideoData(context.Background(), vd, "https://vr.example", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if scan.Duration != doc.Duration {
+		t.Fatalf("scan duration %v differs from scene document duration %v", scan.Duration, doc.Duration)
+	}
+	if scan.Duration != 1234500 {
+		t.Fatalf("expected milliseconds, got %v", scan.Duration)
+	}
+}
+
 func TestGetTags_ToleratesMissingFile(t *testing.T) {
 	loadDefaultRules(t)
 	vd := &library.VideoData{SceneParts: &gql.SceneParts{Id: "4", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}}
