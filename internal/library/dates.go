@@ -429,10 +429,11 @@ func (libraryService *Service) setReleaseDate(id, date string) {
 
 // lookupDate asks each stash-box in order for scene id's release date and
 // stores the first accepted date, or a miss when every box answered without
-// one. When every box errored it stores a failed entry so the scene backs off
-// for dateFailExpiry; when some boxes errored and the rest missed it leaves
-// the scene unchecked. Only title matches are written back to Stash. It
-// reports false when the run should stop because no stash-box can be asked.
+// one. When a box errored and no box had a date it stores a failed entry so
+// the scene backs off for dateFailExpiry: one broken box must not have the
+// sweeper scrape the same scenes on every run. Only title matches are
+// written back to Stash. It reports false when the run should stop because
+// no stash-box can be asked.
 func (libraryService *Service) lookupDate(ctx context.Context, id string) bool {
 	vd, err := libraryService.GetScene(ctx, id, false)
 	if err != nil {
@@ -503,12 +504,13 @@ func (libraryService *Service) lookupDate(ctx context.Context, id string) bool {
 		}
 		return true
 	}
-	if failed && !answered {
-		libraryService.dates().put(id, dateEntry{Checked: time.Now().UTC(), Failed: true})
-		log.Ctx(ctx).Debug().Str("scene", id).Msg("Release date lookup failed on every stash-box, backing off")
-		return true
-	}
 	if failed {
+		libraryService.dates().put(id, dateEntry{Checked: time.Now().UTC(), Failed: true})
+		msg := "Release date lookup failed on every stash-box, backing off"
+		if answered {
+			msg = "Release date not found where a stash-box answered and another failed, backing off"
+		}
+		log.Ctx(ctx).Debug().Str("scene", id).Msg(msg)
 		return true
 	}
 	libraryService.dates().put(id, dateEntry{Checked: time.Now().UTC()})

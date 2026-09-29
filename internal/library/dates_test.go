@@ -147,8 +147,9 @@ type dateStash struct {
 	results   map[string]string // scene id -> scrapeSingleScene JSON array
 	boxes     string            // stashBoxes JSON array
 	scrapeErr error
-	scrapes   []string // "index:id" per ScrapeSceneDate
-	updates   []string // "id=date" per SceneUpdateDate
+	failBoxes map[int]bool // box indexes whose scrape fails
+	scrapes   []string     // "index:id" per ScrapeSceneDate
+	updates   []string     // "id=date" per SceneUpdateDate
 }
 
 func (f *dateStash) vars(req *graphql.Request, into any) error {
@@ -215,6 +216,9 @@ func (f *dateStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 		f.scrapes = append(f.scrapes, fmt.Sprintf("%d:%s", in.Index, in.Id))
 		if f.scrapeErr != nil {
 			return f.scrapeErr
+		}
+		if f.failBoxes[in.Index] {
+			return fmt.Errorf("box %d down", in.Index)
 		}
 		res := f.results[in.Id]
 		if res == "" {
@@ -449,6 +453,43 @@ func TestLookupDate_MatchedGenericTitleIsNotWrittenBack(t *testing.T) {
 	}
 	if got := stash.updateCalls(); len(got) != 0 {
 		t.Fatalf("a short generic title must not be written back, got %v", got)
+	}
+}
+
+// One box fails and the other has nothing: the scene backs off like a
+// failure (6 h), not like a miss (30 d) and not as never checked, so a
+// broken box cannot have the same scenes scraped on every sweep.
+func TestLookupDate_FailedAndMissedBacksOff(t *testing.T) {
+	loadDateConfig(t, true, false)
+	stash := &dateStash{
+		scenes:    map[string]dateScene{"1": {title: "My Scene", basename: "one.mp4"}},
+		boxes:     `[{"name":"first","endpoint":"https://a/graphql"},{"name":"second","endpoint":"https://b/graphql"}]`,
+		failBoxes: map[int]bool{0: true},
+	}
+	svc := NewService(stash)
+
+	svc.lookupDate(context.Background(), "1")
+
+	e, ok := svc.dates().get("1")
+	if !ok || !e.Failed || e.Date != "" || e.Checked.IsZero() {
+		t.Fatalf("expected a failed entry, got %+v %v", e, ok)
+	}
+	now := time.Now()
+	if !e.settled(now.Add(5*time.Hour)) || e.settled(now.Add(7*time.Hour)) {
+		t.Fatal("expected the 6 hour failure backoff")
+	}
+	if got := stash.scrapeCalls(); !slices.Equal(got, []string{"0:1", "1:1"}) {
+		t.Fatalf("expected both boxes asked, got %v", got)
+	}
+
+	// A box that answers with a date still wins over another that fails.
+	stash.mu.Lock()
+	stash.results = map[string]string{"1": `[{"title":"My Scene","date":"2020-01-02"}]`}
+	stash.mu.Unlock()
+	svc.dates().put("1", dateEntry{Failed: true, Checked: now.Add(-7 * time.Hour)})
+	svc.lookupDate(context.Background(), "1")
+	if e, _ := svc.dates().get("1"); e.Failed || e.Date != "2020-01-02" || e.Source != "second" {
+		t.Fatalf("expected the second box's date, got %+v", e)
 	}
 }
 
