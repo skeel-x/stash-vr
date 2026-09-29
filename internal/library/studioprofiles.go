@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"errors"
 	"math"
 	"os"
 	"slices"
@@ -28,6 +29,15 @@ type studioEntry struct {
 	saved time.Time
 }
 
+// studioBackoff is how long after a failed build the index is not built
+// again: with Stash down, every player request would otherwise query it
+// and warn.
+const studioBackoff = 30 * time.Second
+
+// errStudioBackoff says the index was not built because its last build
+// failed less than studioBackoff ago.
+var errStudioBackoff = errors.New("studio profile index build failed recently, not retried yet")
+
 // studioIndex maps a studio id and lens key to the scene with the newest
 // saved profile. It is built on first use from the stored profiles and
 // the scene data, kept until ResetCaches or a change of the video rules,
@@ -40,6 +50,9 @@ type studioIndex struct {
 	rules   *config.VideoRule
 	nRules  int
 	entries map[string]studioEntry
+	// lastFail is when the last build failed, zero once one succeeded;
+	// see studioBackoff.
+	lastFail time.Time
 
 	// pending are the scenes whose profile was saved since the last
 	// lookup. It has its own lock so a save never waits for a build.
@@ -51,10 +64,10 @@ func studioKey(studio, lens string) string {
 	return studio + "\x00" + lens
 }
 
-// reset drops the index; the next lookup builds it again.
+// reset drops the index; the next lookup builds it again, at once.
 func (idx *studioIndex) reset() {
 	idx.mu.Lock()
-	idx.built, idx.entries, idx.rules = false, nil, nil
+	idx.built, idx.entries, idx.rules, idx.lastFail = false, nil, nil, time.Time{}
 	idx.mu.Unlock()
 }
 
@@ -99,7 +112,11 @@ func (libraryService *Service) StudioProfile(ctx context.Context, vd *VideoData,
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
 	if err := libraryService.refreshStudioIndex(ctx, cfg.VideoRules); err != nil {
-		log.Ctx(ctx).Warn().Err(err).Msg("Studio profiles unavailable")
+		if errors.Is(err, errStudioBackoff) {
+			log.Ctx(ctx).Debug().Msg("Studio profiles unavailable, last build failed recently")
+		} else {
+			log.Ctx(ctx).Warn().Err(err).Msg("Studio profiles unavailable")
+		}
 		return ""
 	}
 	e, ok := idx.entries[studioKey(studio, LensKey(f))]
@@ -110,7 +127,8 @@ func (libraryService *Service) StudioProfile(ctx context.Context, vd *VideoData,
 }
 
 // refreshStudioIndex builds the index when there is none or the rules
-// changed, else adds the profiles saved since. idx.mu is held.
+// changed, else adds the profiles saved since. A build is not tried again
+// within studioBackoff of a failed one: errStudioBackoff. idx.mu is held.
 func (libraryService *Service) refreshStudioIndex(ctx context.Context, rules []config.VideoRule) error {
 	idx := &libraryService.studios
 	var first *config.VideoRule
@@ -121,11 +139,15 @@ func (libraryService *Service) refreshStudioIndex(ctx context.Context, rules []c
 	// is then picked up on the next lookup at worst twice, never missed.
 	pending := idx.takePending()
 	if !idx.built || idx.rules != first || idx.nRules != len(rules) {
+		if !idx.lastFail.IsZero() && libraryService.now().Sub(idx.lastFail) < studioBackoff {
+			return errStudioBackoff
+		}
 		entries := map[string]studioEntry{}
 		if err := libraryService.addStudioEntries(ctx, rules, entries, libraryService.ListProfiles()); err != nil {
+			idx.lastFail = libraryService.now()
 			return err
 		}
-		idx.built, idx.rules, idx.nRules, idx.entries = true, first, len(rules), entries
+		idx.built, idx.rules, idx.nRules, idx.entries, idx.lastFail = true, first, len(rules), entries, time.Time{}
 		return nil
 	}
 	if len(pending) > 0 {

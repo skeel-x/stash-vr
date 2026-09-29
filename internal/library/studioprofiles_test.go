@@ -1,16 +1,19 @@
 package library
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
+	"github.com/rs/zerolog"
 	"stash-vr/internal/config"
 )
 
@@ -279,6 +282,100 @@ type failingClient struct{}
 
 func (failingClient) MakeRequest(context.Context, *graphql.Request, *graphql.Response) error {
 	return fmt.Errorf("stash unreachable")
+}
+
+// countingFailingClient fails every request and counts them.
+type countingFailingClient struct{ calls atomic.Int32 }
+
+func (c *countingFailingClient) MakeRequest(context.Context, *graphql.Request, *graphql.Response) error {
+	c.calls.Add(1)
+	return fmt.Errorf("stash unreachable")
+}
+
+func TestStudioProfile_StashDownBacksOffBeforeRebuilding(t *testing.T) {
+	s, _ := studioEnv(t, true, map[int]studioScene{2: {"a", []string{"DOME"}}})
+	vd, err := s.GetScene(t.Context(), "2", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saveAt(t, s, "1", t0)
+	down := &countingFailingClient{}
+	s.SetStashClient(down)
+	now := t0
+	s.now = func() time.Time { return now }
+	f := ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
+	var logged bytes.Buffer
+	ctx := zerolog.New(&logged).WithContext(context.Background())
+	warnings := func() int { return strings.Count(logged.String(), `"level":"warn"`) }
+
+	// The first lookup tries, fails and warns.
+	if got := s.StudioProfile(ctx, vd, &f); got != "" || down.calls.Load() != 1 || warnings() != 1 {
+		t.Fatalf("first lookup: got %q, %d queries, %d warnings", got, down.calls.Load(), warnings())
+	}
+
+	// Within the backoff, lookups neither query Stash nor warn.
+	now = t0.Add(studioBackoff - time.Second)
+	for i := 0; i < 3; i++ {
+		if got := s.StudioProfile(ctx, vd, &f); got != "" {
+			t.Fatalf("expected nothing while backing off, got %q", got)
+		}
+	}
+	if down.calls.Load() != 1 || warnings() != 1 {
+		t.Fatalf("lookups within %v of a failed build must not query or warn again, got %d queries, %d warnings", studioBackoff, down.calls.Load(), warnings())
+	}
+
+	// Past the backoff, the build is tried again.
+	now = t0.Add(studioBackoff)
+	if got := s.StudioProfile(ctx, vd, &f); got != "" || down.calls.Load() != 2 || warnings() != 2 {
+		t.Fatalf("after the backoff: got %q, %d queries, %d warnings", got, down.calls.Load(), warnings())
+	}
+
+	// A reset drops the backoff with the index.
+	now = t0.Add(studioBackoff + time.Second)
+	s.ResetCaches()
+	if s.StudioProfile(ctx, vd, &f); down.calls.Load() != 3 {
+		t.Fatalf("a reset must allow a build at once, got %d queries", down.calls.Load())
+	}
+}
+
+func TestStudioProfile_BuildSucceedingClearsTheBackoff(t *testing.T) {
+	s, st := studioEnv(t, true, map[int]studioScene{
+		1: {"a", []string{"DOME"}},
+		2: {"a", []string{"DOME"}},
+	})
+	saveAt(t, s, "1", t0)
+	vd, err := s.GetScene(t.Context(), "2", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := ResolveFormat(config.Application().VideoRules, vd.SceneParts.Tags)
+	now := t0
+	s.now = func() time.Time { return now }
+
+	// Fail once, then bring Stash back within the backoff: the index is
+	// not built until the backoff passes, then stays built.
+	down := &countingFailingClient{}
+	s.SetStashClient(down)
+	if got := s.StudioProfile(t.Context(), vd, &f); got != "" {
+		t.Fatalf("expected nothing while Stash is down, got %q", got)
+	}
+	s.studios.mu.Lock()
+	s.studios.lastFail = t0
+	s.studios.mu.Unlock()
+	s.client.Store(&clientBox{c: st})
+	if got := s.StudioProfile(t.Context(), vd, &f); got != "" {
+		t.Fatalf("expected the backoff to hold although Stash is back, got %q", got)
+	}
+	now = t0.Add(studioBackoff)
+	if got := s.StudioProfile(t.Context(), vd, &f); got != "1" {
+		t.Fatalf("expected the index built once the backoff passed, got %q", got)
+	}
+	s.studios.mu.Lock()
+	cleared := s.studios.lastFail.IsZero()
+	s.studios.mu.Unlock()
+	if !cleared {
+		t.Fatal("a build that succeeded must clear the failure time")
+	}
 }
 
 func TestScenesByID_UsesCacheAndFetchesTheRestOnce(t *testing.T) {
