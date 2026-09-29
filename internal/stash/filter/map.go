@@ -83,3 +83,13 @@ func GetOr[T any](m any, path string, def T) T {
 	}
 	return def
 }
+
+// require returns the value at path, or an error naming the path when it
+// is missing or not a T.
+func require[T any](m any, path string) (T, error) {
+	if v := Get[T](m, path); v != nil {
+		return *v, nil
+	}
+	var zero T
+	return zero, fmt.Errorf("%s is missing or not a %T", path, zero)
+}

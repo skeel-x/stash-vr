@@ -8,6 +8,7 @@ import (
 	"stash-vr/internal/stash"
 	"stash-vr/internal/stash/filter"
 	"stash-vr/internal/stash/gql"
+	"stash-vr/internal/util"
 	"sync"
 	"time"
 
@@ -481,6 +482,9 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 		go func(i int, src sectionSource) {
 			defer wg.Done()
 			flog := log.Ctx(ctx).With().Str("sectionId", src.row.ID).Str("name", src.row.Name).Logger()
+			// A section that blows up (a saved filter shaped in a way the
+			// converter does not expect, say) is skipped, not the index.
+			defer util.RecoverLog(flog.WithContext(ctx), "resolve section, skipping it")
 
 			if src.smart != nil && src.smart.ids != nil {
 				ids, err := src.smart.ids(libraryService, ctx, size)
