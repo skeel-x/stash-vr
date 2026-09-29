@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -256,6 +257,63 @@ func TestRenderCover_CallerGivingUpDoesNotWaitForTheLeader(t *testing.T) {
 	}
 	if coverbadge.Rendered.Len() != 1 {
 		t.Fatal("expected the leader to finish the render for the callers after it")
+	}
+}
+
+func TestRenderCover_LeaderPanicIsAnErrorForEveryCaller(t *testing.T) {
+	coverbadge.ResetCache()
+	t.Cleanup(coverbadge.ResetCache)
+	// The leader panics only once every caller has joined it, so all of
+	// them wait on the same singleflight call when it fails.
+	const callers = 4
+	joined := make(chan struct{}, callers)
+	release := make(chan struct{})
+	orig := render
+	render = func(context.Context, string, string, string, []coverbadge.Badge) (rendered, error) {
+		<-release
+		panic("boom")
+	}
+	t.Cleanup(func() { render = orig })
+
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			joined <- struct{}{}
+			_, _, errs[i] = RenderCover(context.Background(), "1", "http://stash/cover", "http://stash/heatmap", nil)
+		}(i)
+	}
+	for i := 0; i < callers; i++ {
+		<-joined
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("callers must return when the leader panics, not hang")
+	}
+	for i, err := range errs {
+		if err == nil || !strings.Contains(err.Error(), "panic: boom") {
+			t.Fatalf("caller %d: expected the recovered panic as an error, got %v", i, err)
+		}
+	}
+	if coverbadge.Rendered.Len() != 0 {
+		t.Fatal("a render that panicked must not be cached")
+	}
+
+	// The group forgets the failed call, so the next request renders anew.
+	render = func(context.Context, string, string, string, []coverbadge.Badge) (rendered, error) {
+		return rendered{body: []byte("ok")}, nil
+	}
+	body, _, err := RenderCover(context.Background(), "1", "http://stash/cover", "http://stash/heatmap", nil)
+	if err != nil || string(body) != "ok" {
+		t.Fatalf("expected a fresh render after the panic, got %q, %v", body, err)
 	}
 }
 

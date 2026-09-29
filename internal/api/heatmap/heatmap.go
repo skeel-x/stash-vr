@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"runtime/debug"
 	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/config"
 	"stash-vr/internal/stash"
@@ -178,10 +179,19 @@ type rendered struct {
 // cover. A heatmap Stash does not have (404) is not a degradation.
 func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) (body []byte, degraded error, err error) {
 	key := sceneId + "\x00" + coverbadge.Key(badges) + "\x00" + coverUrl + "\x00" + heatmapUrl
-	ch := renderGroup.DoChan(key, func() (interface{}, error) {
+	ch := renderGroup.DoChan(key, func() (v interface{}, err error) {
+		// A panic in a DoChan leader is re-raised by singleflight on a fresh
+		// goroutine, where nothing can recover it and the whole process
+		// dies. Turn it into an error every waiting caller gets instead.
+		defer func() {
+			if r := recover(); r != nil {
+				log.Ctx(ctx).Error().Interface("panic", r).Str("stack", string(debug.Stack())).Msg("Recovered panic rendering cover")
+				v, err = nil, fmt.Errorf("render cover: panic: %v", r)
+			}
+		}()
 		lctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), renderTimeout)
 		defer cancel()
-		return renderCover(lctx, sceneId, coverUrl, heatmapUrl, badges)
+		return render(lctx, sceneId, coverUrl, heatmapUrl, badges)
 	})
 	select {
 	case r := <-ch:
@@ -197,6 +207,9 @@ func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUr
 		return nil, nil, ctx.Err()
 	}
 }
+
+// render is what a renderGroup leader runs: renderCover, swapped in tests.
+var render = renderCover
 
 // renderCover fetches the sources, answers from coverbadge.Rendered when
 // the same cover was rendered before, else renders and caches it.
