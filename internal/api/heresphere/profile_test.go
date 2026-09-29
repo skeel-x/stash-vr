@@ -235,3 +235,29 @@ func TestBuildProfile_CarriesResumeAndLastPlayed(t *testing.T) {
 		t.Fatalf("an unplayed scene must leave resume and last played at 0, got %d/%d", p.Resume, p.DateLastPlayed)
 	}
 }
+
+func TestBuildProfile_CarriesSceneDescription(t *testing.T) {
+	loadDefaultRules(t)
+	vd := profileScene()
+	vd.SceneParts.Details = util.Ptr("Filmed on a rooftop.")
+	data, err := generateProfile(vd, "https://vr.example", library.Format{Generated: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := hsp.Decode(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Title != "Thirty One" || p.Description != "Filmed on a rooftop." {
+		t.Fatalf("title %q, description %q", p.Title, p.Description)
+	}
+
+	vd.SceneParts.Details = nil
+	data, err = generateProfile(vd, "https://vr.example", library.Format{Generated: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err = hsp.Decode(data); err != nil || p.Description != "" {
+		t.Fatalf("expected no description without details, got %q %v", p.Description, err)
+	}
+}

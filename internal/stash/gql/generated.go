@@ -1485,6 +1485,11 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetTitle() *string
 	return v.SceneParts.Title
 }
 
+// GetDetails returns FindScenesFindScenesFindScenesResultTypeScenesScene.Details, and is useful for accessing the field via an interface.
+func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetDetails() *string {
+	return v.SceneParts.Details
+}
+
 // GetRating100 returns FindScenesFindScenesFindScenesResultTypeScenesScene.Rating100, and is useful for accessing the field via an interface.
 func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) GetRating100() *int {
 	return v.SceneParts.Rating100
@@ -1610,6 +1615,8 @@ type __premarshalFindScenesFindScenesFindScenesResultTypeScenesScene struct {
 
 	Title *string `json:"title"`
 
+	Details *string `json:"details"`
+
 	Rating100 *int `json:"rating100"`
 
 	Created_at time.Time `json:"created_at"`
@@ -1662,6 +1669,7 @@ func (v *FindScenesFindScenesFindScenesResultTypeScenesScene) __premarshalJSON()
 
 	retval.Id = v.SceneParts.Id
 	retval.Title = v.SceneParts.Title
+	retval.Details = v.SceneParts.Details
 	retval.Rating100 = v.SceneParts.Rating100
 	retval.Created_at = v.SceneParts.Created_at
 	retval.Date = v.SceneParts.Date
@@ -3906,6 +3914,7 @@ func (v *SceneMarkersDestroyResponse) GetSceneMarkersDestroy() bool { return v.S
 type SceneParts struct {
 	Id            string                                `json:"id"`
 	Title         *string                               `json:"title"`
+	Details       *string                               `json:"details"`
 	Rating100     *int                                  `json:"rating100"`
 	Created_at    time.Time                             `json:"created_at"`
 	Date          *string                               `json:"date"`
@@ -3936,6 +3945,9 @@ func (v *SceneParts) GetId() string { return v.Id }
 
 // GetTitle returns SceneParts.Title, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetTitle() *string { return v.Title }
+
+// GetDetails returns SceneParts.Details, and is useful for accessing the field via an interface.
+func (v *SceneParts) GetDetails() *string { return v.Details }
 
 // GetRating100 returns SceneParts.Rating100, and is useful for accessing the field via an interface.
 func (v *SceneParts) GetRating100() *int { return v.Rating100 }
@@ -4026,6 +4038,8 @@ type __premarshalSceneParts struct {
 
 	Title *string `json:"title"`
 
+	Details *string `json:"details"`
+
 	Rating100 *int `json:"rating100"`
 
 	Created_at time.Time `json:"created_at"`
@@ -4078,6 +4092,7 @@ func (v *SceneParts) __premarshalJSON() (*__premarshalSceneParts, error) {
 
 	retval.Id = v.Id
 	retval.Title = v.Title
+	retval.Details = v.Details
 	retval.Rating100 = v.Rating100
 	retval.Created_at = v.Created_at
 	retval.Date = v.Date
@@ -6162,6 +6177,7 @@ query FindScenes ($scene_ids: [Int!]) {
 fragment SceneParts on Scene {
 	id
 	title
+	details
 	rating100
 	created_at
 	date

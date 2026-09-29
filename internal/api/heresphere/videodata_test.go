@@ -331,3 +331,38 @@ func TestRedactedMedia_CopiesWithoutTouchingTheOriginal(t *testing.T) {
 		t.Fatal("the original media must not be changed")
 	}
 }
+
+func TestBuildVideoData_CarriesSceneDescription(t *testing.T) {
+	loadDefaultRules(t)
+	scene := func(details *string) *library.VideoData {
+		return &library.VideoData{SceneParts: &gql.SceneParts{Id: "9", Details: details, Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			Files: []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4", Duration: 100, Height: 1080}},
+			Paths: &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream")},
+		}}
+	}
+	cases := []struct {
+		name    string
+		details *string
+		want    string
+		inJSON  bool
+	}{
+		{"details set", util.Ptr("A scene about nine."), "A scene about nine.", true},
+		{"details empty", util.Ptr(""), "", false},
+		{"details null", nil, "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dto, err := buildVideoData(context.Background(), scene(c.details), "https://vr.example", nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if dto.Description != c.want {
+				t.Fatalf("description %q, want %q", dto.Description, c.want)
+			}
+			b, _ := json.Marshal(dto)
+			if strings.Contains(string(b), `"description"`) != c.inJSON {
+				t.Fatalf("description in JSON = %v, want %v: %s", !c.inJSON, c.inJSON, b)
+			}
+		})
+	}
+}

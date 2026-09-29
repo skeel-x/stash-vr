@@ -16,8 +16,8 @@ import (
 type videoDataDto struct {
 	Access int `json:"access"`
 
-	Title string `json:"title"`
-	//Description    string      `json:"description,omitempty"`
+	Title               string          `json:"title"`
+	Description         string          `json:"description,omitempty"`
 	ThumbnailImage      *string         `json:"thumbnailImage,omitempty"`
 	ThumbnailVideo      *string         `json:"thumbnailVideo,omitempty"`
 	DateReleased        *string         `json:"dateReleased,omitempty"`
@@ -86,6 +86,7 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 	dto := videoDataDto{
 		Access:        1,
 		Title:         vd.Title(),
+		Description:   vd.Description(),
 		DateAdded:     vd.SceneParts.Created_at.Format(time.DateOnly),
 		Duration:      vd.SceneParts.Files[0].Duration * 1000,
 		WriteFavorite: util.Ptr(true),

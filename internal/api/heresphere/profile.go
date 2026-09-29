@@ -48,6 +48,7 @@ func buildProfile(vd *library.VideoData, baseUrl string, f library.Format) *hsp.
 	sp := vd.SceneParts
 	p.ID = getVideoDataUrl(baseUrl, vd.Id())
 	p.Title = vd.Title()
+	p.Description = vd.Description()
 	p.DateAdded = dateTicks(sp.Created_at.Format(time.DateOnly))
 	if d := vd.ReleaseDate(); d != "" {
 		p.DateReleased = dateTicks(util.NormalizeDate(d))

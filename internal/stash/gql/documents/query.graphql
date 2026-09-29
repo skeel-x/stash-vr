@@ -269,6 +269,7 @@ fragment SavedFilterParts on SavedFilter {
 fragment SceneParts on Scene {
   id
   title
+  details
   rating100
   created_at
   date

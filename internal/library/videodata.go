@@ -24,6 +24,14 @@ func (vd VideoData) Title() string {
 	return vd.Id()
 }
 
+// Description is the scene's details text from Stash, "" for none.
+func (vd VideoData) Description() string {
+	if vd.SceneParts == nil || vd.SceneParts.Details == nil {
+		return ""
+	}
+	return *vd.SceneParts.Details
+}
+
 func (vd VideoData) Id() string {
 	if vd.SceneParts == nil {
 		return ""
