@@ -280,3 +280,40 @@ type failingClient struct{}
 func (failingClient) MakeRequest(context.Context, *graphql.Request, *graphql.Response) error {
 	return fmt.Errorf("stash unreachable")
 }
+
+func TestScenesByID_UsesCacheAndFetchesTheRestOnce(t *testing.T) {
+	s, st := studioEnv(t, false, map[int]studioScene{1: {}, 2: {}, 3: {}})
+	if _, err := s.GetScene(context.Background(), "1", false); err != nil {
+		t.Fatal(err)
+	}
+	before := st.queries()
+
+	// 1 is cached, 2 and 3 are fetched together, 9 is unknown and "x" is
+	// not an id.
+	vds, err := s.ScenesByID(context.Background(), []string{"1", "2", "3", "9", "x"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.queries() != before+1 {
+		t.Fatalf("expected one query for the missing scenes, got %d", st.queries()-before)
+	}
+	got := map[string]bool{}
+	for _, vd := range vds {
+		got[vd.Id()] = true
+	}
+	if len(vds) != 3 || !got["1"] || !got["2"] || !got["3"] {
+		t.Fatalf("expected scenes 1, 2 and 3, got %v", got)
+	}
+
+	// All cached now: no query. Nothing asked: no query either.
+	if _, err := s.ScenesByID(context.Background(), []string{"3", "2"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ScenesByID(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if st.queries() != before+1 {
+		t.Fatalf("expected no further query, got %d", st.queries()-before)
+	}
+}

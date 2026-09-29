@@ -143,7 +143,7 @@ func (libraryService *Service) refreshStudioIndex(ctx context.Context, rules []c
 // their studio and lens key where they are newer than the entry there.
 // Scenes not cached yet are fetched in one query.
 func (libraryService *Service) addStudioEntries(ctx context.Context, rules []config.VideoRule, entries map[string]studioEntry, ids []string) error {
-	vds, err := libraryService.scenesByID(ctx, ids)
+	vds, err := libraryService.ScenesByID(ctx, ids)
 	if err != nil {
 		return err
 	}
@@ -177,9 +177,9 @@ func newerSave(t time.Time, id string, cur studioEntry) bool {
 	return a > b
 }
 
-// scenesByID returns the scenes ids from the cache, fetching the ones not
+// ScenesByID returns the scenes ids from the cache, fetching the ones not
 // cached in a single query and caching them. Unknown ids are left out.
-func (libraryService *Service) scenesByID(ctx context.Context, ids []string) ([]*VideoData, error) {
+func (libraryService *Service) ScenesByID(ctx context.Context, ids []string) ([]*VideoData, error) {
 	var out []*VideoData
 	var missing []int
 	libraryService.muVdCache.RLock()

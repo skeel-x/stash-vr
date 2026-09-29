@@ -394,6 +394,67 @@ func TestSetup_RendersVideoRulesAndProfiles(t *testing.T) {
 	}
 }
 
+func TestSetup_LooksUpProfileTitlesInOneBatch(t *testing.T) {
+	stash := &fakeStash{}
+	lib, _ := newEnv(t, stash)
+	// Scenes 1 and 2 exist; 11649 does not.
+	for _, id := range []string{"1", "2", "11649"} {
+		if err := lib.SaveProfile(id, []byte("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	body := getPage(t, PagesRouter(lib), "/setup", nil).Body.String()
+
+	if n := stash.callCount("FindScenes"); n != 1 {
+		t.Fatalf("expected one scene query for three profiles, got %d", n)
+	}
+	for _, want := range []string{
+		`<option value="1">1 One</option>`, `<option value="2">2 Two</option>`,
+		// An id Stash does not know is listed by its id alone, not with
+		// another scene's title.
+		`<option value="11649">11649</option>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+
+	// A scene Stash does not know is asked for again on the next render
+	// (it never enters the cache); the known ones are served from it.
+	if err := lib.DeleteProfile("11649"); err != nil {
+		t.Fatal(err)
+	}
+	getPage(t, PagesRouter(lib), "/setup", nil)
+	if n := stash.callCount("FindScenes"); n != 1 {
+		t.Fatalf("expected the cached scenes reused without a query, got %d queries", n)
+	}
+}
+
+func TestSetup_ListsProfileIdsWhenStashIsDown(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{scenesErr: errors.New("dial tcp: connection refused")})
+	for _, id := range []string{"1", "2"} {
+		if err := lib.SaveProfile(id, []byte("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rec := getPage(t, PagesRouter(lib), "/setup", nil)
+
+	body := rec.Body.String()
+	if rec.Code != 200 {
+		t.Fatalf("status %d", rec.Code)
+	}
+	for _, want := range []string{`<option value="1">1</option>`, `<option value="2">2</option>`, `Profiles stored: <span id="profile-count">2</span>`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Contains(body, "1 One") {
+		t.Fatal("no titles can be known with Stash down")
+	}
+}
+
 func TestSetup_OffersProfileDeletion(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)

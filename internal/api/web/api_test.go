@@ -32,8 +32,11 @@ type fakeStash struct {
 	// filtersErr fails the saved filter query, as an unreachable Stash does
 	// on the Sections page.
 	filtersErr error
-	mu         sync.Mutex
-	calls      map[string]int
+	// scenesErr fails the scene query, as an unreachable Stash does when
+	// the Setup page looks up profile titles.
+	scenesErr error
+	mu        sync.Mutex
+	calls     map[string]int
 }
 
 func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -60,6 +63,9 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 	case "FindAllTags":
 		payload = `{"findTags":{"tags":[]}}`
 	case "FindScenes":
+		if f.scenesErr != nil {
+			return f.scenesErr
+		}
 		payload = `{"findScenes":{"scenes":[{"id":"1","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"one.mp4","duration":100,"path":"/one.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/1/screenshot","stream":"http://stash:9999/scene/1/stream"},"tags":[]},{"id":"2","title":"Two","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"two.mp4","duration":100,"path":"/two.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/2/screenshot","stream":"http://stash:9999/scene/2/stream"},"tags":[]}]}}`
 	case "FindSceneGroupings":
 		payload = `{"findScenes":{"scenes":[{"id":"1","studio":{"id":"7","name":"Studio Seven"},"performers":[]},{"id":"2","studio":{"id":"7","name":"Studio Seven"},"performers":[]}]}}`

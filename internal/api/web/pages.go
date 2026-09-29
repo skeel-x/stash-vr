@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"slices"
@@ -279,15 +280,28 @@ func (h pageHandler) setup(w http.ResponseWriter, r *http.Request) {
 	data.Projections = []string{"equirectangular", "equirectangular360", "fisheye", "cubemap", "equiangularCubemap", "perspective"}
 	data.Stereos = []string{"mono", "sbs", "tb"}
 	data.Lenses = []string{"MKX200", "MKX220", "VRCA220"}
-	// A scene that cannot be looked up is still listed by its id.
-	for _, id := range h.lib.ListProfiles() {
-		title := ""
-		if vd, err := h.lib.GetScene(r.Context(), id, false); err == nil {
-			title = vd.Title()
-		}
-		data.Profiles = append(data.Profiles, ProfileOption{ID: id, Title: title})
-	}
+	data.Profiles = profileOptions(r.Context(), h.lib, h.lib.ListProfiles())
 	render(w, r, setupTmpl, data)
+}
+
+// profileOptions lists the stored profiles with their scene titles, looked
+// up in one batch from the cache and one query for the rest. When Stash
+// cannot be asked the ids are listed without titles, so the page still
+// renders.
+func profileOptions(ctx context.Context, lib *library.Service, ids []string) []ProfileOption {
+	titles := make(map[string]string, len(ids))
+	if vds, err := lib.ScenesByID(ctx, ids); err == nil {
+		for _, vd := range vds {
+			titles[vd.Id()] = vd.Title()
+		}
+	} else {
+		log.Ctx(ctx).Warn().Err(err).Msg("Profile titles unavailable, listing ids only")
+	}
+	out := make([]ProfileOption, len(ids))
+	for i, id := range ids {
+		out[i] = ProfileOption{ID: id, Title: titles[id]}
+	}
+	return out
 }
 
 func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
