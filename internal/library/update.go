@@ -8,7 +8,6 @@ import (
 	"stash-vr/internal/config"
 	"stash-vr/internal/stash"
 	"stash-vr/internal/stash/gql"
-	"stash-vr/internal/util"
 	"time"
 )
 
@@ -147,47 +146,6 @@ func (libraryService *Service) UpdateMarkers(ctx context.Context, id string, inc
 		return fmt.Errorf("SceneMarkersDestroy: %w", err)
 	}
 
-	return nil
-}
-
-func (libraryService *Service) ClearAndCreateMarkers(ctx context.Context, id string, markers []MarkerDto) error {
-	resp, err := gql.FindSceneMarkers(ctx, libraryService.Client(), id)
-	if err != nil {
-		return fmt.Errorf("FindSceneMarkers: %w", err)
-	}
-	currentMarkers := make([]MarkerDto, len(resp.FindSceneMarkers.Scene_markers))
-	for i, m := range resp.FindSceneMarkers.Scene_markers {
-		currentMarkers[i] = MarkerDto{
-			PrimaryTagName: m.Primary_tag.Name,
-			StartSecond:    m.Seconds * 1000,
-			Title:          m.Title,
-		}
-		if m.End_seconds != nil {
-			currentMarkers[i].EndSecond = util.Ptr(*m.End_seconds * 1000)
-		}
-	}
-	if util.UnorderedEqual(currentMarkers, markers) {
-		return nil
-	}
-	markersToDestroy := make([]string, len(resp.FindSceneMarkers.Scene_markers))
-	for i, sm := range resp.FindSceneMarkers.Scene_markers {
-		markersToDestroy[i] = sm.Id
-	}
-	_, err = gql.SceneMarkersDestroy(ctx, libraryService.Client(), markersToDestroy)
-	if err != nil {
-		return fmt.Errorf("SceneMarkersDestroy: %w", err)
-	}
-
-	for _, m := range markers {
-		tagId, err := stash.FindOrCreateTag(ctx, libraryService.Client(), m.PrimaryTagName)
-		if err != nil {
-			return fmt.Errorf("failed to find or create primary tag for marker: %w", err)
-		}
-		_, err = gql.SceneMarkerCreate(ctx, libraryService.Client(), id, tagId, m.StartSecond, m.EndSecond, m.Title)
-		if err != nil {
-			return fmt.Errorf("SceneMarkerCreate: %w", err)
-		}
-	}
 	return nil
 }
 

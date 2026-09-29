@@ -1294,113 +1294,6 @@ func (v *FindSceneIdsByFilterResponse) GetFindScenes() *FindSceneIdsByFilterFind
 	return v.FindScenes
 }
 
-// FindSceneMarkersFindSceneMarkersFindSceneMarkersResultType includes the requested fields of the GraphQL type FindSceneMarkersResultType.
-type FindSceneMarkersFindSceneMarkersFindSceneMarkersResultType struct {
-	Scene_markers []*FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker `json:"scene_markers"`
-}
-
-// GetScene_markers returns FindSceneMarkersFindSceneMarkersFindSceneMarkersResultType.Scene_markers, and is useful for accessing the field via an interface.
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultType) GetScene_markers() []*FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker {
-	return v.Scene_markers
-}
-
-// FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker includes the requested fields of the GraphQL type SceneMarker.
-type FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker struct {
-	SceneMarkerParts `json:"-"`
-}
-
-// GetId returns FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker.Id, and is useful for accessing the field via an interface.
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) GetId() string {
-	return v.SceneMarkerParts.Id
-}
-
-// GetSeconds returns FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker.Seconds, and is useful for accessing the field via an interface.
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) GetSeconds() float64 {
-	return v.SceneMarkerParts.Seconds
-}
-
-// GetEnd_seconds returns FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker.End_seconds, and is useful for accessing the field via an interface.
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) GetEnd_seconds() *float64 {
-	return v.SceneMarkerParts.End_seconds
-}
-
-// GetTitle returns FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker.Title, and is useful for accessing the field via an interface.
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) GetTitle() string {
-	return v.SceneMarkerParts.Title
-}
-
-// GetPrimary_tag returns FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker.Primary_tag, and is useful for accessing the field via an interface.
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) GetPrimary_tag() *SceneMarkerPartsPrimary_tagTag {
-	return v.SceneMarkerParts.Primary_tag
-}
-
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) UnmarshalJSON(b []byte) error {
-
-	if string(b) == "null" {
-		return nil
-	}
-
-	var firstPass struct {
-		*FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker
-		graphql.NoUnmarshalJSON
-	}
-	firstPass.FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker = v
-
-	err := json.Unmarshal(b, &firstPass)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(
-		b, &v.SceneMarkerParts)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type __premarshalFindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker struct {
-	Id string `json:"id"`
-
-	Seconds float64 `json:"seconds"`
-
-	End_seconds *float64 `json:"end_seconds"`
-
-	Title string `json:"title"`
-
-	Primary_tag *SceneMarkerPartsPrimary_tagTag `json:"primary_tag"`
-}
-
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) MarshalJSON() ([]byte, error) {
-	premarshaled, err := v.__premarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(premarshaled)
-}
-
-func (v *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker) __premarshalJSON() (*__premarshalFindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker, error) {
-	var retval __premarshalFindSceneMarkersFindSceneMarkersFindSceneMarkersResultTypeScene_markersSceneMarker
-
-	retval.Id = v.SceneMarkerParts.Id
-	retval.Seconds = v.SceneMarkerParts.Seconds
-	retval.End_seconds = v.SceneMarkerParts.End_seconds
-	retval.Title = v.SceneMarkerParts.Title
-	retval.Primary_tag = v.SceneMarkerParts.Primary_tag
-	return &retval, nil
-}
-
-// FindSceneMarkersResponse is returned by FindSceneMarkers on success.
-type FindSceneMarkersResponse struct {
-	// A function which queries SceneMarker objects
-	FindSceneMarkers *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultType `json:"findSceneMarkers"`
-}
-
-// GetFindSceneMarkers returns FindSceneMarkersResponse.FindSceneMarkers, and is useful for accessing the field via an interface.
-func (v *FindSceneMarkersResponse) GetFindSceneMarkers() *FindSceneMarkersFindSceneMarkersFindSceneMarkersResultType {
-	return v.FindSceneMarkers
-}
-
 // FindSceneTagsFindScene includes the requested fields of the GraphQL type Scene.
 type FindSceneTagsFindScene struct {
 	TagPartsArray `json:"-"`
@@ -5268,14 +5161,6 @@ func (v *__FindSceneIdsByFilterInput) GetScene_filter() *SceneFilterType { retur
 // GetFilterOpts returns __FindSceneIdsByFilterInput.FilterOpts, and is useful for accessing the field via an interface.
 func (v *__FindSceneIdsByFilterInput) GetFilterOpts() *FindFilterType { return v.FilterOpts }
 
-// __FindSceneMarkersInput is used internally by genqlient
-type __FindSceneMarkersInput struct {
-	Scene_id string `json:"scene_id"`
-}
-
-// GetScene_id returns __FindSceneMarkersInput.Scene_id, and is useful for accessing the field via an interface.
-func (v *__FindSceneMarkersInput) GetScene_id() string { return v.Scene_id }
-
 // __FindSceneTagsInput is used internally by genqlient
 type __FindSceneTagsInput struct {
 	Scene_id string `json:"scene_id"`
@@ -6058,52 +5943,6 @@ func FindSceneIdsByFilter(
 	}
 
 	data_ = &FindSceneIdsByFilterResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The query executed by FindSceneMarkers.
-const FindSceneMarkers_Operation = `
-query FindSceneMarkers ($scene_id: ID!) {
-	findSceneMarkers(scene_marker_filter: {scenes:{value:[$scene_id],modifier:EQUALS}}) {
-		scene_markers {
-			... SceneMarkerParts
-		}
-	}
-}
-fragment SceneMarkerParts on SceneMarker {
-	id
-	seconds
-	end_seconds
-	title
-	primary_tag {
-		id
-		name
-	}
-}
-`
-
-func FindSceneMarkers(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	scene_id string,
-) (data_ *FindSceneMarkersResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "FindSceneMarkers",
-		Query:  FindSceneMarkers_Operation,
-		Variables: &__FindSceneMarkersInput{
-			Scene_id: scene_id,
-		},
-	}
-
-	data_ = &FindSceneMarkersResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

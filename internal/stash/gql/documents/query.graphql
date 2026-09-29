@@ -170,16 +170,6 @@ query FindScenes($scene_ids: [Int!]) {
   }
 }
 
-query FindSceneMarkers($scene_id: ID!) {
-  findSceneMarkers(
-    scene_marker_filter: { scenes: { value: [$scene_id], modifier: EQUALS } }
-  ) {
-    scene_markers {
-      ...SceneMarkerParts
-    }
-  }
-}
-
 query FindSceneTags($scene_id: ID!) {
   findScene(id: $scene_id) {
     ...TagPartsArray
