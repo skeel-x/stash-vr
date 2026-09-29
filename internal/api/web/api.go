@@ -374,7 +374,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	// http://stash:9999/graphql count as the same host.
 	next.StashGraphQLUrl = config.NormalizeStashURL(in.StashGraphQLUrl)
 	if in.StashApiKey != nil {
-		next.StashApiKey = *in.StashApiKey
+		// Trimmed here, before Validate, so a key pasted with surrounding
+		// whitespace is accepted the same way testConfig accepts it.
+		next.StashApiKey = strings.TrimSpace(*in.StashApiKey)
 	}
 	if in.StashTLSInsecure != nil {
 		next.StashTLSInsecure = *in.StashTLSInsecure

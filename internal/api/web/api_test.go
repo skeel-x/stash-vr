@@ -1222,6 +1222,25 @@ func TestPutConfig_WhitespaceInsideKeyIs400(t *testing.T) {
 	}
 }
 
+func TestPutConfig_SurroundingWhitespaceAroundKeyIsTrimmed(t *testing.T) {
+	// Only whitespace inside a key is a paste gone wrong; around it the
+	// key is trimmed, as testConfig does, so Test and Save agree.
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": " abc ",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "log_level": "info",
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["stash_api_key_set"] != true {
+		t.Fatalf("expected 200 with the key set, got %d %v", rec.Code, out)
+	}
+	if got := config.Application().StashApiKey; got != "abc" {
+		t.Fatalf("expected the trimmed key stored, got %q", got)
+	}
+}
+
 // keyRecordingStash answers the version query and records the ApiKey
 // header of the last request.
 func keyRecordingStash(t *testing.T) (*httptest.Server, func() (string, bool)) {
