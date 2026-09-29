@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -921,6 +922,41 @@ func TestGetProfile_Errors(t *testing.T) {
 	}
 	if rec, out := do(t, h, http.MethodGet, "/profiles/12", nil); rec.Code != http.StatusUnprocessableEntity || out["error"] == nil {
 		t.Fatalf("unreadable profile: %d %v", rec.Code, out)
+	}
+}
+
+func TestDeleteProfile_MovesToHistoryAndAnswersCount(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	for _, id := range []string{"7", "12"} {
+		if err := lib.SaveProfile(id, []byte("profile "+id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rec, out := do(t, h, http.MethodDelete, "/profiles/7", nil)
+
+	if rec.Code != 200 || out["id"] != "7" || out["profiles"] != float64(1) {
+		t.Fatalf("expected 200 with the profiles left, got %d %v", rec.Code, out)
+	}
+	if lib.HasProfile("7") || !lib.HasProfile("12") {
+		t.Fatal("expected profile 7 gone and 12 kept")
+	}
+	hist, _ := os.ReadDir(filepath.Join(filepath.Dir(lib.ProfilePath("7")), "history"))
+	if len(hist) != 1 || !strings.HasPrefix(hist[0].Name(), "scene-7-") {
+		t.Fatalf("expected the profile kept in history, got %v", hist)
+	}
+	if data, _ := os.ReadFile(filepath.Join(filepath.Dir(lib.ProfilePath("7")), "history", hist[0].Name())); string(data) != "profile 7" {
+		t.Fatalf("history holds %q", data)
+	}
+
+	// Gone, never stored, not an id, and a path escape: all 404.
+	for _, p := range []string{"/profiles/7", "/profiles/99", "/profiles/abc", "/profiles/..%2Fconfig.json"} {
+		if rec, _ := do(t, h, http.MethodDelete, p, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("DELETE %s: expected 404, got %d", p, rec.Code)
+		}
+	}
+	if !lib.HasProfile("12") {
+		t.Fatal("a refused delete must not touch other profiles")
 	}
 }
 

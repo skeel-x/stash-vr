@@ -387,10 +387,39 @@ func TestSetup_RendersVideoRulesAndProfiles(t *testing.T) {
 
 	body := getPage(t, h, "/setup", nil).Body.String()
 
-	for _, want := range []string{"Video rules", `data-rule`, `value="DOME"`, `value="Alpha"`, `<option value="11649"`, "Profiles stored: 1", `id="save-rules"`, `id="reset-rules"`, `id="add-rule"`} {
+	for _, want := range []string{"Video rules", `data-rule`, `value="DOME"`, `value="Alpha"`, `<option value="11649"`, `Profiles stored: <span id="profile-count">1</span>`, `id="save-rules"`, `id="reset-rules"`, `id="add-rule"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
 		}
+	}
+}
+
+func TestSetup_OffersProfileDeletion(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	// Nothing stored: the pick list is off and so is the button.
+	body := getPage(t, h, "/setup", nil).Body.String()
+	for _, want := range []string{
+		`<select id="profile-select" aria-label="Stored profile" disabled><option value="">Stored profiles</option></select>`,
+		`data-confirm="Delete this profile? Click again" id="delete-profile" disabled>Delete profile</button>`,
+		"moved to hsp/history",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+
+	if err := lib.SaveProfile("11649", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	body = getPage(t, h, "/setup", nil).Body.String()
+	// The list is live; the button waits for a pick (the script enables it).
+	if !strings.Contains(body, `<select id="profile-select" aria-label="Stored profile"><option value="">Stored profiles</option><option value="11649">11649`) {
+		t.Fatal("expected the stored profile offered for deletion")
+	}
+	if !strings.Contains(body, `id="delete-profile" disabled>`) {
+		t.Fatal("expected the delete button off until a profile is picked")
 	}
 }
 

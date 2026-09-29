@@ -134,7 +134,7 @@
   const markDirty = (target) => {
     // The inspector, the badge preview and the coverage check are tools
     // inside the form, not settings.
-    if (target.closest('#inspect-q, #badge-preview-scene, #coverage-panel')) return;
+    if (target.closest('#inspect-q, #badge-preview-scene, #coverage-panel, #profile-select')) return;
     if (target.closest('#rules, #add-preset')) rulesDirty = true;
     else settingsDirty = true;
   };
@@ -386,6 +386,32 @@
         rulesDirty = false;
         setMsg($('#rules-msg'), 'Defaults restored.', 'ok');
       } catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
+    });
+  }
+
+  // Setup page: delete a stored profile. The button is live once a profile
+  // is picked and needs a second click; the deleted profile leaves the
+  // copy-from lists, while a rule that names it keeps its choice (the
+  // server ignores a profile that is gone).
+  const deleteProfile = $('#delete-profile');
+  if (deleteProfile) {
+    const select = $('#profile-select');
+    select.addEventListener('change', () => { deleteProfile.disabled = !select.value; });
+    confirmClick(deleteProfile, async () => {
+      const id = select.value;
+      if (!id) return;
+      deleteProfile.disabled = true;
+      setMsg($('#profile-msg'), 'Deleting');
+      try {
+        const r = await api('DELETE', '/profiles/' + encodeURIComponent(id));
+        document.querySelectorAll('#profile-select option, .copy-profile option').forEach((o) => { if (o.value === id) o.remove(); });
+        select.value = '';
+        $('#profile-count').textContent = String(r.profiles);
+        setMsg($('#profile-msg'), 'Deleted the profile of scene ' + id + '. The file is kept in hsp/history.', 'ok');
+      } catch (e) {
+        setMsg($('#profile-msg'), e.message, 'err');
+        deleteProfile.disabled = !select.value;
+      }
     });
   }
 

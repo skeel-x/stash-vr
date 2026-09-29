@@ -100,10 +100,21 @@ func keepPreviousProfile(dir, current, id string, next []byte) {
 	if err := os.MkdirAll(histDir, 0o755); err != nil {
 		return
 	}
-	name := fmt.Sprintf("scene-%s-%d.hsp", id, time.Now().UnixNano())
-	if err := os.WriteFile(filepath.Join(histDir, name), prev, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(histDir, historyName(id)), prev, 0o600); err != nil {
 		return
 	}
+	pruneProfileHistory(histDir, id)
+}
+
+// historyName is the file name a version of scene id's profile is kept
+// under in hsp/history; the timestamp orders the versions.
+func historyName(id string) string {
+	return fmt.Sprintf("scene-%s-%d.hsp", id, time.Now().UnixNano())
+}
+
+// pruneProfileHistory removes the oldest versions of scene id's profile
+// beyond profileHistoryKeep.
+func pruneProfileHistory(histDir, id string) {
 	entries, err := os.ReadDir(histDir)
 	if err != nil {
 		return
@@ -119,6 +130,33 @@ func keepPreviousProfile(dir, current, id string, next []byte) {
 		_ = os.Remove(filepath.Join(histDir, mine[0]))
 		mine = mine[1:]
 	}
+}
+
+// ErrNoProfile is returned by DeleteProfile when no profile is stored for
+// the scene.
+var ErrNoProfile = errors.New("no profile stored")
+
+// DeleteProfile removes the profile stored for scene id by moving it into
+// hsp/history, where the last profileHistoryKeep versions stay, and
+// forgets it in the learned studio index. HereSphere then gets the
+// scene's rule or generated profile again, or none.
+func (libraryService *Service) DeleteProfile(id string) error {
+	if !validProfileId(id) {
+		return errBadProfileId
+	}
+	if !libraryService.HasProfile(id) {
+		return fmt.Errorf("%w for scene %s", ErrNoProfile, id)
+	}
+	histDir := filepath.Join(profileDir(), "history")
+	if err := os.MkdirAll(histDir, 0o755); err != nil {
+		return fmt.Errorf("create profile history dir: %w", err)
+	}
+	if err := os.Rename(libraryService.ProfilePath(id), filepath.Join(histDir, historyName(id))); err != nil {
+		return fmt.Errorf("move profile to history: %w", err)
+	}
+	pruneProfileHistory(histDir, id)
+	libraryService.studios.reset()
+	return nil
 }
 
 // ListProfiles returns the scene ids with a stored profile, numerically

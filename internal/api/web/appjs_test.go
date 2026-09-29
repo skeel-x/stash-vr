@@ -53,7 +53,7 @@ func TestAppJS_SetupFormGuards(t *testing.T) {
 		"form.addEventListener('change', (e) => markDirty(e.target));",
 		"settingsDirty = false;\n        rulesDirty = false;",
 		// The inspector and the preview are tools, not settings.
-		"if (target.closest('#inspect-q, #badge-preview-scene, #coverage-panel')) return;",
+		"if (target.closest('#inspect-q, #badge-preview-scene, #coverage-panel, #profile-select')) return;",
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("app.js missing %q", want)
@@ -93,6 +93,22 @@ func TestAppJS_ResetButtonsNeedASecondClick(t *testing.T) {
 	for _, stale := range []string{"$('#reset-rules').addEventListener('click'", "$('#reset-filters').addEventListener('click'"} {
 		if strings.Contains(js, stale) {
 			t.Errorf("a reset button must not act on a single click: %q", stale)
+		}
+	}
+}
+
+func TestAppJS_DeleteProfileNeedsAPickAndASecondClick(t *testing.T) {
+	js := appJS(t)
+	for _, want := range []string{
+		"select.addEventListener('change', () => { deleteProfile.disabled = !select.value; });",
+		"confirmClick(deleteProfile, async () => {",
+		"await api('DELETE', '/profiles/' + encodeURIComponent(id));",
+		// The deleted profile leaves the pick lists; the count follows the server.
+		"document.querySelectorAll('#profile-select option, .copy-profile option').forEach((o) => { if (o.value === id) o.remove(); });",
+		"$('#profile-count').textContent = String(r.profiles);",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("app.js missing %q", want)
 		}
 	}
 }

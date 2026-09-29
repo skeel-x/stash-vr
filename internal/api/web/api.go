@@ -228,6 +228,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Put("/filters", h.putFilters)
 	r.Put("/video-rules", h.putVideoRules)
 	r.Get("/profiles/{id}", h.getProfile)
+	r.Delete("/profiles/{id}", h.deleteProfile)
 	r.Post("/reindex", h.reindex)
 	r.Get("/log", h.getLog)
 	r.Get("/random", h.getRandom)
@@ -643,6 +644,29 @@ func (h *apiHandler) getProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJson(ctx, w, profileValues(id, p))
+}
+
+// deleteProfile moves the profile stored for a scene into hsp/history (see
+// library.Service.DeleteProfile) and answers with the profiles left.
+func (h *apiHandler) deleteProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+	if !h.lib.HasProfile(id) {
+		writeError(ctx, w, http.StatusNotFound, "no profile stored for scene "+id)
+		return
+	}
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+	if err := h.lib.DeleteProfile(id); err != nil {
+		if errors.Is(err, library.ErrNoProfile) {
+			writeError(ctx, w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(ctx, w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	log.Ctx(ctx).Info().Str("scene", id).Msg("Deleted HereSphere profile, kept in history")
+	writeJson(ctx, w, map[string]any{"id": id, "profiles": len(h.lib.ListProfiles())})
 }
 
 var (

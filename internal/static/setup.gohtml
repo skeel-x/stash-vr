@@ -80,7 +80,13 @@
   </div>
 
   <h2>Video rules</h2>
-  <p class="lead">Tags decide how a scene is shown. Rules apply top to bottom; a later rule overrides an earlier one. Profiles stored: {{len .Profiles}}. Tune a scene in HereSphere and save it there; it then shows up here and can back a rule. Save rules saves the table alone; Save changes at the bottom saves it along with everything else.</p>
+  <p class="lead">Tags decide how a scene is shown. Rules apply top to bottom; a later rule overrides an earlier one. Profiles stored: <span id="profile-count">{{len .Profiles}}</span>. Tune a scene in HereSphere and save it there; it then shows up here and can back a rule. Save rules saves the table alone; Save changes at the bottom saves it along with everything else.</p>
+  <div class="row profile-row">
+    <select id="profile-select" aria-label="Stored profile"{{if not .Profiles}} disabled{{end}}><option value="">Stored profiles</option>{{range .Profiles}}<option value="{{.ID}}">{{.ID}}{{if .Title}} {{.Title}}{{end}}</option>{{end}}</select>
+    <button type="button" data-confirm="Delete this profile? Click again" id="delete-profile" disabled>Delete profile</button>
+    <span class="msg" id="profile-msg"></span>
+  </div>
+  <p class="lead">A deleted profile is moved to hsp/history next to the settings; the scene then gets its rule or generated profile again.</p>
   <div class="rules" id="rules">
     {{range .VideoRules}}{{template "rule-row" ($.Row .)}}{{end}}
   </div>

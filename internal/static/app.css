@@ -168,6 +168,8 @@ table.inspect td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-al
 table.inspect td.num{text-align:right;font-variant-numeric:tabular-nums}
 table.inspect tr.missing td{color:var(--muted)}
 #add-preset{width:auto;margin:0;max-width:100%}
+.profile-row{margin:0 0 16px}
+#profile-select{width:auto;margin:0;max-width:100%;flex:1;min-width:12em}
 .handle{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:6px;color:var(--muted);cursor:grab;user-select:none;touch-action:none;font-size:22px}
 .handle:hover{background:var(--raised)}
 tr.dragging{opacity:.5}
