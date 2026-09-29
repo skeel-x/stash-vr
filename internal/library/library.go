@@ -63,6 +63,10 @@ type Service struct {
 
 	// studios is the learned studio profile index; see StudioProfile.
 	studios studioIndex
+	// muProfiles serialises the profile store: HereSphere can send two
+	// saves of one scene close together, and each save reads the current
+	// file into history before replacing it.
+	muProfiles sync.Mutex
 
 	// resetHooks run after ResetCaches, so caches kept outside the
 	// library (rendered covers) are dropped with it.

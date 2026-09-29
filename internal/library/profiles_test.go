@@ -2,8 +2,11 @@ package library
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 )
 
@@ -130,5 +133,65 @@ func TestProfiles_DeleteMovesToHistoryAndForgetsStudioIndex(t *testing.T) {
 	}
 	if hist, _ = os.ReadDir(histDir); len(hist) != profileHistoryKeep {
 		t.Fatal("a refused delete must not touch the history")
+	}
+}
+
+func TestProfiles_ConcurrentSavesOfOneScene(t *testing.T) {
+	loadConfig(t, nil)
+	s := NewService(&scriptStash{})
+	const rounds = 25
+
+	// Two headsets (or two quick saves from one) write scene 7's profile at
+	// the same time, each with its own distinct payloads.
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for g := range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range rounds {
+				payload := []byte(fmt.Sprintf("writer-%d-round-%d", g, i))
+				if err := s.SaveProfile("7", payload); err != nil {
+					errs[g] = err
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	for g, err := range errs {
+		if err != nil {
+			t.Fatalf("writer %d: %v", g, err)
+		}
+	}
+
+	// The stored profile is one whole payload, never a torn or empty one.
+	data, err := os.ReadFile(s.ProfilePath("7"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(data), "writer-") || !strings.Contains(string(data), "-round-") {
+		t.Fatalf("stored profile is not one of the payloads: %q", data)
+	}
+	// Every save was serialised: no temp files are left, and history was
+	// pruned to its limit rather than overshooting under two pruners.
+	entries, err := os.ReadDir(filepath.Dir(s.ProfilePath("7")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Fatalf("temp file left behind: %s", e.Name())
+		}
+	}
+	hist, err := os.ReadDir(filepath.Join(filepath.Dir(s.ProfilePath("7")), "history"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hist) > profileHistoryKeep {
+		t.Fatalf("history holds %d versions, want at most %d", len(hist), profileHistoryKeep)
+	}
+	if !s.HasProfile("7") {
+		t.Fatal("expected profile 7 after the concurrent saves")
 	}
 }

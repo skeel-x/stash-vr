@@ -49,8 +49,12 @@ func (libraryService *Service) HasProfile(id string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
-// SaveProfile stores data as the profile for scene id, atomically.
+// SaveProfile stores data as the profile for scene id, atomically. Saves
+// run one at a time, so two overlapping ones cannot both move the same
+// previous version into history or prune it from under each other.
 func (libraryService *Service) SaveProfile(id string, data []byte) error {
+	libraryService.muProfiles.Lock()
+	defer libraryService.muProfiles.Unlock()
 	if !validProfileId(id) {
 		return errBadProfileId
 	}
@@ -141,6 +145,8 @@ var ErrNoProfile = errors.New("no profile stored")
 // forgets it in the learned studio index. HereSphere then gets the
 // scene's rule or generated profile again, or none.
 func (libraryService *Service) DeleteProfile(id string) error {
+	libraryService.muProfiles.Lock()
+	defer libraryService.muProfiles.Unlock()
 	if !validProfileId(id) {
 		return errBadProfileId
 	}
