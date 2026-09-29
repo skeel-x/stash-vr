@@ -378,3 +378,31 @@ func TestEvents_ConcurrentClients(t *testing.T) {
 		t.Fatalf("expected %d resume saves, got %d", clients*rounds, len(stash.resumes))
 	}
 }
+
+func TestPlaybackTracker_PlayWithoutASceneIsIgnored(t *testing.T) {
+	h, _ := clockedHandler(&fakeStash{})
+	seven := &library.VideoData{SceneParts: &gql.SceneParts{Id: "7"}}
+	if prev := h.playback.play("a", seven, nil); prev != nil {
+		t.Fatalf("unexpected stop %+v", prev)
+	}
+
+	for _, vd := range []*library.VideoData{nil, {}} {
+		if prev := h.playback.play("a", vd, nil); prev != nil {
+			t.Fatalf("a play without a scene must not stop anything, got %+v", prev)
+		}
+	}
+	// The client is still playing 7.
+	if stop := h.playback.stop("a", "7", nil); stop == nil || stop.videoId != "7" {
+		t.Fatalf("expected the client to still be on scene 7, got %+v", stop)
+	}
+	if h.playback.size() != 1 {
+		t.Fatalf("expected one tracked client, got %d", h.playback.size())
+	}
+}
+
+func TestNewPlayback_NoScenePartsMeansNoDuration(t *testing.T) {
+	ps := newPlayback(&library.VideoData{}, time.Now())
+	if ps.videoDuration != 0 || ps.videoId != "" || !ps.isPlaying {
+		t.Fatalf("unexpected state %+v", ps)
+	}
+}

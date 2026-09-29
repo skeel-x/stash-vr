@@ -21,17 +21,31 @@ type Source struct {
 
 var rgxResolution = regexp.MustCompile(`\((\d+)p\)`)
 
+// fileHeight is the height of the scene's first file, 0 when the scene
+// has none (a file gone missing, or a partial answer from Stash).
+func fileHeight(sp *gql.SceneParts) int {
+	if sp == nil || len(sp.Files) == 0 || sp.Files[0] == nil {
+		return 0
+	}
+	return sp.Files[0].Height
+}
+
+// GetDirectStream is Stash's direct stream of the scene's file. A scene
+// without a file or a stream path has none: the stream is returned with
+// no sources rather than a nil dereference.
 func GetDirectStream(sp *gql.SceneParts) Stream {
-	directStream := Source{
+	direct := Stream{Name: "direct"}
+	if sp == nil || len(sp.Files) == 0 || sp.Files[0] == nil ||
+		sp.Paths == nil || sp.Paths.Stream == nil || *sp.Paths.Stream == "" {
+		return direct
+	}
+	direct.Sources = []Source{{
 		Resolution: sp.Files[0].Height,
 		Url:        *sp.Paths.Stream,
-	}
-
-	return Stream{
-		Name:    "direct",
-		Sources: []Source{directStream},
-	}
+	}}
+	return direct
 }
+
 func GetTranscodingStream(sp *gql.SceneParts) Stream {
 	return transcodingStream(sp, "video/mp4", "transcoding")
 }
@@ -43,14 +57,23 @@ func GetHLSStream(sp *gql.SceneParts) Stream {
 	return transcodingStream(sp, "application/vnd.apple.mpegurl", "hls")
 }
 
+// transcodingStream lists the scene's transcodes whose mime type starts
+// with mimePrefix, highest resolution first, one per resolution. Stream
+// entries Stash left incomplete (no mime type or label) are skipped.
 func transcodingStream(sp *gql.SceneParts, mimePrefix string, name string) Stream {
 	mp4Sources := make([]Source, 0)
+	if sp == nil {
+		return Stream{Name: name, Sources: mp4Sources}
+	}
 	seenResolutions := make(map[int]struct{})
 	for _, stream := range sp.SceneStreams {
+		if stream == nil || stream.Mime_type == nil || stream.Label == nil {
+			continue
+		}
 		if strings.HasPrefix(*stream.Mime_type, mimePrefix) && *stream.Label != "Direct stream" {
 			resolution, err := parseResolutionFromLabel(*stream.Label)
 			if err != nil {
-				resolution = sp.Files[0].Height
+				resolution = fileHeight(sp)
 			}
 			if _, seen := seenResolutions[resolution]; seen {
 				continue

@@ -223,27 +223,27 @@ func buildPlayableLinkCandidates(vd *library.VideoData, projection string, stere
 	nativeResolution := fileResolution(vd)
 	candidates := make([]videoLinkCandidate, 0, 4)
 
-	if sp.Paths != nil && sp.Paths.Stream != nil && *sp.Paths.Stream != "" && len(sp.Files) > 0 && sp.Files[0] != nil {
-		for _, source := range stash.GetDirectStream(sp).Sources {
-			if source.Url == "" {
-				continue
-			}
-			keyed := stash.ApiKeyed(source.Url)
-			directOrder := preferredDirectQualityOrder(source.Resolution)
-			candidates = append(candidates, videoLinkCandidate{
-				link: VideoLinkView{
-					IsStream:     true,
-					IsDownload:   true,
-					URL:          &keyed,
-					Projection:   projection,
-					Stereo:       stereo,
-					QualityName:  qualityNameWithDirectSuffix(source.Resolution),
-					QualityOrder: directOrder,
-				},
-				resolution: source.Resolution,
-				isDirect:   true,
-			})
+	// GetDirectStream has no sources for a scene without a file or a
+	// stream path.
+	for _, source := range stash.GetDirectStream(sp).Sources {
+		if source.Url == "" {
+			continue
 		}
+		keyed := stash.ApiKeyed(source.Url)
+		directOrder := preferredDirectQualityOrder(source.Resolution)
+		candidates = append(candidates, videoLinkCandidate{
+			link: VideoLinkView{
+				IsStream:     true,
+				IsDownload:   true,
+				URL:          &keyed,
+				Projection:   projection,
+				Stereo:       stereo,
+				QualityName:  qualityNameWithDirectSuffix(source.Resolution),
+				QualityOrder: directOrder,
+			},
+			resolution: source.Resolution,
+			isDirect:   true,
+		})
 	}
 
 	if len(sp.Files) == 0 || sp.Files[0] == nil {

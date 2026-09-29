@@ -62,6 +62,11 @@ type playbackStop struct {
 // play records that client key started or resumed vd. When the client was
 // playing another scene, that scene's stop is returned for reporting.
 func (t *playbackTracker) play(key string, vd *library.VideoData, minPlayFraction *float64) *playbackStop {
+	if vd == nil || vd.SceneParts == nil {
+		// Nothing to track without a scene; the client's current state
+		// stays as it is.
+		return nil
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	now := t.now()
@@ -124,7 +129,7 @@ func newPlayback(vd *library.VideoData, now time.Time) *playbackState {
 		lastEvent:    now,
 		isPlaying:    true,
 	}
-	if len(vd.SceneParts.Files) > 0 && vd.SceneParts.Files[0] != nil {
+	if vd.SceneParts != nil && len(vd.SceneParts.Files) > 0 && vd.SceneParts.Files[0] != nil {
 		ps.videoDuration = vd.SceneParts.Files[0].Duration
 	}
 	return ps

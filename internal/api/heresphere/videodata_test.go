@@ -368,3 +368,75 @@ func TestBuildVideoData_CarriesSceneDescription(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildVideoData_ToleratesMissingPathsAndStreams(t *testing.T) {
+	loadDefaultRules(t)
+	file := &gql.ScenePartsFilesVideoFile{Basename: "nine.mp4", Duration: 100, Height: 1080}
+	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name    string
+		vd      *library.VideoData
+		wantErr bool
+	}{
+		{name: "nil scene", vd: nil, wantErr: true},
+		{name: "no scene parts", vd: &library.VideoData{}, wantErr: true},
+		{name: "no files", vd: &library.VideoData{SceneParts: &gql.SceneParts{Id: "9", Created_at: created}}, wantErr: true},
+		{name: "nil first file", vd: &library.VideoData{SceneParts: &gql.SceneParts{Id: "9", Created_at: created, Files: []*gql.ScenePartsFilesVideoFile{nil}}}, wantErr: true},
+		{name: "no paths", vd: &library.VideoData{SceneParts: &gql.SceneParts{Id: "9", Created_at: created, Files: []*gql.ScenePartsFilesVideoFile{file},
+			Captions: []*gql.ScenePartsCaptionsVideoCaption{{Language_code: "en", Caption_type: "srt"}}}}},
+		{name: "paths without a stream", vd: &library.VideoData{SceneParts: &gql.SceneParts{Id: "9", Created_at: created, Files: []*gql.ScenePartsFilesVideoFile{file},
+			Paths: &gql.ScenePartsPathsScenePathsType{}, SceneStreams: []*gql.ScenePartsSceneStreamsSceneStreamEndpoint{nil, {Url: "http://stash/x"}}}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dto, err := buildVideoData(context.Background(), c.vd, "https://vr.example", nil, nil)
+			if c.wantErr {
+				if err == nil {
+					t.Fatalf("expected an error, got %+v", dto)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Both media entries are listed, without sources.
+			if len(dto.Media) != 2 || len(dto.Media[0].Sources) != 0 || len(dto.Media[1].Sources) != 0 {
+				t.Fatalf("media = %+v", dto.Media)
+			}
+			if len(dto.Subtitles) != 0 {
+				t.Fatalf("captions without a caption path must not be listed, got %+v", dto.Subtitles)
+			}
+		})
+	}
+}
+
+func TestSetSubtitles(t *testing.T) {
+	caption := util.Ptr("http://stash/scene/9/caption")
+	captions := []*gql.ScenePartsCaptionsVideoCaption{{Language_code: "en", Caption_type: "srt"}, nil, {Language_code: "de", Caption_type: "vtt"}}
+	cases := []struct {
+		name string
+		sp   *gql.SceneParts
+		want []string
+	}{
+		{name: "no captions", sp: &gql.SceneParts{Paths: &gql.ScenePartsPathsScenePathsType{Caption: caption}}},
+		{name: "no paths", sp: &gql.SceneParts{Captions: captions}},
+		{name: "no caption path", sp: &gql.SceneParts{Captions: captions, Paths: &gql.ScenePartsPathsScenePathsType{}}},
+		{name: "empty caption path", sp: &gql.SceneParts{Captions: captions, Paths: &gql.ScenePartsPathsScenePathsType{Caption: util.Ptr("")}}},
+		{name: "listed, nil entry skipped", sp: &gql.SceneParts{Captions: captions, Paths: &gql.ScenePartsPathsScenePathsType{Caption: caption}},
+			want: []string{"http://stash/scene/9/caption?lang=en&type=srt", "http://stash/scene/9/caption?lang=de&type=vtt"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var dto videoDataDto
+			setSubtitles(&library.VideoData{SceneParts: c.sp}, &dto)
+			if len(dto.Subtitles) != len(c.want) {
+				t.Fatalf("subtitles = %+v, want %d", dto.Subtitles, len(c.want))
+			}
+			for i, w := range c.want {
+				if dto.Subtitles[i].Url != w {
+					t.Fatalf("subtitle %d = %q, want %q", i, dto.Subtitles[i].Url, w)
+				}
+			}
+		})
+	}
+}

@@ -2,6 +2,7 @@ package stash
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -130,5 +131,30 @@ func TestTransport_SharedPerMode(t *testing.T) {
 	}
 	if verified.TLSClientConfig.InsecureSkipVerify || !insecure.TLSClientConfig.InsecureSkipVerify {
 		t.Fatal("expected InsecureSkipVerify to follow the mode")
+	}
+}
+
+func TestGetVersion_AnswerWithoutAVersionIsAnError(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "null version object", body: `{"data":{"version":null}}`},
+		{name: "null version string", body: `{"data":{"version":{"version":null}}}`},
+		{name: "empty data", body: `{"data":{}}`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(c.body))
+			}))
+			t.Cleanup(srv.Close)
+
+			version, err := GetVersion(context.Background(), NewClient(srv.URL, "", false))
+			if !errors.Is(err, errNoVersion) {
+				t.Fatalf("expected errNoVersion, got %q %v", version, err)
+			}
+		})
 	}
 }

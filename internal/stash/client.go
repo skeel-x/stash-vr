@@ -2,6 +2,7 @@ package stash
 
 import (
 	"context"
+	"errors"
 	"github.com/Khan/genqlient/graphql"
 	"net/http"
 	"stash-vr/internal/stash/gql"
@@ -45,10 +46,18 @@ func NewClient(graphqlUrl string, apiKey string, tlsInsecure bool) graphql.Clien
 	return graphql.NewClient(graphqlUrl, htc)
 }
 
+// errNoVersion is returned when Stash answers the version query without a
+// version, which a proxy or an unexpected server in front of it can do.
+var errNoVersion = errors.New("stash answered without a version")
+
+// GetVersion asks Stash for its version.
 func GetVersion(ctx context.Context, client graphql.Client) (string, error) {
 	version, err := gql.Version(ctx, client)
 	if err != nil {
 		return "", err
+	}
+	if version == nil || version.Version == nil || version.Version.Version == nil {
+		return "", errNoVersion
 	}
 	return *version.Version.Version, nil
 }

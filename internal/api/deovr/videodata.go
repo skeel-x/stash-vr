@@ -1,6 +1,7 @@
 package deovr
 
 import (
+	"errors"
 	"fmt"
 	"stash-vr/internal/api/heatmap"
 	"stash-vr/internal/config"
@@ -45,8 +46,11 @@ type videoSourceDto struct {
 }
 
 func buildVideoData(vd *library.VideoData, baseUrl string) (*videoDataDto, error) {
+	if vd == nil || vd.SceneParts == nil {
+		return nil, errors.New("scene has no data")
+	}
 	videoId := vd.Id()
-	if len(vd.SceneParts.Files) == 0 {
+	if len(vd.SceneParts.Files) == 0 || vd.SceneParts.Files[0] == nil {
 		return nil, fmt.Errorf("scene %s has no files", videoId)
 	}
 

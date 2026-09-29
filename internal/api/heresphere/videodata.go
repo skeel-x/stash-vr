@@ -2,6 +2,7 @@ package heresphere
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"stash-vr/internal/api/heatmap"
 	"stash-vr/internal/config"
@@ -78,8 +79,11 @@ type profileLookup interface {
 }
 
 func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, variants []library.ScriptVariant, profiles profileLookup) (*videoDataDto, error) {
+	if vd == nil || vd.SceneParts == nil {
+		return nil, errors.New("scene has no data")
+	}
 	videoId := vd.Id()
-	if len(vd.SceneParts.Files) == 0 {
+	if len(vd.SceneParts.Files) == 0 || vd.SceneParts.Files[0] == nil {
 		return nil, fmt.Errorf("scene %s has no files", videoId)
 	}
 
@@ -173,11 +177,17 @@ func derefOr(s *string) string {
 	return *s
 }
 
+// setSubtitles lists the scene's captions. Without Stash's caption path
+// there is no URL to serve them from, so none are listed.
 func setSubtitles(vd *library.VideoData, dto *videoDataDto) {
-	if vd.SceneParts.Captions == nil {
+	if vd.SceneParts.Captions == nil || vd.SceneParts.Paths == nil ||
+		vd.SceneParts.Paths.Caption == nil || *vd.SceneParts.Paths.Caption == "" {
 		return
 	}
 	for _, c := range vd.SceneParts.Captions {
+		if c == nil {
+			continue
+		}
 		dto.Subtitles = append(dto.Subtitles, subtitleDto{
 			Name:     fmt.Sprintf("%s.%s", c.Language_code, c.Caption_type),
 			Language: c.Language_code,
