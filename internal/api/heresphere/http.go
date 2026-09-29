@@ -136,6 +136,10 @@ func (h *httpHandler) scanHandler(w http.ResponseWriter, req *http.Request) {
 // other fields.
 const maxVideoDataBody = library.MaxProfileBytes*4/3 + 64*1024
 
+// errNoBody marks a scene request without a body: there is nothing to
+// update, only the document to serve.
+var errNoBody = errors.New("no request body")
+
 func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request) {
 	defer func() { _ = req.Body.Close() }()
 	req.Body = http.MaxBytesReader(w, req.Body, maxVideoDataBody)
@@ -149,8 +153,14 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	vdReq, reqErr := internal.UnmarshalBody[videoDataRequestDto](req)
-	if reqErr != nil {
+	// HereSphere always sends a JSON body; a browser following the scene
+	// link sends none, which is not worth a warning or a decode.
+	var vdReq videoDataRequestDto
+	var reqErr error
+	if req.ContentLength == 0 {
+		reqErr = errNoBody
+		log.Ctx(ctx).Debug().Msg("Scene request without a body, serving the document only")
+	} else if vdReq, reqErr = internal.UnmarshalBody[videoDataRequestDto](req); reqErr != nil {
 		log.Ctx(ctx).Warn().Err(reqErr).Msg("Failed to parse request body")
 	} else if vdReq.DeleteFile != nil && *vdReq.DeleteFile {
 		if err = h.libraryService.Delete(ctx, videoId); err != nil {
