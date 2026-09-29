@@ -23,6 +23,7 @@
 </section>
 
 {{if eq .Status.Connection "ok"}}
+{{if .Links.Loopback}}<p class="note warn" id="loopback-note">These addresses point at this computer only: the page was opened via localhost. Open Stash-VR by the computer's network address or host name instead, and the addresses below become ones your headset can reach.</p>{{end}}
 <section class="players">
   <article class="player heresphere">
     <a class="launch" href="{{.Links.HereSphere}}">

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net"
 	"net/http"
 	"strings"
 
@@ -16,6 +17,25 @@ type PlayerLinks struct {
 	DeoVRApi   string `json:"deovr_api"`
 	Playa      string `json:"playa"`
 	PlainHTTP  bool   `json:"plain_http"`
+	// Loopback is set when the page was opened via localhost, 127.0.0.1 or
+	// [::1]: the addresses then only work on this computer, never in a
+	// headset. The page says so; it does not go looking for a better
+	// address, which would mean enumerating the network interfaces.
+	Loopback bool `json:"loopback"`
+}
+
+// isLoopbackHost reports whether host (with or without a port) names this
+// computer only: localhost or a loopback IP such as 127.0.0.1 or ::1.
+func isLoopbackHost(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // StashSceneUrl turns the configured GraphQL endpoint into the Stash web
@@ -39,5 +59,6 @@ func LinksFor(req *http.Request) PlayerLinks {
 		DeoVRApi:   base + "/deovr",
 		Playa:      base,
 		PlainHTTP:  strings.HasPrefix(base, "http://"),
+		Loopback:   isLoopbackHost(req.Host),
 	}
 }
