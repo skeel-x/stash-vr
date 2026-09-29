@@ -263,3 +263,95 @@ func TestSectionRows_RecommendedJoinsExistingOrderAfterContinue(t *testing.T) {
 		t.Fatal("recommended is on by default")
 	}
 }
+
+func TestGetSections_JustPlayedSceneLeavesRecommendedAtOnce(t *testing.T) {
+	loadConfig(t, nil)
+	stash := &routingStash{recScenes: recJSON()}
+	now := recNow
+	svc := recService(stash, &now)
+	ctx := context.Background()
+
+	sections, err := svc.GetSections(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := sectionByID(sections, "smart:recommended"); rec == nil || fmt.Sprint(rec.Ids) != "[3 2]" {
+		t.Fatalf("recommended section wrong: %+v", rec)
+	}
+
+	// A stored resume position puts 3 in Continue watching: it must not sit
+	// in Recommended as well until the cache expires.
+	resume := 120.0
+	if err := svc.SaveActivity(ctx, "3", nil, &resume); err != nil {
+		t.Fatal(err)
+	}
+	svc.ResetSections()
+	sections, err = svc.GetSections(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := sectionByID(sections, "smart:recommended"); rec == nil || fmt.Sprint(rec.Ids) != "[2]" {
+		t.Fatalf("expected 3 gone from the cached recommendation, got %+v", rec)
+	}
+	if got := stash.recQueries(); got != 1 {
+		t.Fatalf("the cache must be filtered, not recomputed, got %d queries", got)
+	}
+
+	// A cleared position (finished or barely started) is not a play, and a
+	// write Stash refused leaves the scene in the list.
+	zero := 0.0
+	if err := svc.SaveActivity(ctx, "2", nil, &zero); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SaveActivity(ctx, "2", &resume, nil); err != nil {
+		t.Fatal(err)
+	}
+	stash.mu.Lock()
+	stash.writeErr = errors.New("stash down")
+	stash.mu.Unlock()
+	if err := svc.IncrementPlayCount(ctx, "2"); err == nil {
+		t.Fatal("expected the failed write reported")
+	}
+	svc.ResetSections()
+	if sections, err = svc.GetSections(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if rec := sectionByID(sections, "smart:recommended"); rec == nil || fmt.Sprint(rec.Ids) != "[2]" {
+		t.Fatalf("expected 2 still recommended, got %+v", rec)
+	}
+
+	// A counted play removes it too; with nothing left the section goes.
+	stash.mu.Lock()
+	stash.writeErr = nil
+	stash.mu.Unlock()
+	if err := svc.IncrementPlayCount(ctx, "2"); err != nil {
+		t.Fatal(err)
+	}
+	svc.ResetSections()
+	if sections, err = svc.GetSections(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if sectionByID(sections, "smart:recommended") != nil {
+		t.Fatalf("expected the emptied recommendation left out, got %v", names(sections))
+	}
+
+	// Once the cache expires the fresh query decides, and the old marks
+	// are forgotten (the fake still lists both as unplayed).
+	now = now.Add(recCacheTTL + time.Minute)
+	svc.ResetSections()
+	if sections, err = svc.GetSections(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if rec := sectionByID(sections, "smart:recommended"); rec == nil || fmt.Sprint(rec.Ids) != "[3 2]" {
+		t.Fatalf("expected the fresh recommendation, got %+v", rec)
+	}
+	if got := stash.recQueries(); got != 2 {
+		t.Fatalf("expected one recomputation, got %d", got)
+	}
+	svc.muRec.Lock()
+	marks := len(svc.recPlayed)
+	svc.muRec.Unlock()
+	if marks != 0 {
+		t.Fatalf("expected the expired marks pruned, %d left", marks)
+	}
+}

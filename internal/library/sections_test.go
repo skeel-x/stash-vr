@@ -46,6 +46,8 @@ type routingStash struct {
 	recScenes string
 	recLoads  int
 	recErr    error
+	// writeErr fails the playback write-backs (activity and play count).
+	writeErr error
 }
 
 func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -79,6 +81,14 @@ func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp
 			scenes = "[]"
 		}
 		payload = `{"findScenes":{"scenes":` + scenes + `}}`
+	case "SceneSaveActivity", "SceneIncrementPlayCount":
+		r.mu.Lock()
+		err := r.writeErr
+		r.mu.Unlock()
+		if err != nil {
+			return err
+		}
+		payload = `{}`
 	case "FindAllSceneIds":
 		r.mu.Lock()
 		r.allIds++

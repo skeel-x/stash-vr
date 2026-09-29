@@ -219,6 +219,7 @@ func (libraryService *Service) IncrementPlayCount(ctx context.Context, id string
 	if err != nil {
 		return fmt.Errorf("SceneIncrementPlayCount: %w", err)
 	}
+	libraryService.markPlayed(id)
 	return nil
 }
 
@@ -259,11 +260,15 @@ func (libraryService *Service) SaveResumeTime(ctx context.Context, id string, se
 
 // SaveActivity reports one playback stop to Stash: the seconds played since
 // the last report and the position to resume from (0 clears it). Either
-// value may be nil to leave it unchanged.
+// value may be nil to leave it unchanged. A stored position puts the scene
+// in Continue watching, so it is marked played for the recommendation.
 func (libraryService *Service) SaveActivity(ctx context.Context, id string, playedSeconds *float64, resume *float64) error {
 	_, err := gql.SceneSaveActivity(ctx, libraryService.Client(), id, playedSeconds, resume)
 	if err != nil {
 		return fmt.Errorf("SceneSaveActivity: %w", err)
+	}
+	if resume != nil && *resume > 0 {
+		libraryService.markPlayed(id)
 	}
 	return nil
 }

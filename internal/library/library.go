@@ -53,6 +53,11 @@ type Service struct {
 	muRec  sync.Mutex
 	rec    *recCache
 	recGen uint64
+	// recPlayed holds the scenes played since the recommendation was
+	// computed (and when), so a scene that just entered Continue watching
+	// leaves Recommended for you at once instead of when the cache
+	// expires. Entries older than recCacheTTL are pruned on read.
+	recPlayed map[string]time.Time
 	// now is the clock; tests replace it.
 	now func() time.Time
 

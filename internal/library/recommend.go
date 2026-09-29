@@ -303,7 +303,8 @@ type recCache struct {
 
 // recommendedIDs returns the Recommended for you ids, computing them at
 // most once per recCacheTTL (or when the size or excluded sort name
-// changes). An empty result is cached too; errors are not.
+// changes). An empty result is cached too; errors are not. Scenes played
+// since the computation (see markPlayed) are left out of a cached result.
 func (libraryService *Service) recommendedIDs(ctx context.Context, size int) ([]string, error) {
 	exclude := config.Application().ExcludeSortName
 	now := libraryService.now()
@@ -312,7 +313,7 @@ func (libraryService *Service) recommendedIDs(ctx context.Context, size int) ([]
 	c, gen := libraryService.rec, libraryService.recGen
 	libraryService.muRec.Unlock()
 	if c != nil && c.size == size && c.excludeSortName == exclude && now.Sub(c.at) < recCacheTTL {
-		return slices.Clone(c.ids), nil
+		return libraryService.withoutPlayed(c.ids, now), nil
 	}
 
 	resp, err := gql.FindRecommendationScenes(ctx, libraryService.Client())
@@ -330,5 +331,39 @@ func (libraryService *Service) recommendedIDs(ctx context.Context, size int) ([]
 		libraryService.rec = &recCache{ids: ids, at: now, size: size, excludeSortName: exclude}
 	}
 	libraryService.muRec.Unlock()
-	return slices.Clone(ids), nil
+	return libraryService.withoutPlayed(ids, now), nil
+}
+
+// markPlayed notes that scene id was played now (its play count rose or a
+// resume position was stored), so it leaves Recommended for you at once.
+func (libraryService *Service) markPlayed(id string) {
+	libraryService.muRec.Lock()
+	defer libraryService.muRec.Unlock()
+	if libraryService.recPlayed == nil {
+		libraryService.recPlayed = map[string]time.Time{}
+	}
+	libraryService.recPlayed[id] = libraryService.now()
+}
+
+// withoutPlayed copies ids without the scenes played in the last
+// recCacheTTL, pruning older marks: a recommendation computed after them
+// already knows they were played.
+func (libraryService *Service) withoutPlayed(ids []string, now time.Time) []string {
+	libraryService.muRec.Lock()
+	defer libraryService.muRec.Unlock()
+	for id, at := range libraryService.recPlayed {
+		if now.Sub(at) >= recCacheTTL {
+			delete(libraryService.recPlayed, id)
+		}
+	}
+	if len(libraryService.recPlayed) == 0 {
+		return slices.Clone(ids)
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if _, played := libraryService.recPlayed[id]; !played {
+			out = append(out, id)
+		}
+	}
+	return out
 }
