@@ -39,10 +39,31 @@
     img.onerror = () => { headset.textContent = 'No. This device cannot load images from Stash. Check that it can reach the Stash host, and that Stash uses https if this page does.'; };
     img.src = headset.dataset.cover;
   }
+  // copyText puts text on the clipboard and reports whether it got there.
+  // navigator.clipboard only exists on a secure origin (https, or
+  // localhost); over plain http, which is how most headsets open this
+  // page, a hidden textarea and execCommand("copy") do the same.
+  async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* try the fallback */ }
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.setAttribute('aria-hidden', 'true');
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
   document.querySelectorAll('[data-copy]').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(btn.dataset.copy); btn.textContent = 'Copied'; }
-      catch (e) { btn.textContent = 'Select the address'; }
+      btn.textContent = (await copyText(btn.dataset.copy)) ? 'Copied' : 'Select the address';
       setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
     });
   });
