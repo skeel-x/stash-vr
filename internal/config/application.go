@@ -77,96 +77,103 @@ type ApplicationConfig struct {
 	VideoRules            []VideoRule
 }
 
+// registerFlags declares every setting flag on fs and binds each one with
+// bind (viper.BindPFlag in production), so the declarations can be checked
+// without parsing the process arguments.
+func registerFlags(fs *pflag.FlagSet, bind func(key string, flag *pflag.Flag) error) {
+	fs.String(envKeyListenAddress, ":9666", "Local address for Stash-VR to listen on")
+	_ = bind(envKeyListenAddress, fs.Lookup(envKeyListenAddress))
+
+	fs.String(envKeyStashGraphQLUrl, "http://localhost:9999/graphql", "Url to Stash graphql")
+	_ = bind(envKeyStashGraphQLUrl, fs.Lookup(envKeyStashGraphQLUrl))
+
+	fs.String(envKeyStashApiKey, "", "Stash API key")
+	_ = bind(envKeyStashApiKey, fs.Lookup(envKeyStashApiKey))
+
+	fs.Bool(envKeyStashTLSInsecure, false, "Skip verifying the TLS certificate of an https Stash (self-signed certificates)")
+	_ = bind(envKeyStashTLSInsecure, fs.Lookup(envKeyStashTLSInsecure))
+
+	fs.String(envKeyFavoriteTag, "FAVORITE", "Name of tag in Stash to hold scenes marked as favorites")
+	_ = bind(envKeyFavoriteTag, fs.Lookup(envKeyFavoriteTag))
+
+	fs.String(envKeyLogLevel, "info", "Set log level - trace, debug, warn, info or error")
+	_ = bind(envKeyLogLevel, fs.Lookup(envKeyLogLevel))
+
+	fs.Bool(envKeyDisableLogColor, false, "Disable colors in log output")
+	_ = bind(envKeyDisableLogColor, fs.Lookup(envKeyDisableLogColor))
+
+	fs.Bool(envKeyDisableRedact, false, "Disable redacting sensitive information from logs")
+	_ = bind(envKeyDisableRedact, fs.Lookup(envKeyDisableRedact))
+
+	fs.Bool(envKeyForceHTTPS, false, "Force Stash-VR to use HTTPS")
+	_ = bind(envKeyForceHTTPS, fs.Lookup(envKeyForceHTTPS))
+
+	fs.String(envKeyBasePath, "", "Path prefix when served under a sub-path behind a reverse proxy, e.g. /stashvr")
+	_ = bind(envKeyBasePath, fs.Lookup(envKeyBasePath))
+
+	fs.Bool(envKeyDeovrAutoload, true, "Send the DeoVR library when DeoVR's browser opens the front page")
+	_ = bind(envKeyDeovrAutoload, fs.Lookup(envKeyDeovrAutoload))
+
+	fs.Bool(envKeyPerformerFacets, true, "Add Country and Age tags derived from a scene's performers in HereSphere")
+	_ = bind(envKeyPerformerFacets, fs.Lookup(envKeyPerformerFacets))
+
+	fs.Bool(envKeyDateLookup, true, "Look up missing release dates from the stash-boxes configured in Stash")
+	_ = bind(envKeyDateLookup, fs.Lookup(envKeyDateLookup))
+
+	fs.Bool(envKeyDateWriteback, false, "Write release dates found on stash-boxes back to Stash")
+	_ = bind(envKeyDateWriteback, fs.Lookup(envKeyDateWriteback))
+
+	fs.String(envKeyFunscriptIndexPath, "", "Path to the timestampTrade plugin's funscript_index.sqlite; its scripts are offered as alternates")
+	_ = bind(envKeyFunscriptIndexPath, fs.Lookup(envKeyFunscriptIndexPath))
+
+	fs.Int(envKeyHeatmapHeightPx, 0, "Height of heatmaps")
+	_ = bind(envKeyHeatmapHeightPx, fs.Lookup(envKeyHeatmapHeightPx))
+
+	fs.Int(envKeySmartSectionSize, 50, "Number of scenes in each smart section")
+	_ = bind(envKeySmartSectionSize, fs.Lookup(envKeySmartSectionSize))
+
+	fs.Int(envKeyAutoStudioMin, 0, "Generate a section for every studio with at least this many scenes (0 turns it off)")
+	_ = bind(envKeyAutoStudioMin, fs.Lookup(envKeyAutoStudioMin))
+
+	fs.Int(envKeyAutoPerformerMin, 0, "Generate a section for every performer with at least this many scenes (0 turns it off)")
+	_ = bind(envKeyAutoPerformerMin, fs.Lookup(envKeyAutoPerformerMin))
+
+	fs.String(envKeyExcludeSortName, "hidden", "Exclude tags with this sort name")
+	_ = bind(envKeyExcludeSortName, fs.Lookup(envKeyExcludeSortName))
+
+	fs.String(envKeyUserConfigPath, "", "Path to store user config (may contain filter names in plain text)")
+	_ = bind(envKeyUserConfigPath, fs.Lookup(envKeyUserConfigPath))
+
+	fs.Bool(envKeyGenerateSummaryIds, false, "Generate summary ids for categorized tags")
+	_ = bind(envKeyGenerateSummaryIds, fs.Lookup(envKeyGenerateSummaryIds))
+
+	fs.Bool(envKeyCoverBadgeQuality, true, "Draw the quality tier or resolution onto scene covers")
+	_ = bind(envKeyCoverBadgeQuality, fs.Lookup(envKeyCoverBadgeQuality))
+
+	fs.Bool(envKeyCoverBadgeFormat, false, "Draw the projection (180, 360, FISHEYE, FLAT 3D) onto scene covers")
+	_ = bind(envKeyCoverBadgeFormat, fs.Lookup(envKeyCoverBadgeFormat))
+
+	fs.Bool(envKeyCoverBadgePass, true, "Draw an AR badge onto covers of passthrough scenes")
+	_ = bind(envKeyCoverBadgePass, fs.Lookup(envKeyCoverBadgePass))
+
+	fs.Bool(envKeyCoverBadgeDuration, true, "Draw the running time onto scene covers")
+	_ = bind(envKeyCoverBadgeDuration, fs.Lookup(envKeyCoverBadgeDuration))
+
+	fs.Bool(envKeyCoverBadgeRate, true, "Draw the frame rate onto scene covers")
+	_ = bind(envKeyCoverBadgeRate, fs.Lookup(envKeyCoverBadgeRate))
+
+	fs.Bool(envKeyLearnStudio, false, "Use a saved HereSphere profile for other scenes from the same studio with the same lens")
+	_ = bind(envKeyLearnStudio, fs.Lookup(envKeyLearnStudio))
+
+	fs.Bool(envKeyCorrectVertical, true, "Correct the vertical misalignment vrQualityTags measured between the eyes in generated HereSphere profiles")
+	_ = bind(envKeyCorrectVertical, fs.Lookup(envKeyCorrectVertical))
+
+	fs.BoolP("help", "h", false, "Display usage information")
+	_ = bind("help", fs.Lookup("help"))
+}
+
 func Init() error {
-	pflag.String(envKeyListenAddress, ":9666", "Local address for Stash-VR to listen on")
-	_ = viper.BindPFlag(envKeyListenAddress, pflag.Lookup(envKeyListenAddress))
-
-	pflag.String(envKeyStashGraphQLUrl, "http://localhost:9999/graphql", "Url to Stash graphql")
-	_ = viper.BindPFlag(envKeyStashGraphQLUrl, pflag.Lookup(envKeyStashGraphQLUrl))
-
-	pflag.String(envKeyStashApiKey, "", "Stash API key")
-	_ = viper.BindPFlag(envKeyStashApiKey, pflag.Lookup(envKeyStashApiKey))
-
-	pflag.Bool(envKeyStashTLSInsecure, false, "Skip verifying the TLS certificate of an https Stash (self-signed certificates)")
-	_ = viper.BindPFlag(envKeyStashTLSInsecure, pflag.Lookup(envKeyStashTLSInsecure))
-
-	pflag.String(envKeyFavoriteTag, "FAVORITE", "Name of tag in Stash to hold scenes marked as favorites")
-	_ = viper.BindPFlag(envKeyFavoriteTag, pflag.Lookup(envKeyFavoriteTag))
-
-	pflag.String(envKeyLogLevel, "info", "Set log level - trace, debug, warn, info or error")
-	_ = viper.BindPFlag(envKeyLogLevel, pflag.Lookup(envKeyLogLevel))
-
-	pflag.Bool(envKeyDisableLogColor, false, "Disable colors in log output")
-	_ = viper.BindPFlag(envKeyDisableLogColor, pflag.Lookup(envKeyDisableLogColor))
-
-	pflag.Bool(envKeyDisableRedact, false, "Disable redacting sensitive information from logs")
-	_ = viper.BindPFlag(envKeyDisableRedact, pflag.Lookup(envKeyDisableRedact))
-
-	pflag.Bool(envKeyForceHTTPS, false, "Force Stash-VR to use HTTPS")
-	_ = viper.BindPFlag(envKeyForceHTTPS, pflag.Lookup(envKeyForceHTTPS))
-
-	pflag.String(envKeyBasePath, "", "Path prefix when served under a sub-path behind a reverse proxy, e.g. /stashvr")
-	_ = viper.BindPFlag(envKeyBasePath, pflag.Lookup(envKeyBasePath))
-
-	pflag.Bool(envKeyDeovrAutoload, true, "Send the DeoVR library when DeoVR's browser opens the front page")
-	_ = viper.BindPFlag(envKeyDeovrAutoload, pflag.Lookup(envKeyDeovrAutoload))
-
-	pflag.Bool(envKeyPerformerFacets, true, "Add Country and Age tags derived from a scene's performers in HereSphere")
-	_ = viper.BindPFlag(envKeyPerformerFacets, pflag.Lookup(envKeyPerformerFacets))
-
-	pflag.Bool(envKeyDateLookup, true, "Look up missing release dates from the stash-boxes configured in Stash")
-	_ = viper.BindPFlag(envKeyDateLookup, pflag.Lookup(envKeyDateLookup))
-
-	pflag.Bool(envKeyDateWriteback, false, "Write release dates found on stash-boxes back to Stash")
-	_ = viper.BindPFlag(envKeyDateWriteback, pflag.Lookup(envKeyDateWriteback))
-
-	pflag.String(envKeyFunscriptIndexPath, "", "Path to the timestampTrade plugin's funscript_index.sqlite; its scripts are offered as alternates")
-	_ = viper.BindPFlag(envKeyFunscriptIndexPath, pflag.Lookup(envKeyFunscriptIndexPath))
-
-	pflag.Int(envKeyHeatmapHeightPx, 0, "Height of heatmaps")
-	_ = viper.BindPFlag(envKeyHeatmapHeightPx, pflag.Lookup(envKeyHeatmapHeightPx))
-
-	pflag.Int(envKeySmartSectionSize, 50, "Number of scenes in each smart section")
-	_ = viper.BindPFlag(envKeySmartSectionSize, pflag.Lookup(envKeySmartSectionSize))
-
-	pflag.Int(envKeyAutoStudioMin, 0, "Generate a section for every studio with at least this many scenes (0 turns it off)")
-	_ = viper.BindPFlag(envKeyAutoStudioMin, pflag.Lookup(envKeyAutoStudioMin))
-
-	pflag.Int(envKeyAutoPerformerMin, 0, "Generate a section for every performer with at least this many scenes (0 turns it off)")
-	_ = viper.BindPFlag(envKeyAutoPerformerMin, pflag.Lookup(envKeyAutoPerformerMin))
-
-	pflag.String(envKeyExcludeSortName, "hidden", "Exclude tags with this sort name")
-	_ = viper.BindPFlag(envKeyExcludeSortName, pflag.Lookup(envKeyExcludeSortName))
-
-	pflag.String(envKeyUserConfigPath, "", "Path to store user config (may contain filter names in plain text)")
-	_ = viper.BindPFlag(envKeyUserConfigPath, pflag.Lookup(envKeyUserConfigPath))
-
-	pflag.String(envKeyGenerateSummaryIds, "", "Generate summary ids for categorized tags")
-	_ = viper.BindPFlag(envKeyGenerateSummaryIds, pflag.Lookup(envKeyGenerateSummaryIds))
-
-	pflag.Bool(envKeyCoverBadgeQuality, true, "Draw the quality tier or resolution onto scene covers")
-	_ = viper.BindPFlag(envKeyCoverBadgeQuality, pflag.Lookup(envKeyCoverBadgeQuality))
-
-	pflag.Bool(envKeyCoverBadgeFormat, false, "Draw the projection (180, 360, FISHEYE, FLAT 3D) onto scene covers")
-	_ = viper.BindPFlag(envKeyCoverBadgeFormat, pflag.Lookup(envKeyCoverBadgeFormat))
-
-	pflag.Bool(envKeyCoverBadgePass, true, "Draw an AR badge onto covers of passthrough scenes")
-	_ = viper.BindPFlag(envKeyCoverBadgePass, pflag.Lookup(envKeyCoverBadgePass))
-
-	pflag.Bool(envKeyCoverBadgeDuration, true, "Draw the running time onto scene covers")
-	_ = viper.BindPFlag(envKeyCoverBadgeDuration, pflag.Lookup(envKeyCoverBadgeDuration))
-
-	pflag.Bool(envKeyCoverBadgeRate, true, "Draw the frame rate onto scene covers")
-	_ = viper.BindPFlag(envKeyCoverBadgeRate, pflag.Lookup(envKeyCoverBadgeRate))
-
-	pflag.Bool(envKeyLearnStudio, false, "Use a saved HereSphere profile for other scenes from the same studio with the same lens")
-	_ = viper.BindPFlag(envKeyLearnStudio, pflag.Lookup(envKeyLearnStudio))
-
-	pflag.Bool(envKeyCorrectVertical, true, "Correct the vertical misalignment vrQualityTags measured between the eyes in generated HereSphere profiles")
-	_ = viper.BindPFlag(envKeyCorrectVertical, pflag.Lookup(envKeyCorrectVertical))
-
-	pflag.BoolP("help", "h", false, "Display usage information")
-	_ = viper.BindPFlag("help", pflag.Lookup("help"))
+	registerFlags(pflag.CommandLine, viper.BindPFlag)
 
 	pflag.Parse()
 
