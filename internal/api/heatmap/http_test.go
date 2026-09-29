@@ -156,14 +156,19 @@ func (s *sceneStash) MakeRequest(_ context.Context, req *graphql.Request, resp *
 			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"S%d","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","width":8192,"height":4096,"video_codec":"hevc"}],"tags":[%s],"interactive":%t,"paths":{"screenshot":"%s%s","interactive_heatmap":"%s/heatmap","stream":"%s/stream","preview":"","funscript":"","caption":""}}`, id, id, strings.Join(tags, ","), b.interactive, s.base, b.shot, s.base, s.base))
 			continue
 		}
-		shot := map[int]string{1: "/jpeg", 2: "/webp", 3: "/png", 4: "/missing", 5: "/jpeg", 6: "/broken", 9: "/huge"}[id]
-		interactive := id == 5
+		shot := map[int]string{1: "/jpeg", 2: "/webp", 3: "/png", 4: "/missing", 5: "/jpeg", 6: "/broken", 9: "/huge", 15: "/jpeg", 16: "/jpeg"}[id]
+		// 5 has a heatmap, 15 one Stash fails to serve, 16 none.
+		interactive := id == 5 || id == 15 || id == 16
+		heat := map[int]string{15: "/broken", 16: "/missing"}[id]
+		if heat == "" {
+			heat = "/heatmap"
+		}
 		screenshotURL := s.base + shot
 		if id == 7 {
 			// A closed port: the transport error carries the keyed URL.
 			screenshotURL = "http://127.0.0.1:1/x"
 		}
-		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"S%d","created_at":"2024-01-01T00:00:00Z","files":[],"tags":[],"interactive":%t,"paths":{"screenshot":"%s","interactive_heatmap":"%s/heatmap","stream":"%s/stream","preview":"","funscript":"","caption":""}}`, id, id, interactive, screenshotURL, s.base, s.base))
+		scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"S%d","created_at":"2024-01-01T00:00:00Z","files":[],"tags":[],"interactive":%t,"paths":{"screenshot":"%s","interactive_heatmap":"%s%s","stream":"%s/stream","preview":"","funscript":"","caption":""}}`, id, id, interactive, screenshotURL, s.base, heat, s.base))
 	}
 	payload := `{"findScenes":{"scenes":[` + strings.Join(scenes, ",") + `]}}`
 	return json.Unmarshal([]byte(payload), resp.Data)
@@ -354,6 +359,63 @@ func TestCover_InteractiveSceneStillGetsHeatmapJpeg(t *testing.T) {
 	}
 	if bytes.Equal(rec.Body.Bytes(), jpg) {
 		t.Fatal("interactive cover must be re-encoded with the heatmap, not passed through")
+	}
+}
+
+// captureLog routes the global and context loggers into a buffer for the
+// test.
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	bufLogger := zerolog.New(&buf)
+	prevLogger := log.Logger
+	prevCtxLogger := zerolog.DefaultContextLogger
+	log.Logger = bufLogger
+	zerolog.DefaultContextLogger = &bufLogger
+	t.Cleanup(func() {
+		log.Logger = prevLogger
+		zerolog.DefaultContextLogger = prevCtxLogger
+	})
+	return &buf
+}
+
+func TestCover_HeatmapFetchFailureIsServedUncachedWithAWarning(t *testing.T) {
+	coverbadge.ResetCache()
+	t.Cleanup(coverbadge.ResetCache)
+	srv, jpg, _ := imageServer(t)
+	h := coverRouter(t, srv.URL)
+	logs := captureLog(t)
+
+	rec := get(t, h, "/cover/15")
+
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("got %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("a cover rendered without its heatmap must not be kept, got %q", got)
+	}
+	if bytes.Equal(rec.Body.Bytes(), jpg) {
+		t.Fatal("expected the rendered cover, not the screenshot")
+	}
+	if !strings.Contains(logs.String(), `"level":"warn"`) || !strings.Contains(logs.String(), "Heatmap unavailable") {
+		t.Fatalf("expected a warning about the heatmap, got %s", logs.String())
+	}
+}
+
+func TestCover_SceneWithoutAHeatmapIsKept(t *testing.T) {
+	coverbadge.ResetCache()
+	t.Cleanup(coverbadge.ResetCache)
+	srv, _, _ := imageServer(t)
+	h := coverRouter(t, srv.URL)
+	logs := captureLog(t)
+
+	rec := get(t, h, "/cover/16")
+
+	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "private, max-age=86400" {
+		t.Fatalf("a heatmap Stash does not have is no reason to refetch, got %d %q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	if strings.Contains(logs.String(), `"level":"warn"`) {
+		t.Fatalf("no warning for a missing heatmap, got %s", logs.String())
 	}
 }
 

@@ -43,13 +43,20 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 		badges := coverbadge.ForScene(vd, cfg.CoverBadges, cfg.VideoRules)
 		heatmapUrl := SceneHeatmapURL(vd)
 		if heatmapUrl != "" || len(badges) > 0 {
-			body, err := RenderCover(ctx, vd.Id(), stash.ApiKeyed(*p.Screenshot), heatmapUrl, badges)
+			body, degraded, err := RenderCover(ctx, vd.Id(), stash.ApiKeyed(*p.Screenshot), heatmapUrl, badges)
 			if err != nil {
 				log.Ctx(ctx).Err(err).Msg("RenderCover")
 				writeFailure(w, err)
 				return
 			}
-			writeCover(ctx, w, "image/jpeg", body)
+			if degraded != nil {
+				// Sent uncached, so the headset asks again rather than
+				// keeping a heatmap-less cover for a day.
+				log.Ctx(ctx).Warn().Err(degraded).Msg("Heatmap unavailable, serving the cover without it uncached")
+				writeCover(ctx, w, "image/jpeg", body, noStore)
+				return
+			}
+			writeCover(ctx, w, "image/jpeg", body, keepForADay)
 			return
 		}
 
@@ -59,10 +66,17 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 			writeFailure(w, err)
 			return
 		}
-		writeCover(ctx, w, ct, body)
+		writeCover(ctx, w, ct, body, keepForADay)
 	}
 	return internal.LogRoute("cover", internal.LogVideoId(f))
 }
+
+// Cache-Control values of a cover: one the headset may keep for a day,
+// one it must ask for again.
+const (
+	keepForADay = "private, max-age=86400"
+	noStore     = "no-store"
+)
 
 // SceneHeatmapURL is the keyed address of the heatmap Stash generates for
 // an interactive scene, or "" when the scene has none.
@@ -80,7 +94,7 @@ func SceneHeatmapURL(vd *library.VideoData) string {
 // writeFailure answers a failed cover uncached: 404 for a missing
 // screenshot, 502 for anything else.
 func writeFailure(w http.ResponseWriter, err error) {
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Cache-Control", noStore)
 	if errors.Is(err, errImageNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 	} else {
@@ -88,9 +102,9 @@ func writeFailure(w http.ResponseWriter, err error) {
 	}
 }
 
-// writeCover sends a cover the headset may keep for a day.
-func writeCover(ctx context.Context, w http.ResponseWriter, contentType string, body []byte) {
-	w.Header().Set("Cache-Control", "private, max-age=86400")
+// writeCover sends a cover under the given Cache-Control.
+func writeCover(ctx context.Context, w http.ResponseWriter, contentType string, body []byte, cacheControl string) {
+	w.Header().Set("Cache-Control", cacheControl)
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	if _, err := w.Write(body); err != nil {

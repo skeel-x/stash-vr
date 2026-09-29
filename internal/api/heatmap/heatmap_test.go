@@ -56,11 +56,61 @@ func renderFixture(t *testing.T, srv *httptest.Server) (image.Image, error) {
 	t.Helper()
 	coverbadge.ResetCache()
 	t.Cleanup(coverbadge.ResetCache)
-	b, err := RenderCover(context.Background(), "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
+	b, _, err := RenderCover(context.Background(), "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
 	if err != nil {
 		return nil, err
 	}
 	return jpeg.Decode(bytes.NewReader(b))
+}
+
+func TestRenderCover_DegradedOnlyWhenTheHeatmapFetchMayPass(t *testing.T) {
+	for name, c := range map[string]struct {
+		heatmap  http.HandlerFunc
+		degraded bool
+	}{
+		"heatmap served": {func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, filepath.Join("testdata", "heatmap.png"))
+		}, false},
+		"no heatmap (404)": {http.NotFound, false},
+		"stash error":      {func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "boom", http.StatusInternalServerError) }, true},
+		"too large": {func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write(make([]byte, maxCoverBytes+1))
+		}, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			setMaxCoverBytesForTest(t, 1<<16)
+			coverbadge.ResetCache()
+			t.Cleanup(coverbadge.ResetCache)
+			mux := http.NewServeMux()
+			mux.HandleFunc("/cover", func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, filepath.Join("testdata", "cover.gif"))
+			})
+			mux.HandleFunc("/heatmap", c.heatmap)
+			srv := httptest.NewServer(mux)
+			t.Cleanup(srv.Close)
+
+			body, degraded, err := RenderCover(context.Background(), "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (degraded != nil) != c.degraded {
+				t.Fatalf("degraded = %v, want %t", degraded, c.degraded)
+			}
+			if _, err := jpeg.Decode(bytes.NewReader(body)); err != nil {
+				t.Fatalf("expected a cover either way, got %v", err)
+			}
+			// A second call finds the render cached and still reports the
+			// heatmap state of this fetch.
+			_, again, err := RenderCover(context.Background(), "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
+			if err != nil || (again != nil) != c.degraded || coverbadge.Rendered.Len() != 1 {
+				t.Fatalf("cached render: degraded = %v (want %t), err %v, %d cached", again, c.degraded, err, coverbadge.Rendered.Len())
+			}
+		})
+	}
+	if _, _, err := RenderCover(context.Background(), "1", "http://127.0.0.1:1/x", "", nil); err == nil {
+		t.Fatal("a screenshot that does not load stays an error")
+	}
 }
 
 func TestRenderCover_DecodesWebpScreenshot(t *testing.T) {
@@ -161,7 +211,7 @@ func TestRenderCover_ConcurrentRequestsShareOneFetchAndRender(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			results[i], errs[i] = RenderCover(context.Background(), "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
+			results[i], _, errs[i] = RenderCover(context.Background(), "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
 		}(i)
 	}
 	wg.Wait()
@@ -190,7 +240,7 @@ func TestRenderCover_CallerGivingUpDoesNotWaitForTheLeader(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	_, err := RenderCover(ctx, "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
+	_, _, err := RenderCover(ctx, "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
 
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected the caller's deadline, got %v", err)

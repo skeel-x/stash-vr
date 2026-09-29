@@ -157,6 +157,13 @@ func acquireRenderSlot(ctx context.Context) (release func(), err error) {
 	}
 }
 
+// rendered is one renderCover result: the JPEG and, when the heatmap
+// could not be fetched for a reason that may pass, that failure.
+type rendered struct {
+	body     []byte
+	degraded error
+}
+
 // RenderCover returns a scene's cover as JPEG: the screenshot at coverUrl
 // with the heatmap at heatmapUrl across the bottom (when heatmapUrl is
 // set and the heatmap loads) and badges drawn in the bottom left corner,
@@ -164,7 +171,12 @@ func acquireRenderSlot(ctx context.Context) (release func(), err error) {
 // screenshot, heatmap and badges come from coverbadge.Rendered, and
 // concurrent calls for the same cover share one fetch and render. A
 // missing screenshot is ErrImageNotFound.
-func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
+//
+// degraded is set when the heatmap could not be fetched for a reason that
+// may pass (Stash answered an error or did not answer), so the cover was
+// rendered without it: the caller should not let a headset keep such a
+// cover. A heatmap Stash does not have (404) is not a degradation.
+func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) (body []byte, degraded error, err error) {
 	key := sceneId + "\x00" + coverbadge.Key(badges) + "\x00" + coverUrl + "\x00" + heatmapUrl
 	ch := renderGroup.DoChan(key, func() (interface{}, error) {
 		lctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), renderTimeout)
@@ -174,44 +186,45 @@ func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUr
 	select {
 	case r := <-ch:
 		if r.Err != nil {
-			return nil, r.Err
+			return nil, nil, r.Err
 		}
 		if r.Shared {
 			log.Ctx(ctx).Trace().Msg("Rendered cover shared with a concurrent request")
 		}
-		return r.Val.([]byte), nil
+		res := r.Val.(rendered)
+		return res.body, res.degraded, nil
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, nil, ctx.Err()
 	}
 }
 
 // renderCover fetches the sources, answers from coverbadge.Rendered when
 // the same cover was rendered before, else renders and caches it.
-func renderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
-	shot, heat, err := fetchSources(ctx, coverUrl, heatmapUrl)
+func renderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) (rendered, error) {
+	shot, heat, degraded, err := fetchSources(ctx, coverUrl, heatmapUrl)
 	if err != nil {
-		return nil, err
+		return rendered{}, err
 	}
 
 	key := coverbadge.CacheKey(sceneId, badges, shot, heat)
 	if b, ok := coverbadge.Rendered.Get(key); ok {
 		log.Ctx(ctx).Trace().Msg("Rendered cover from cache")
-		return b, nil
+		return rendered{body: b, degraded: degraded}, nil
 	}
 
 	b, err := renderJPEG(ctx, shot, heat, badges)
 	if err != nil {
-		return nil, err
+		return rendered{}, err
 	}
 	coverbadge.Rendered.Add(key, b)
-	return b, nil
+	return rendered{body: b, degraded: degraded}, nil
 }
 
 // RenderPreview renders a cover the way RenderCover does, but always
 // afresh and without adding it to coverbadge.Rendered: the Setup page
 // previews badge settings that are not saved yet.
 func RenderPreview(ctx context.Context, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
-	shot, heat, err := fetchSources(ctx, coverUrl, heatmapUrl)
+	shot, heat, _, err := fetchSources(ctx, coverUrl, heatmapUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -220,8 +233,10 @@ func RenderPreview(ctx context.Context, coverUrl string, heatmapUrl string, badg
 
 // fetchSources fetches the screenshot and, when heatmapUrl is set, the
 // heatmap in parallel. A heatmap that does not load is left out (heat is
-// nil); a screenshot that does not load is an error.
-func fetchSources(ctx context.Context, coverUrl string, heatmapUrl string) (shot, heat []byte, err error) {
+// nil): when Stash has none (404) silently, otherwise (an error answer,
+// no answer, too large) with the failure in degraded, since the next try
+// may well get it. A screenshot that does not load is an error.
+func fetchSources(ctx context.Context, coverUrl string, heatmapUrl string) (shot, heat []byte, degraded error, err error) {
 	var shotErr error
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
@@ -234,6 +249,9 @@ func fetchSources(ctx context.Context, coverUrl string, heatmapUrl string) (shot
 			if err != nil {
 				// No heatmap: the plain screenshot is served instead.
 				log.Ctx(ctx).Debug().Err(err).Msg("Heatmap unavailable")
+				if !errors.Is(err, errImageNotFound) {
+					degraded = fmt.Errorf("heatmap: %w", err)
+				}
 				return nil
 			}
 			heat = b
@@ -242,9 +260,9 @@ func fetchSources(ctx context.Context, coverUrl string, heatmapUrl string) (shot
 	}
 	_ = g.Wait()
 	if shotErr != nil {
-		return nil, nil, fmt.Errorf("screenshot: %w", shotErr)
+		return nil, nil, nil, fmt.Errorf("screenshot: %w", shotErr)
 	}
-	return shot, heat, nil
+	return shot, heat, degraded, nil
 }
 
 // renderJPEG composes the cover and encodes it as JPEG, holding a render

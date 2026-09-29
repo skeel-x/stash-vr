@@ -109,8 +109,15 @@ func (h httpHandler) posterHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	cacheControl := "private, max-age=3600"
+	if p.degraded != nil {
+		// Sent uncached, so the player asks again rather than keeping a
+		// heatmap-less poster.
+		log.Ctx(ctx).Warn().Err(p.degraded).Msg("Heatmap unavailable, serving the poster without it uncached")
+		cacheControl = "no-store"
+	}
 	w.Header().Set("Content-Type", p.contentType)
-	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Header().Set("Cache-Control", cacheControl)
 	w.Header().Set("Content-Length", strconv.Itoa(len(p.body)))
 	if _, err := w.Write(p.body); err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("error writing Playa poster")

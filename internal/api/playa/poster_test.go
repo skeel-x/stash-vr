@@ -18,6 +18,8 @@ import (
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/config"
@@ -27,8 +29,13 @@ import (
 var posterSky = color.RGBA{R: 40, G: 90, B: 160, A: 255}
 
 // posterShots maps a scene id to the path its screenshot is served on:
-// 1 a JPEG, 2 a PNG, 3 a WebP, 4 missing, 5 a Stash error.
-var posterShots = map[string]string{"1": "/shot", "2": "/png", "3": "/webp", "4": "/missing", "5": "/broken"}
+// 1 a JPEG, 2 a PNG, 3 a WebP, 4 missing, 5 a Stash error, 6 and 7 the
+// JPEG of interactive scenes whose heatmap posterHeatmaps gives.
+var posterShots = map[string]string{"1": "/shot", "2": "/png", "3": "/webp", "4": "/missing", "5": "/broken", "6": "/shot", "7": "/shot"}
+
+// posterHeatmaps maps an interactive scene id to its heatmap path: 6 one
+// Stash fails to serve, 7 one it serves.
+var posterHeatmaps = map[string]string{"6": "/broken", "7": "/heatmap"}
 
 // posterStash answers FindScenes with the requested 8K scene whose
 // screenshot is served by base on the path posterShots gives its id.
@@ -48,7 +55,8 @@ func (s *posterStash) MakeRequest(_ context.Context, req *graphql.Request, resp 
 			if !ok {
 				continue
 			}
-			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","width":8192,"height":4096,"video_codec":"hevc"}],"tags":[{"id":"8","name":"8K","sort_name":"","aliases":[],"parents":[]}],"interactive":false,"paths":{"screenshot":"%s%s","stream":"%s/stream"}}`, id, s.base, shot, s.base))
+			heat, interactive := posterHeatmaps[fmt.Sprint(id)]
+			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","width":8192,"height":4096,"video_codec":"hevc"}],"tags":[{"id":"8","name":"8K","sort_name":"","aliases":[],"parents":[]}],"interactive":%t,"paths":{"screenshot":"%s%s","interactive_heatmap":"%s%s","stream":"%s/stream"}}`, id, interactive, s.base, shot, s.base, heat, s.base))
 		}
 		payload = `{"findScenes":{"scenes":[` + strings.Join(scenes, ",") + `]}}`
 	}
@@ -94,6 +102,9 @@ func posterEnv(t *testing.T, badges config.CoverBadges) httpHandler {
 	})
 	mux.HandleFunc("/missing", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	mux.HandleFunc("/broken", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "boom", http.StatusInternalServerError) })
+	mux.HandleFunc("/heatmap", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, filepath.Join("..", "heatmap", "testdata", "heatmap.png"))
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	if err := config.Load(config.ApplicationConfig{
@@ -204,6 +215,42 @@ func TestPosterHandler_PassesThroughAndTranscodesLikeCover(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPosterHandler_HeatmapFetchFailureIsServedUncachedWithAWarning(t *testing.T) {
+	h := posterEnv(t, config.CoverBadges{})
+	var logs bytes.Buffer
+	bufLogger := zerolog.New(&logs)
+	prevLogger, prevCtxLogger := log.Logger, zerolog.DefaultContextLogger
+	log.Logger, zerolog.DefaultContextLogger = bufLogger, &bufLogger
+	t.Cleanup(func() { log.Logger, zerolog.DefaultContextLogger = prevLogger, prevCtxLogger })
+	w := httptest.NewRecorder()
+
+	h.posterHandler(w, newPlayaRequestWithVideoId("6"))
+
+	if w.Code != 200 || w.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("got %d %q", w.Code, w.Header().Get("Content-Type"))
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("a poster rendered without its heatmap must not be kept, got %q", got)
+	}
+	if !strings.Contains(logs.String(), `"level":"warn"`) || !strings.Contains(logs.String(), "Heatmap unavailable") {
+		t.Fatalf("expected a warning about the heatmap, got %s", logs.String())
+	}
+}
+
+func TestPosterHandler_HeatmapPosterIsKept(t *testing.T) {
+	h := posterEnv(t, config.CoverBadges{})
+	w := httptest.NewRecorder()
+
+	h.posterHandler(w, newPlayaRequestWithVideoId("7"))
+
+	if w.Code != 200 || w.Header().Get("Cache-Control") != "private, max-age=3600" {
+		t.Fatalf("got %d %q", w.Code, w.Header().Get("Cache-Control"))
+	}
+	if bytes.Equal(w.Body.Bytes(), posterFixtures.jpg) || coverbadge.Rendered.Len() != 1 {
+		t.Fatal("expected the poster rendered with its heatmap and cached")
 	}
 }
 

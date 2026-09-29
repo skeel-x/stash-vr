@@ -12,10 +12,13 @@ import (
 
 var errPosterNotFound = errors.New("poster not found")
 
-// poster is a scene's poster ready to send.
+// poster is a scene's poster ready to send. degraded is set when the
+// heatmap could not be fetched for a reason that may pass and the poster
+// was rendered without it: it should then not be cached by the player.
 type poster struct {
 	contentType string
 	body        []byte
+	degraded    error
 }
 
 // buildPoster returns the scene's poster. Interactive scenes get the
@@ -36,11 +39,11 @@ func buildPoster(ctx context.Context, vd *library.VideoData) (poster, error) {
 	badges := coverbadge.ForScene(vd, cfg.CoverBadges, cfg.VideoRules)
 	heatmapURL := heatmap.SceneHeatmapURL(vd)
 	if heatmapURL != "" || len(badges) > 0 {
-		b, err := heatmap.RenderCover(ctx, vd.Id(), stash.ApiKeyed(*paths.Screenshot), heatmapURL, badges)
+		b, degraded, err := heatmap.RenderCover(ctx, vd.Id(), stash.ApiKeyed(*paths.Screenshot), heatmapURL, badges)
 		if err != nil {
 			return poster{}, mapPosterError(err)
 		}
-		return poster{contentType: "image/jpeg", body: b}, nil
+		return poster{contentType: "image/jpeg", body: b, degraded: degraded}, nil
 	}
 	ct, b, err := heatmap.LoadScreenshot(ctx, stash.ApiKeyed(*paths.Screenshot))
 	if err != nil {
