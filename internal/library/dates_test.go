@@ -98,6 +98,25 @@ func TestDateStore_MissingOrBrokenFileIsEmpty(t *testing.T) {
 	}
 }
 
+func TestDateStore_NullFileIsEmptyAndWritable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dates.json")
+	if err := os.WriteFile(path, []byte("null"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := loadDateStore(path)
+	if len(s.entries) != 0 {
+		t.Fatalf("expected an empty store for a null file, got %d entries", len(s.entries))
+	}
+	// The sweeper's first put must not panic on a nil map.
+	s.put("1", dateEntry{Date: "2020-01-01", Checked: time.Now()})
+	if err := s.flush(); err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := loadDateStore(path).get("1"); !ok || e.Date != "2020-01-01" {
+		t.Fatalf("expected the entry written over the null file, got %+v %v", e, ok)
+	}
+}
+
 func TestReleaseDate_Precedence(t *testing.T) {
 	stash := VideoData{SceneParts: &gql.SceneParts{Id: "1", Date: util.Ptr("2019-01-01")}, releaseDate: "2020-01-01"}
 	if got := stash.ReleaseDate(); got != "2019-01-01" {

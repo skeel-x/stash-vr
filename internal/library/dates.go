@@ -94,6 +94,11 @@ func loadDateStore(path string) *dateStore {
 		log.Warn().Err(err).Str("path", path).Msg("Release dates: store not parsable, starting empty")
 		d.entries = map[string]dateEntry{}
 	}
+	// A file holding "null" parses fine and leaves a nil map, which the
+	// sweeper's first put would panic on.
+	if d.entries == nil {
+		d.entries = map[string]dateEntry{}
+	}
 	return d
 }
 
