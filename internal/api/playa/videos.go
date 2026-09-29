@@ -243,6 +243,12 @@ func pageBounds(itemTotal int, pageIndex int, pageSize int) (start, end, pageTot
 	if itemTotal > 0 {
 		pageTotal = (itemTotal + pageSize - 1) / pageSize
 	}
+	// A page past the last one is empty. Checked by division so a page
+	// index near MaxInt cannot overflow the multiplication into a negative
+	// start and a slice panic.
+	if pageIndex > itemTotal/pageSize {
+		return itemTotal, itemTotal, pageTotal
+	}
 	start = min(pageIndex*pageSize, itemTotal)
 	end = min(start+pageSize, itemTotal)
 	return start, end, pageTotal

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -348,6 +349,12 @@ func TestPageBounds(t *testing.T) {
 		{5, 3, 2, 5, 5, 3},
 		{4, 0, 4, 0, 4, 1},
 		{4, 1, 4, 4, 4, 1},
+		// A page index near MaxInt must give an empty page, not overflow
+		// the multiplication into a negative slice start.
+		{5, math.MaxInt, 2, 5, 5, 3},
+		{5, math.MaxInt / 2, 2, 5, 5, 3},
+		{5, math.MaxInt, 1, 5, 5, 5},
+		{0, math.MaxInt, 1000, 0, 0, 1},
 	} {
 		start, end, pageTotal := pageBounds(c.total, c.index, c.size)
 		if start != c.start || end != c.end || pageTotal != c.pageTotal {
@@ -356,6 +363,13 @@ func TestPageBounds(t *testing.T) {
 	}
 	page := paginate([]int{1, 2, 3}, 1, 2)
 	if len(page.Content) != 1 || page.Content[0] != 3 || page.ItemTotal != 3 || page.PageTotal != 2 {
+		t.Fatalf("unexpected page %+v", page)
+	}
+}
+
+func TestPaginate_MaxIntPageIndexIsEmpty(t *testing.T) {
+	page := paginate([]int{1, 2, 3}, math.MaxInt, 2)
+	if len(page.Content) != 0 || page.ItemTotal != 3 || page.PageTotal != 2 || page.PageIndex != math.MaxInt || page.PageSize != 2 {
 		t.Fatalf("unexpected page %+v", page)
 	}
 }
