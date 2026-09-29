@@ -1,9 +1,11 @@
 package playa
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +15,7 @@ import (
 	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
+	"stash-vr/internal/stash/gql"
 )
 
 // pageScene is one scene pageStash knows.
@@ -237,6 +240,85 @@ func TestBuildVideoPage_PosterURLsCarryTheCoverFingerprint(t *testing.T) {
 	want := "https://vr.example/api/playa/v2/poster/1" + coverbadge.CurrentURLQuery()
 	if got := page.Content[0].PreviewImage; got == nil || *got != want || !strings.Contains(want, "?b=") {
 		t.Fatalf("expected %q, got %v", want, got)
+	}
+}
+
+func TestBuildVideoPage_RandomPagesAgree(t *testing.T) {
+	h, _ := pageEnv(t)
+	random := videoQuery{PageSize: 2, Order: "title", Direction: "asc", Randomize: true}
+
+	var seen []string
+	for pageIndex := 0; pageIndex < 3; pageIndex++ {
+		q := random
+		q.PageIndex = pageIndex
+		page, err := h.buildVideoPage(context.Background(), q, "https://vr.example")
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen = append(seen, pageIDs(page)...)
+	}
+	sorted := append([]string(nil), seen...)
+	slices.Sort(sorted)
+	if strings.Join(sorted, ",") != "1,2,3,4,5" {
+		t.Fatalf("random pages must list every scene once, got %v", seen)
+	}
+
+	again, err := h.buildVideoPage(context.Background(), random, "https://vr.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := pageIDs(again); strings.Join(got, ",") != strings.Join(seen[:2], ",") {
+		t.Fatalf("the same page asked again must not change while the index stands, got %v, want %v", got, seen[:2])
+	}
+	if h.libraryService.IndexBuiltAt().IsZero() {
+		t.Fatal("expected the index build time to seed the order")
+	}
+}
+
+func TestShuffleVideoData(t *testing.T) {
+	scenes := func(ids ...string) []*library.VideoData {
+		out := make([]*library.VideoData, len(ids))
+		for i, id := range ids {
+			out[i] = &library.VideoData{SceneParts: &gql.SceneParts{Id: id}}
+		}
+		return out
+	}
+	order := func(items []*library.VideoData) string {
+		ids := make([]string, len(items))
+		for i, vd := range items {
+			ids[i] = vd.Id()
+		}
+		return strings.Join(ids, ",")
+	}
+	ids := []string{"12", "3", "7", "1", "20", "5", "9", "15", "2", "11", "4", "8"}
+	reversed := slices.Clone(ids)
+	slices.Reverse(reversed)
+
+	a, b := scenes(ids...), scenes(reversed...)
+	shuffleVideoData(a, 42)
+	shuffleVideoData(b, 42)
+	if order(a) != order(b) {
+		t.Fatalf("the same seed must give the same order whatever the input order: %s vs %s", order(a), order(b))
+	}
+	c := scenes(ids...)
+	shuffleVideoData(c, 43)
+	if order(c) == order(a) {
+		t.Fatal("another seed must give another order")
+	}
+	sorted := slices.Clone(ids)
+	slices.SortFunc(sorted, func(x, y string) int {
+		l, _ := numericID(x)
+		r, _ := numericID(y)
+		return cmp.Compare(l, r)
+	})
+	if order(a) == strings.Join(sorted, ",") {
+		t.Fatal("expected a shuffle, got id order")
+	}
+
+	one := scenes("1")
+	shuffleVideoData(one, 1)
+	if order(one) != "1" {
+		t.Fatal("a single item stays")
 	}
 }
 

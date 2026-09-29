@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
 	"stash-vr/internal/config"
@@ -336,6 +337,34 @@ func TestGetSections_ServesCachedSetsWithinTTL(t *testing.T) {
 	}
 	if got := stash.sceneIdQueries(); got != 2*first {
 		t.Fatalf("after ResetSections the sets must be rebuilt, got %d queries", got)
+	}
+}
+
+func TestIndexBuiltAt_FollowsTheBuild(t *testing.T) {
+	loadConfig(t, nil)
+	svc := NewService(&routingStash{})
+	if !svc.IndexBuiltAt().IsZero() {
+		t.Fatal("no build yet must give the zero time")
+	}
+
+	before := time.Now()
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	built := svc.IndexBuiltAt()
+	if built.Before(before) || built.After(time.Now()) {
+		t.Fatalf("expected the build time, got %v", built)
+	}
+	if _, err := svc.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !svc.IndexBuiltAt().Equal(built) {
+		t.Fatal("a cached index keeps its build time")
+	}
+
+	svc.ResetSections()
+	if !svc.IndexBuiltAt().IsZero() {
+		t.Fatal("a reset drops the build time with the index")
 	}
 }
 

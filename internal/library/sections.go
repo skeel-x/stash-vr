@@ -241,6 +241,19 @@ func (libraryService *Service) freshIndex() (indexResult, bool) {
 	return indexResult{sets: libraryService.sets, sections: libraryService.sections, auto: libraryService.auto}, true
 }
 
+// IndexBuiltAt is when the cached index was last built, zero before the
+// first build or after a reset. Playa seeds its random order from it, so
+// the pages of one random listing agree with each other until the index
+// is rebuilt.
+func (libraryService *Service) IndexBuiltAt() time.Time {
+	libraryService.muSets.Lock()
+	defer libraryService.muSets.Unlock()
+	if libraryService.sets == nil {
+		return time.Time{}
+	}
+	return libraryService.setsAt
+}
+
 func (libraryService *Service) GetSections(ctx context.Context) ([]Section, error) {
 	_, sections, err := libraryService.buildIndex(ctx)
 	if err != nil {

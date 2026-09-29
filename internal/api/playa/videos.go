@@ -110,7 +110,7 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseU
 	}
 
 	if query.Randomize {
-		shuffleVideoData(filtered)
+		shuffleVideoData(filtered, h.libraryService.IndexBuiltAt().UnixNano())
 	} else {
 		sortVideoData(filtered, query.Order, query.Direction)
 	}
@@ -124,11 +124,21 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseU
 	return Page[VideoListView]{PageIndex: query.PageIndex, PageSize: query.PageSize, PageTotal: pageTotal, ItemTotal: len(filtered), Content: items}, nil
 }
 
-func shuffleVideoData(items []*library.VideoData) {
+// shuffleVideoData puts items in a random order that depends on seed and
+// the set of items only: the scene cache is a map, so items is first put
+// in id order. Playa asks for a random listing one page at a time, and the
+// same seed across those requests keeps a scene from being skipped or
+// listed twice.
+func shuffleVideoData(items []*library.VideoData, seed int64) {
 	if len(items) < 2 {
 		return
 	}
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	slices.SortFunc(items, func(left, right *library.VideoData) int {
+		l, lok := numericID(left.Id())
+		r, rok := numericID(right.Id())
+		return compareEntityIDs(left.Id(), l, lok, right.Id(), r, rok)
+	})
+	rng := rand.New(rand.NewSource(seed))
 	rng.Shuffle(len(items), func(i int, j int) {
 		items[i], items[j] = items[j], items[i]
 	})
