@@ -1,6 +1,7 @@
 package deovr
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ func TestBuildIndex_ThumbnailsUseCoverEndpoint(t *testing.T) {
 	}
 
 	got := index.Scenes[0].List[0].ThumbnailUrl
-	if got == nil || *got != "https://vr.example/cover/9" {
+	if got == nil || !strings.HasPrefix(*got, "https://vr.example/cover/9?b=") {
 		t.Fatalf("expected cover endpoint thumbnail, got %v", got)
 	}
 }

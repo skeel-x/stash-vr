@@ -238,7 +238,8 @@ func TestPreviewImage_PosterUrlCarriesBadgeFingerprint(t *testing.T) {
 
 	got := previewImage(vd, "https://vr.example", coverbadge.CurrentURLQuery())
 
-	want := "https://vr.example/api/playa/v2/poster/1" + coverbadge.URLQuery(config.Application().CoverBadges, config.Application().VideoRules)
+	cfg := config.Application()
+	want := "https://vr.example/api/playa/v2/poster/1" + coverbadge.URLQuery(cfg.CoverBadges, cfg.VideoRules, cfg.HeatmapHeightPx)
 	if got == nil || *got != want || want == "https://vr.example/api/playa/v2/poster/1" {
 		t.Fatalf("expected %q, got %v", want, got)
 	}

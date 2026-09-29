@@ -248,10 +248,11 @@ cover width are left out.
 
 Badges are 7% of the cover height (at least 18 px), inset by 2% of the
 cover width, and sit just above the heatmap strip of interactive scenes. Covers with badges are re-encoded as
-JPEG and the last 500 are kept in memory; covers without any are served as
-Stash sends them. Headsets keep covers for a day, so while any badge is on
-the cover URLs carry a short fingerprint of the badge settings and layout
-(`?b=...`), and changing them shows on the next library load.
+JPEG and the last 500 (at most 64 MiB) are kept in memory; covers without
+any are served as Stash sends them. Headsets keep covers for a day, so the
+cover URLs carry a short fingerprint of the badge settings, the badge
+layout and the heatmap height (`?b=...`), and changing them shows on the
+next library load.
 
 Under the checkboxes the Setup page previews a real cover with the badges
 as ticked, before saving, redrawn on every change. It picks a scene with a

@@ -541,8 +541,9 @@ func TestCover_BadgedSceneWithMissingScreenshotIs404(t *testing.T) {
 
 func TestGetCoverUrl_CarriesBadgeFingerprint(t *testing.T) {
 	setBadges(t, config.CoverBadges{})
-	if got := GetCoverUrl("https://vr.example", "9"); got != "https://vr.example/cover/9" {
-		t.Fatalf("badges off must keep the plain url, got %q", got)
+	plain := GetCoverUrl("https://vr.example", "9")
+	if !strings.HasPrefix(plain, "https://vr.example/cover/9?b=") {
+		t.Fatalf("badges off must still carry the fingerprint, got %q", plain)
 	}
 
 	cfg := config.Application()
@@ -551,8 +552,8 @@ func TestGetCoverUrl_CarriesBadgeFingerprint(t *testing.T) {
 		t.Fatal(err)
 	}
 	quality := GetCoverUrl("https://vr.example", "9")
-	if !strings.HasPrefix(quality, "https://vr.example/cover/9?b=") {
-		t.Fatalf("expected a badge fingerprint, got %q", quality)
+	if !strings.HasPrefix(quality, "https://vr.example/cover/9?b=") || quality == plain {
+		t.Fatalf("expected a badge fingerprint of its own, got %q", quality)
 	}
 
 	cfg.CoverBadges.Format = true
@@ -561,6 +562,29 @@ func TestGetCoverUrl_CarriesBadgeFingerprint(t *testing.T) {
 	}
 	if got := GetCoverUrl("https://vr.example", "9"); got == quality {
 		t.Fatal("toggling a badge must change the cover url")
+	}
+}
+
+func TestGetCoverUrl_CarriesTheHeatmapHeight(t *testing.T) {
+	setBadges(t, config.CoverBadges{})
+	plain := GetCoverUrl("https://vr.example", "9")
+
+	cfg := config.Application()
+	cfg.HeatmapHeightPx = 24
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	tall := GetCoverUrl("https://vr.example", "9")
+	if tall == plain || !strings.HasPrefix(tall, "https://vr.example/cover/9?b=") {
+		t.Fatalf("a heatmap height change must change the cover url with badges off, got %q", tall)
+	}
+
+	cfg.HeatmapHeightPx = 0
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := GetCoverUrl("https://vr.example", "9"); got != plain {
+		t.Fatalf("the same settings must give the same url again, got %q", got)
 	}
 }
 

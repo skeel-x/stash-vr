@@ -845,7 +845,7 @@ func TestGetRandom_ReturnsScenesFromIndex(t *testing.T) {
 	for _, s := range scenes {
 		m, _ := s.(map[string]any)
 		cover, _ := m["cover"].(string)
-		if !strings.HasSuffix(cover, "/cover/1") && !strings.HasSuffix(cover, "/cover/2") {
+		if !strings.Contains(cover, "/cover/1?b=") && !strings.Contains(cover, "/cover/2?b=") {
 			t.Errorf("unexpected cover %q", cover)
 		}
 		if !strings.HasPrefix(cover, "http://example.com/") {

@@ -103,7 +103,7 @@ func TestBuildVideoData_ThumbnailAlwaysUsesCoverEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dto.ThumbnailImage == nil || *dto.ThumbnailImage != "https://vr.example/cover/9" {
+	if dto.ThumbnailImage == nil || !strings.HasPrefix(*dto.ThumbnailImage, "https://vr.example/cover/9?b=") {
 		t.Fatalf("expected cover endpoint thumbnail, got %v", dto.ThumbnailImage)
 	}
 }

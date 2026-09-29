@@ -20,20 +20,20 @@ const LayoutVersion = 2
 // holding the pointer keeps that slice from being reused.
 var fingerprintMemo struct {
 	sync.Mutex
-	on    config.CoverBadges
-	rules *config.VideoRule
-	n     int
-	value string
+	on     config.CoverBadges
+	rules  *config.VideoRule
+	n      int
+	height int
+	value  string
 }
 
-// Fingerprint is a short hash of the badge layout, the badge settings and, when the format
-// or passthrough badge is on, the video rules those badges resolve
-// through; "" when every badge is off. Cover URLs carry it so headsets,
-// which keep covers for a day, fetch them again when it changes.
-func Fingerprint(on config.CoverBadges, rules []config.VideoRule) string {
-	if !on.Any() {
-		return ""
-	}
+// Fingerprint is a short hash of everything that changes how a cover is
+// drawn: the badge layout, the badge settings, the heatmap height and,
+// when the format or passthrough badge is on, the video rules those
+// badges resolve through. Cover URLs carry it so headsets, which keep
+// covers for a day, fetch them again when it changes. It is never empty:
+// the heatmap height matters with every badge off too.
+func Fingerprint(on config.CoverBadges, rules []config.VideoRule, heatmapHeight int) string {
 	var first *config.VideoRule
 	if len(rules) > 0 {
 		first = &rules[0]
@@ -41,19 +41,19 @@ func Fingerprint(on config.CoverBadges, rules []config.VideoRule) string {
 	m := &fingerprintMemo
 	m.Lock()
 	defer m.Unlock()
-	if m.value != "" && m.on == on && m.rules == first && m.n == len(rules) {
+	if m.value != "" && m.on == on && m.rules == first && m.n == len(rules) && m.height == heatmapHeight {
 		return m.value
 	}
-	m.on, m.rules, m.n = on, first, len(rules)
-	m.value = fingerprint(on, rules, LayoutVersion)
+	m.on, m.rules, m.n, m.height = on, first, len(rules), heatmapHeight
+	m.value = fingerprint(on, rules, heatmapHeight, LayoutVersion)
 	return m.value
 }
 
-// fingerprint hashes the badge layout version, the switches and, when the
-// format or passthrough badge is on, the rules.
-func fingerprint(on config.CoverBadges, rules []config.VideoRule, layout int) string {
+// fingerprint hashes the badge layout version, the switches, the heatmap
+// height and, when the format or passthrough badge is on, the rules.
+func fingerprint(on config.CoverBadges, rules []config.VideoRule, heatmapHeight int, layout int) string {
 	h := fnv.New32a()
-	_, _ = fmt.Fprintf(h, "l%d q%t f%t p%t d%t r%t", layout, on.Quality, on.Format, on.Passthrough, on.Duration, on.FrameRate)
+	_, _ = fmt.Fprintf(h, "l%d q%t f%t p%t d%t r%t h%d", layout, on.Quality, on.Format, on.Passthrough, on.Duration, on.FrameRate, heatmapHeight)
 	if on.Format || on.Passthrough {
 		b, _ := json.Marshal(rules)
 		_, _ = h.Write(b)
@@ -61,17 +61,13 @@ func fingerprint(on config.CoverBadges, rules []config.VideoRule, layout int) st
 	return fmt.Sprintf("%08x", h.Sum32())
 }
 
-// URLQuery is "?b=<fingerprint>" for cover URLs, or "" with every badge
-// off so the URLs stay as they were.
-func URLQuery(on config.CoverBadges, rules []config.VideoRule) string {
-	if f := Fingerprint(on, rules); f != "" {
-		return "?b=" + f
-	}
-	return ""
+// URLQuery is "?b=<fingerprint>" for cover URLs.
+func URLQuery(on config.CoverBadges, rules []config.VideoRule, heatmapHeight int) string {
+	return "?b=" + Fingerprint(on, rules, heatmapHeight)
 }
 
 // CurrentURLQuery is URLQuery for the current settings.
 func CurrentURLQuery() string {
 	cfg := config.Application()
-	return URLQuery(cfg.CoverBadges, cfg.VideoRules)
+	return URLQuery(cfg.CoverBadges, cfg.VideoRules, cfg.HeatmapHeightPx)
 }

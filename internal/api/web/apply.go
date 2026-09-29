@@ -11,8 +11,8 @@ import (
 
 // ApplyChanges performs the side effects of a settings change: a new Stash
 // client when the connection changed, a rebuilt index when an auto section
-// threshold changed, fresh cover renders when the cover badges changed, a
-// new effective log level when the level changed.
+// threshold changed, fresh cover renders when the cover badges or the
+// heatmap height changed, a new effective log level when the level changed.
 func ApplyChanges(prev, next config.ApplicationConfig, lib *library.Service) {
 	if prev.StashGraphQLUrl != next.StashGraphQLUrl || prev.StashApiKey != next.StashApiKey || prev.StashTLSInsecure != next.StashTLSInsecure {
 		lib.SetStashClient(stash.NewClient(next.StashGraphQLUrl, next.StashApiKey, next.StashTLSInsecure))
@@ -25,6 +25,10 @@ func ApplyChanges(prev, next config.ApplicationConfig, lib *library.Service) {
 	if prev.CoverBadges != next.CoverBadges {
 		coverbadge.ResetCache()
 		log.Info().Msg("Cover badges changed, rendered covers cleared")
+	}
+	if prev.HeatmapHeightPx != next.HeatmapHeightPx {
+		coverbadge.ResetCache()
+		log.Info().Int("height_px", next.HeatmapHeightPx).Msg("Heatmap height changed, rendered covers cleared")
 	}
 	if prev.LogLevel != next.LogLevel {
 		// Reassigning the global logger would race with requests that are

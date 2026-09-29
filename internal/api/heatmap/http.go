@@ -98,9 +98,9 @@ func writeCover(ctx context.Context, w http.ResponseWriter, contentType string, 
 	}
 }
 
-// GetCoverUrl is the cover URL handed to players. With cover badges on it
-// carries the badge settings fingerprint, so a settings change reaches
-// headsets that keep covers for a day.
+// GetCoverUrl is the cover URL handed to players. It carries the
+// fingerprint of the badge settings and the heatmap height, so a settings
+// change reaches headsets that keep covers for a day.
 func GetCoverUrl(baseUrl string, sceneId string) string {
 	return baseUrl + "/cover/" + sceneId + coverbadge.CurrentURLQuery()
 }
