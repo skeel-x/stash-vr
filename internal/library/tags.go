@@ -48,20 +48,30 @@ func (libraryService *Service) LoadTags(ctx context.Context) error {
 	return nil
 }
 
+// GetBrowseTags lists the tags Playa offers as categories, by sort name,
+// leaving out the excluded one and the ancestor markers. It reads the tag
+// cache the index build fills and queries Stash only while there is none
+// (before the first build, or after a reset).
 func (libraryService *Service) GetBrowseTags(ctx context.Context) ([]Tag, error) {
-	if err := libraryService.LoadTags(ctx); err != nil {
-		return nil, fmt.Errorf("LoadTags: %w", err)
+	libraryService.muTagCache.RLock()
+	loaded := libraryService.tagCache != nil
+	libraryService.muTagCache.RUnlock()
+	if !loaded {
+		if err := libraryService.LoadTags(ctx); err != nil {
+			return nil, fmt.Errorf("LoadTags: %w", err)
+		}
 	}
 
 	libraryService.muTagCache.RLock()
 	defer libraryService.muTagCache.RUnlock()
 
+	exclude := config.Application().ExcludeSortName
 	tags := make([]Tag, 0, len(libraryService.tagCache))
 	for _, tag := range libraryService.tagCache {
 		if tag == nil {
 			continue
 		}
-		if tag.SortName == config.Application().ExcludeSortName || strings.HasPrefix(tag.SortName, prefix.SvrAncestor) {
+		if tag.SortName == exclude || strings.HasPrefix(tag.SortName, prefix.SvrAncestor) {
 			continue
 		}
 		tags = append(tags, *tag)
