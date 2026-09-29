@@ -215,8 +215,8 @@ func TestBuildVideoData_ProfileLinkPrecedence(t *testing.T) {
 	}{
 		{"own profile wins", "9", fakeProfiles{"9": true, "11649": true}, "https://vr.example/hsp/scene/9"},
 		{"own beats studio", "9", learnedProfiles{fakeProfiles{"9": true, "11649": true, "20": true}, "20"}, "https://vr.example/hsp/scene/9"},
-		{"studio beats rule", "9", learnedProfiles{fakeProfiles{"11649": true, "20": true}, "20"}, "https://vr.example/hsp/scene/20"},
-		{"rule profile", "9", fakeProfiles{"11649": true}, "https://vr.example/hsp/scene/11649"},
+		{"studio beats rule", "9", learnedProfiles{fakeProfiles{"11649": true, "20": true}, "20"}, "https://vr.example/hsp/scene/9"},
+		{"rule profile", "9", fakeProfiles{"11649": true}, "https://vr.example/hsp/scene/9"},
 		{"none stored", "9", fakeProfiles{}, ""},
 	}
 	for _, c := range cases {
@@ -272,7 +272,7 @@ func TestBuildVideoData_VerticalCorrectionLinksGeneratedProfile(t *testing.T) {
 		if got := hsp(scene(0.1, "DOME"), fakeProfiles{}); got != "" {
 			t.Errorf("on=%v: small offset got a profile %q", on, got)
 		}
-		if got := hsp(scene(0.8, "DOME"), learnedProfiles{fakeProfiles{"20": true}, "20"}); got != "https://vr.example/hsp/scene/20" {
+		if got := hsp(scene(0.8, "DOME"), learnedProfiles{fakeProfiles{"20": true}, "20"}); got != "https://vr.example/hsp/scene/9" {
 			t.Errorf("on=%v: studio profile should win, got %q", on, got)
 		}
 	}

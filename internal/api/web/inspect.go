@@ -129,7 +129,9 @@ func (h *apiHandler) inspectScene(ctx context.Context, vd *library.VideoData, ru
 	out.Profile = profileSource{Source: source, Scene: scene}
 	out.Vertical = viewVertical(&vertical, source)
 	if scene != "" {
-		out.Profile.Link = baseUrl + "/hsp/scene/" + scene
+		// What the headset fetches: a borrowed profile is served rebased
+		// on this scene under its own id.
+		out.Profile.Link = baseUrl + "/hsp/scene/" + id
 	}
 	return out
 }

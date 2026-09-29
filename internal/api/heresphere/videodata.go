@@ -229,16 +229,17 @@ func setFormat(vd *library.VideoData, dto *videoDataDto, f library.Format) {
 	}
 }
 
-// profileLink picks the HereSphere profile for the scene (see
-// library.ProfileSourceFor); a generated profile is served under the
-// scene's own id.
+// profileLink links the HereSphere profile for the scene when it has one
+// (see library.ProfileSourceFor). Every profile is served under the
+// scene's own id: the hsp handler resolves the source again and serves a
+// profile learned from another scene rebased on this one.
 func profileLink(ctx context.Context, baseUrl string, vd *library.VideoData, f library.Format, profiles profileLookup) string {
 	if profiles == nil {
 		return ""
 	}
 	learned := func() string { return profiles.StudioProfile(ctx, vd, &f) }
 	if _, scene := library.ProfileSourceFor(vd.Id(), f, profiles.HasProfile, learned); scene != "" {
-		return baseUrl + "/hsp/scene/" + scene
+		return baseUrl + "/hsp/scene/" + vd.Id()
 	}
 	return ""
 }

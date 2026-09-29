@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"time"
 	"unicode/utf16"
 )
@@ -785,4 +786,18 @@ func (w *writer) profile(p *Profile) {
 		w.color(k.Light)
 		w.color(k.AlphaCoords)
 	}
+}
+
+// ForScene returns a copy of p, a profile learned from another scene, that
+// describes the scene own was built for: p's geometry, image, audio and
+// environment sections with own's ID, title, duration, resume position,
+// tags, A-B range and rating. The keyframe slices are shared with p.
+func (p *Profile) ForScene(own *Profile) *Profile {
+	out := *p
+	out.ID, out.Title = own.ID, own.Title
+	out.Duration, out.Resume = own.Duration, own.Resume
+	out.ABStart, out.ABEnd = own.ABStart, own.ABEnd
+	out.AverageRating = own.AverageRating
+	out.Tags = slices.Clone(own.Tags)
+	return &out
 }

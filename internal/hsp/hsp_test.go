@@ -312,3 +312,52 @@ func TestColorHex(t *testing.T) {
 		t.Fatalf("clamping: %s", (Color{R: 2, G: -1, B: 0.5}).Hex())
 	}
 }
+
+func TestProfile_ForScene(t *testing.T) {
+	learned := Default()
+	learned.ID, learned.Title = "a", "Scene A"
+	learned.Duration, learned.Resume = TimespanTicks(100), TimespanTicks(40)
+	learned.ABStart, learned.ABEnd = 1, 2
+	learned.AverageRating, learned.IsFavorite, learned.PlayCount = 2, true, 3
+	learned.Tags = []Tag{{Name: "a-tag"}}
+	learned.Alignment[0].Position.Y = 9
+	learned.Image[0].Exposure = 0.5
+
+	own := Default()
+	own.ID, own.Title = "b", "Scene B"
+	own.Duration, own.Resume = TimespanTicks(200), TimespanTicks(0)
+	own.AverageRating = 4.5
+	own.Tags = []Tag{{Name: "b-tag"}, {Name: "b-tag-2"}}
+	own.Alignment[0].Position.Y = 1
+
+	got := learned.ForScene(own)
+	if got.ID != "b" || got.Title != "Scene B" || got.Duration != TimespanTicks(200) || got.Resume != 0 {
+		t.Fatalf("scene fields not taken from own: %+v", got)
+	}
+	if got.ABStart != 0 || got.ABEnd != 0 || got.AverageRating != 4.5 {
+		t.Fatalf("ab/rating not taken from own: %d %d %v", got.ABStart, got.ABEnd, got.AverageRating)
+	}
+	if len(got.Tags) != 2 || got.Tags[0].Name != "b-tag" {
+		t.Fatalf("tags not taken from own: %+v", got.Tags)
+	}
+	if got.Alignment[0].Position.Y != 9 || got.Image[0].Exposure != 0.5 {
+		t.Fatalf("geometry not kept: %+v %+v", got.Alignment[0], got.Image[0])
+	}
+	// The tags are a copy, and the learned profile is untouched.
+	own.Tags[0].Name = "changed"
+	if got.Tags[0].Name != "b-tag" || learned.ID != "a" || len(learned.Tags) != 1 {
+		t.Fatal("ForScene must not alias its inputs")
+	}
+	// The result round-trips through the file format.
+	data, err := Encode(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := Decode(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.Title != "Scene B" || back.Alignment[0].Position.Y != 9 {
+		t.Fatalf("round trip lost fields: %+v", back)
+	}
+}

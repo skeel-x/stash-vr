@@ -160,7 +160,7 @@ func TestInspect_OwnAndRuleProfile(t *testing.T) {
 	}
 	_, out = do(t, h, http.MethodGet, "/inspect?q=5", nil)
 	s := scenesOf(t, out)[0]
-	if p := s["profile"].(map[string]any); p["source"] != "rule" || p["scene"] != "11649" || p["link"] != "http://example.com/hsp/scene/11649" {
+	if p := s["profile"].(map[string]any); p["source"] != "rule" || p["scene"] != "11649" || p["link"] != "http://example.com/hsp/scene/5" {
 		t.Fatalf("rule: %v", p)
 	}
 	f := s["format"].(map[string]any)
@@ -227,7 +227,7 @@ func TestInspect_StudioProfile(t *testing.T) {
 	}
 
 	_, out := do(t, h, http.MethodGet, "/inspect?q=31", nil)
-	if p := scenesOf(t, out)[0]["profile"].(map[string]any); p["source"] != "studio" || p["scene"] != "30" || p["link"] != "http://example.com/hsp/scene/30" {
+	if p := scenesOf(t, out)[0]["profile"].(map[string]any); p["source"] != "studio" || p["scene"] != "30" || p["link"] != "http://example.com/hsp/scene/31" {
 		t.Fatalf("studio: %v", p)
 	}
 	_, out = do(t, h, http.MethodGet, "/inspect?q=32", nil)
