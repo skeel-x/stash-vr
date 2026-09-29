@@ -356,13 +356,13 @@ func Load(seed ApplicationConfig) error {
 		return fmt.Errorf("resolve config dir: %w", err)
 	}
 	seed.ConfigPath = dir
-	seed.StashGraphQLUrl = NormalizeStashURL(seed.StashGraphQLUrl)
 	if seed.Filters == nil {
 		seed.Filters = []Filter{}
 	}
 	if seed.VideoRules == nil {
 		seed.VideoRules = DefaultVideoRules()
 	}
+	normalize(&seed)
 	if seed.BasePath, err = NormalizeBasePath(seed.BasePath); err != nil {
 		return err
 	}
@@ -390,7 +390,7 @@ func Load(seed ApplicationConfig) error {
 		return fmt.Errorf("parse config %s: %w", path, err)
 	}
 	merged := applyFile(seed, fc)
-	merged.StashGraphQLUrl = NormalizeStashURL(merged.StashGraphQLUrl)
+	normalize(&merged)
 	if kept, dropped := dropLegacyLabelRules(merged.VideoRules); len(dropped) > 0 {
 		merged.VideoRules = kept
 		migrated = dropped
@@ -555,8 +555,7 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	if next.VideoRules == nil {
 		next.VideoRules = []VideoRule{}
 	}
-	normalizeVideoRules(next.VideoRules)
-	next.StashGraphQLUrl = NormalizeStashURL(next.StashGraphQLUrl)
+	normalize(&next)
 	var err error
 	if next.BasePath, err = NormalizeBasePath(next.BasePath); err != nil {
 		return ApplicationConfig{}, err
@@ -569,6 +568,18 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	}
 	store(next)
 	return cloneConfig(next), nil
+}
+
+// normalize trims the free-text settings and the rule tags and completes
+// the Stash address. Load and Set apply it before validating, so a value
+// pasted with a stray space or newline is stored clean.
+func normalize(c *ApplicationConfig) {
+	c.StashGraphQLUrl = NormalizeStashURL(c.StashGraphQLUrl)
+	c.StashApiKey = strings.TrimSpace(c.StashApiKey)
+	c.FavoriteTag = strings.TrimSpace(c.FavoriteTag)
+	c.ExcludeSortName = strings.TrimSpace(c.ExcludeSortName)
+	c.FunscriptIndexPath = strings.TrimSpace(c.FunscriptIndexPath)
+	normalizeVideoRules(c.VideoRules)
 }
 
 // NormalizeStashURL returns u trimmed and, when it names only a host
@@ -608,6 +619,11 @@ func Validate(c ApplicationConfig) error {
 	u, err := url.Parse(c.StashGraphQLUrl)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("%w: stash_graphql_url must be an absolute http(s) URL, got %q", ErrInvalid, c.StashGraphQLUrl)
+	}
+	// A key is one token; whitespace inside it means a paste went wrong,
+	// and a header with a newline in it would be refused anyway.
+	if strings.ContainsAny(c.StashApiKey, " \t\r\n") {
+		return fmt.Errorf("%w: stash_api_key must not contain whitespace", ErrInvalid)
 	}
 	if _, ok := validLogLevels[c.LogLevel]; !ok {
 		return fmt.Errorf("%w: log_level must be one of trace, debug, info, warn, error, got %q", ErrInvalid, c.LogLevel)

@@ -86,7 +86,7 @@
   if (form) {
     const read = () => ({
       stash_graphql_url: form.stash_graphql_url.value.trim(),
-      stash_api_key: form.stash_api_key.value,
+      stash_api_key: form.stash_api_key.value.trim(),
       stash_tls_insecure: form.stash_tls_insecure.checked,
       favorite_tag: form.favorite_tag.value.trim(),
       exclude_sort_name: form.exclude_sort_name.value.trim(),
@@ -116,7 +116,7 @@
     $('#test').addEventListener('click', async () => {
       setMsg($('#test-msg'), 'Testing');
       try {
-        const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: form.stash_api_key.value, stash_tls_insecure: form.stash_tls_insecure.checked });
+        const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: form.stash_api_key.value.trim(), stash_tls_insecure: form.stash_tls_insecure.checked });
         // The server appends /graphql to a bare host; show what it tested.
         if (r.stash_graphql_url) form.stash_graphql_url.value = r.stash_graphql_url;
         setMsg($('#test-msg'), r.ok ? 'Connected to Stash ' + r.stash_version : r.error, r.ok ? 'ok' : 'err');

@@ -972,3 +972,78 @@ func TestLoadAndSet_AppendGraphqlToBareHost(t *testing.T) {
 		t.Fatalf("Set: expected /graphql appended, got %q", saved.StashGraphQLUrl)
 	}
 }
+
+func TestSet_TrimsFreeTextFields(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Application()
+	cfg.StashGraphQLUrl = " http://stash:9999/graphql\n"
+	cfg.StashApiKey = "\tkey \n"
+	cfg.FavoriteTag = " LOVED "
+	cfg.ExcludeSortName = " hidden\t"
+	cfg.FunscriptIndexPath = " /opt/index.sqlite "
+	cfg.VideoRules = []VideoRule{{Tag: " DOME "}}
+
+	saved, err := Set(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if saved.StashGraphQLUrl != "http://stash:9999/graphql" || saved.StashApiKey != "key" || saved.FavoriteTag != "LOVED" ||
+		saved.ExcludeSortName != "hidden" || saved.FunscriptIndexPath != "/opt/index.sqlite" || saved.VideoRules[0].Tag != "DOME" {
+		t.Fatalf("expected every field trimmed, got %+v", saved)
+	}
+	if got := Application(); got.StashApiKey != "key" || got.FavoriteTag != "LOVED" {
+		t.Fatalf("expected the trimmed values stored, got %+v", got)
+	}
+}
+
+func TestLoad_TrimsSeedAndFileValues(t *testing.T) {
+	seed := seedFor(t)
+	seed.StashApiKey = " seedkey "
+	seed.FavoriteTag = "FAVORITE "
+	seed.VideoRules = []VideoRule{{Tag: " SEED "}}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application(); got.StashApiKey != "seedkey" || got.FavoriteTag != "FAVORITE" || got.VideoRules[0].Tag != "SEED" {
+		t.Fatalf("expected the seed trimmed, got %+v", got)
+	}
+
+	content := `{"stash_graphql_url":" http://other:9999/graphql ","stash_api_key":"filekey\n","favorite_tag":" FAV ","exclude_sort_name":" hidden ","funscript_index_path":" /opt/index.sqlite ","video_rules":[{"tag":" DOME ","projection":"equirectangular"}]}`
+	if err := os.WriteFile(FilePath(seed), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	got := Application()
+	if got.StashGraphQLUrl != "http://other:9999/graphql" || got.StashApiKey != "filekey" || got.FavoriteTag != "FAV" ||
+		got.ExcludeSortName != "hidden" || got.FunscriptIndexPath != "/opt/index.sqlite" || got.VideoRules[0].Tag != "DOME" {
+		t.Fatalf("expected the file values trimmed, got %+v", got)
+	}
+}
+
+func TestValidate_RejectsWhitespaceInsideApiKey(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"ab cd", "ab\tcd", "ab\ncd", "ab\r\ncd"} {
+		cfg := Application()
+		cfg.StashApiKey = key
+		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "whitespace") {
+			t.Errorf("key %q: expected ErrInvalid naming whitespace, got %v", key, err)
+		}
+	}
+	if Application().StashApiKey != "secret" {
+		t.Fatal("a rejected key must leave the store unchanged")
+	}
+	cfg := Application()
+	cfg.StashApiKey = ""
+	if _, err := Set(cfg); err != nil {
+		t.Fatalf("an empty key must be allowed: %v", err)
+	}
+}
