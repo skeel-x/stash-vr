@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -210,7 +211,70 @@ func Init() error {
 		CorrectVerticalStereo: viper.GetBool(envKeyCorrectVertical),
 	}
 
-	return Load(seed)
+	err := Load(seed)
+	loaded := Application()
+	envOverrides = ignoredOverrides(viper.IsSet, &seed, &loaded)
+	return err
+}
+
+// envOverrides is what EnvOverrides returns; set once by Init.
+var envOverrides []string
+
+// EnvOverrides lists the settings given as a flag or environment variable
+// at startup whose value differs from config.json, which wins: the
+// variable is being ignored, which is worth a warning once the logger is
+// up. Keys only; the values may be secrets and are never reported.
+func EnvOverrides() []string { return envOverrides }
+
+// settingValues maps each persisted setting's flag/env key to its value in
+// c, so a seed can be compared with what was loaded.
+func settingValues(c *ApplicationConfig) map[string]any {
+	return map[string]any{
+		envKeyStashGraphQLUrl:    c.StashGraphQLUrl,
+		envKeyStashApiKey:        c.StashApiKey,
+		envKeyStashTLSInsecure:   c.StashTLSInsecure,
+		envKeyFavoriteTag:        c.FavoriteTag,
+		envKeyLogLevel:           c.LogLevel,
+		envKeyForceHTTPS:         c.ForceHTTPS,
+		envKeyBasePath:           c.BasePath,
+		envKeyDeovrAutoload:      c.DeovrAutoload,
+		envKeyPerformerFacets:    c.PerformerFacets,
+		envKeyDateLookup:         c.DateLookup,
+		envKeyDateWriteback:      c.DateWriteback,
+		envKeyFunscriptIndexPath: c.FunscriptIndexPath,
+		envKeyHeatmapHeightPx:    c.HeatmapHeightPx,
+		envKeyExcludeSortName:    c.ExcludeSortName,
+		envKeyGenerateSummaryIds: c.GenerateSummaryIds,
+		envKeySmartSectionSize:   c.SmartSectionSize,
+		envKeyAutoStudioMin:      c.AutoStudioMin,
+		envKeyAutoPerformerMin:   c.AutoPerformerMin,
+		envKeyCoverBadgeQuality:  c.CoverBadges.Quality,
+		envKeyCoverBadgeFormat:   c.CoverBadges.Format,
+		envKeyCoverBadgePass:     c.CoverBadges.Passthrough,
+		envKeyCoverBadgeDuration: c.CoverBadges.Duration,
+		envKeyCoverBadgeRate:     c.CoverBadges.FrameRate,
+		envKeyLearnStudio:        c.LearnStudioProfiles,
+		envKeyCorrectVertical:    c.CorrectVerticalStereo,
+	}
+}
+
+// ignoredOverrides returns, sorted, the keys isSet reports as given whose
+// value in seed differs from loaded. The seed is compared as Load would
+// store it, so a value that only differs in form is not reported.
+func ignoredOverrides(isSet func(string) bool, seed, loaded *ApplicationConfig) []string {
+	normalized := *seed
+	if p, err := NormalizeBasePath(normalized.BasePath); err == nil {
+		normalized.BasePath = p
+	}
+	sv, lv := settingValues(&normalized), settingValues(loaded)
+	var out []string
+	for k := range sv {
+		if isSet(k) && sv[k] != lv[k] {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (a ApplicationConfig) Redacted() ApplicationConfig {

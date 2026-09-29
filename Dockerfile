@@ -39,7 +39,6 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build --chown=nonroot:nonroot /out/config /config
 
-ENV STASH_GRAPHQL_URL=http://localhost:9999/graphql
 ENV CONFIG_PATH=/config
 
 VOLUME /config

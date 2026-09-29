@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -865,5 +866,53 @@ func TestLoad_StashTLSInsecureSeedAndFile(t *testing.T) {
 	}
 	if Application().StashTLSInsecure {
 		t.Fatal("expected certificate verification on by default")
+	}
+}
+
+func TestIgnoredOverrides(t *testing.T) {
+	seed := ApplicationConfig{StashGraphQLUrl: "http://env:9999/graphql", StashApiKey: "envkey", LogLevel: "debug", BasePath: "stashvr/", SmartSectionSize: 50, CoverBadges: CoverBadges{Quality: true}}
+	loaded := ApplicationConfig{StashGraphQLUrl: "http://file:9999/graphql", StashApiKey: "envkey", LogLevel: "info", BasePath: "/stashvr", SmartSectionSize: 120, CoverBadges: CoverBadges{Quality: false}}
+	cases := []struct {
+		name string
+		set  []string
+		want []string
+	}{
+		{"nothing set", nil, nil},
+		{"set and different", []string{"STASH_GRAPHQL_URL", "LOG_LEVEL"}, []string{"LOG_LEVEL", "STASH_GRAPHQL_URL"}},
+		{"set but equal", []string{"STASH_API_KEY"}, nil},
+		{"different but not set", []string{"STASH_API_KEY"}, nil},
+		{"base path compared normalised", []string{"BASE_PATH"}, nil},
+		{"numbers and badges", []string{"SMART_SECTION_SIZE", "COVER_BADGE_QUALITY", "COVER_BADGE_FORMAT"}, []string{"COVER_BADGE_QUALITY", "SMART_SECTION_SIZE"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			isSet := func(k string) bool { return slices.Contains(c.set, k) }
+			got := ignoredOverrides(isSet, &seed, &loaded)
+			if !slices.Equal(got, c.want) {
+				t.Fatalf("ignoredOverrides = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestSettingValues_CoverEveryPersistedSetting(t *testing.T) {
+	// Every key Init binds for a persisted setting must be comparable, or an
+	// ignored override would go unreported.
+	want := []string{
+		envKeyStashGraphQLUrl, envKeyStashApiKey, envKeyStashTLSInsecure, envKeyFavoriteTag, envKeyLogLevel,
+		envKeyForceHTTPS, envKeyBasePath, envKeyDeovrAutoload, envKeyPerformerFacets, envKeyDateLookup,
+		envKeyDateWriteback, envKeyFunscriptIndexPath, envKeyHeatmapHeightPx, envKeyExcludeSortName,
+		envKeyGenerateSummaryIds, envKeySmartSectionSize, envKeyAutoStudioMin, envKeyAutoPerformerMin,
+		envKeyCoverBadgeQuality, envKeyCoverBadgeFormat, envKeyCoverBadgePass, envKeyCoverBadgeDuration,
+		envKeyCoverBadgeRate, envKeyLearnStudio, envKeyCorrectVertical,
+	}
+	values := settingValues(&ApplicationConfig{})
+	for _, k := range want {
+		if _, ok := values[k]; !ok {
+			t.Errorf("settingValues lacks %s", k)
+		}
+	}
+	if len(values) != len(want) {
+		t.Fatalf("settingValues has %d keys, want %d", len(values), len(want))
 	}
 }

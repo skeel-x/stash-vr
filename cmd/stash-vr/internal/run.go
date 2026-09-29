@@ -44,6 +44,10 @@ func Run(ctx context.Context) error {
 		log.Warn().Err(seedNotPersisted).Msg("settings will not persist; check CONFIG_PATH permissions")
 	}
 
+	for _, key := range config.EnvOverrides() {
+		log.Warn().Str("key", key).Msg("Set as a flag or in the environment but config.json holds a different value, which wins; change it on the Setup page or remove the variable")
+	}
+
 	if m := config.MigratedRules(); len(m) > 0 {
 		log.Info().Strs("tags", m).Msg("Dropped default video rules keyed on studio labels; measured tags from vrQualityTags replace them")
 	}
