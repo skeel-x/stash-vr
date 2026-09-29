@@ -1047,3 +1047,18 @@ func TestValidate_RejectsWhitespaceInsideApiKey(t *testing.T) {
 		t.Fatalf("an empty key must be allowed: %v", err)
 	}
 }
+
+func TestLoad_LowercasesFileLogLevel(t *testing.T) {
+	seed := seedFor(t)
+	if err := os.WriteFile(FilePath(seed), []byte(`{"log_level":"DEBUG"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if got := Application().LogLevel; got != "debug" {
+		t.Fatalf("expected the file's log level lower-cased, got %q", got)
+	}
+}

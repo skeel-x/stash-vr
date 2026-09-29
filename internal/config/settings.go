@@ -503,7 +503,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 		base.FunscriptIndexPath = *fc.FunscriptIndexPath
 	}
 	if fc.LogLevel != nil {
-		base.LogLevel = *fc.LogLevel
+		// The seed is lower-cased by Init; a hand-edited "INFO" must
+		// pass Validate the same way.
+		base.LogLevel = strings.ToLower(*fc.LogLevel)
 	}
 	if b := fc.CoverBadges; b != nil {
 		if b.Quality != nil {
