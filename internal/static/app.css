@@ -115,6 +115,7 @@ input:disabled{color:var(--muted)}
 .msg{font-size:16px;color:var(--muted)}
 .msg.ok{color:var(--ok)}
 .msg.err{color:var(--err)}
+.msg.warn{color:var(--warn)}
 
 /* log page */
 #log-level,#log-filter{width:auto;margin-top:0;min-height:44px}

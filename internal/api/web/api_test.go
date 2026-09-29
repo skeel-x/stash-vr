@@ -28,6 +28,9 @@ import (
 // fakeStash answers generated queries by operation name.
 type fakeStash struct {
 	versionErr error
+	// filtersErr fails the saved filter query, as an unreachable Stash does
+	// on the Sections page.
+	filtersErr error
 	mu         sync.Mutex
 	calls      map[string]int
 }
@@ -47,6 +50,9 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 		}
 		payload = `{"version":{"version":"v0.31.1"}}`
 	case "FindSavedSceneFilters":
+		if f.filtersErr != nil {
+			return f.filtersErr
+		}
 		payload = `{"findSavedFilters":[]}`
 	case "FindAllSceneIds":
 		payload = `{"findScenes":{"scenes":[{"id":"1"},{"id":"2"}]}}`

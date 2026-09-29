@@ -294,10 +294,21 @@
       });
       setMsg($('#rules-msg'), added ? 'Added ' + added + (added === 1 ? ' rule' : ' rules') + '. Save rules to keep them.' : 'Every default rule is already in the table.', 'ok');
     });
+    // showDefaultRules replaces the table with the default rules, as the
+    // server stores them when it is sent an empty list.
+    const showDefaultRules = () => {
+      rulesBody.replaceChildren(...Array.from($('#default-rules').content.querySelectorAll('[data-rule]')).map((card) => card.cloneNode(true)));
+    };
     $('#save-rules').addEventListener('click', async () => {
+      const list = ruleRows();
       setMsg($('#rules-msg'), 'Saving');
-      try { await api('PUT', '/video-rules', ruleRows()); setMsg($('#rules-msg'), 'Saved. Scenes use the new rules when opened next.', 'ok'); }
-      catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
+      try {
+        await api('PUT', '/video-rules', list);
+        if (!list.length) {
+          showDefaultRules();
+          setMsg($('#rules-msg'), 'Defaults restored: the table was empty, so the default rules were saved instead.', 'ok');
+        } else setMsg($('#rules-msg'), 'Saved. Scenes use the new rules when opened next.', 'ok');
+      } catch (e) { setMsg($('#rules-msg'), e.message, 'err'); }
     });
     $('#reset-rules').addEventListener('click', async () => {
       setMsg($('#rules-msg'), 'Resetting');
@@ -516,8 +527,12 @@
       };
     });
     $('#save-filters').addEventListener('click', async () => {
+      const list = rows();
+      // An empty list would replace the stored order and names with
+      // nothing; without rows there is nothing to save.
+      if (!list.length) { setMsg($('#filters-msg'), 'Nothing to save: reload this page once Stash is reachable.', 'warn'); return; }
       setMsg($('#filters-msg'), 'Saving');
-      try { await api('PUT', '/filters', rows()); setMsg($('#filters-msg'), 'Saved. Players pick it up on their next index load.', 'ok'); }
+      try { await api('PUT', '/filters', list); setMsg($('#filters-msg'), 'Saved. Players pick it up on their next index load.', 'ok'); }
       catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
     });
     $('#reset-filters').addEventListener('click', async () => {

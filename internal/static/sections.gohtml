@@ -3,6 +3,9 @@
   <h1>Sections</h1>
   <p class="lead">Each saved scene filter in Stash is a section in your player, and the smart sections are computed for you. Drag to reorder, rename, and tick where each section should show. The first section shown in HereSphere is the one it opens on. An empty name keeps the original name.</p>
   {{if .FilterError}}<p class="note warn">Could not load saved filters from Stash: {{.FilterError}}</p>{{end}}
+  {{/* With no rows there is nothing to save: a save would replace the
+       stored order and names with an empty list. */}}
+  {{$blocked := or .FilterError (not .FilterRows)}}
   <table class="sections">
     <thead><tr><th></th><th>HS</th><th>DeoVR</th><th>Playa</th><th>Stash filter</th><th>Name in player</th></tr></thead>
     <tbody id="rows">
@@ -19,9 +22,9 @@
     </tbody>
   </table>
   <div class="row">
-    <button type="button" id="save-filters" class="primary">Save order</button>
-    <button type="button" id="reset-filters">Reset to Stash order</button>
-    <span class="msg" id="filters-msg"></span>
+    <button type="button" id="save-filters" class="primary"{{if $blocked}} disabled{{end}}>Save order</button>
+    <button type="button" id="reset-filters"{{if $blocked}} disabled{{end}}>Reset to Stash order</button>
+    <span class="msg{{if $blocked}} warn{{end}}" id="filters-msg">{{if $blocked}}Nothing to save: the sections could not be loaded. Reload this page once Stash is reachable; the saved order and names are kept until then.{{end}}</span>
   </div>
 </section>
 {{end}}

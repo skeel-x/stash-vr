@@ -183,6 +183,37 @@ func TestSections_RendersPage(t *testing.T) {
 	}
 }
 
+func TestSections_BlocksSaveAndResetWhenRowsCannotLoad(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{filtersErr: errors.New("dial tcp: connection refused")})
+
+	body := getPage(t, PagesRouter(lib), "/sections", nil).Body.String()
+
+	// A save with no rows would replace the stored order with nothing, so
+	// both buttons are off until the page can be reloaded with rows.
+	for _, want := range []string{
+		`id="save-filters" class="primary" disabled>`,
+		`id="reset-filters" disabled>`,
+		"Could not load saved filters from Stash: ", "dial tcp: connection refused",
+		`<span class="msg warn" id="filters-msg">Nothing to save: the sections could not be loaded. Reload this page once Stash is reachable`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Contains(body, "<tr data-id=") {
+		t.Fatal("expected no rows when the filters cannot be loaded")
+	}
+
+	// With Stash reachable both buttons are live and the message is empty.
+	lib, _ = newEnv(t, &fakeStash{})
+	body = getPage(t, PagesRouter(lib), "/sections", nil).Body.String()
+	for _, want := range []string{`id="save-filters" class="primary">`, `id="reset-filters">`, `<span class="msg" id="filters-msg"></span>`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+}
+
 func TestSections_ShowsRecommendedAfterContinueWatching(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	h := PagesRouter(lib)
