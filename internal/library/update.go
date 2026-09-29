@@ -191,11 +191,31 @@ func (libraryService *Service) ClearAndCreateMarkers(ctx context.Context, id str
 	return nil
 }
 
+// Delete removes scene id and its files from Stash, then forgets it here:
+// the scene leaves the cache and the sections are rebuilt on the next
+// index request, so a player does not keep listing it with a stream that
+// no longer plays.
 func (libraryService *Service) Delete(ctx context.Context, id string) error {
 	if _, err := gql.SceneDestroy(ctx, libraryService.Client(), id); err != nil {
 		return fmt.Errorf("SceneDestroy: %w", err)
 	}
+	title := libraryService.evictScene(id)
+	libraryService.ResetSections()
+	log.Ctx(ctx).Info().Str("id", id).Str("title", title).Msg("Deleted scene")
 	return nil
+}
+
+// evictScene drops scene id from the cache and returns the title it was
+// cached under, "" when it was not.
+func (libraryService *Service) evictScene(id string) string {
+	libraryService.muVdCache.Lock()
+	defer libraryService.muVdCache.Unlock()
+	vd := libraryService.vdCache[id]
+	delete(libraryService.vdCache, id)
+	if vd == nil {
+		return ""
+	}
+	return vd.Title()
 }
 
 func (libraryService *Service) IncrementO(ctx context.Context, id string) error {

@@ -8,16 +8,21 @@ import (
 	"github.com/Khan/genqlient/graphql"
 )
 
-// fakeGraphQL answers each MakeRequest with the next JSON payload in order.
+// fakeGraphQL answers each MakeRequest with the next JSON payload in order;
+// a call whose index is in errs fails with that error instead.
 type fakeGraphQL struct {
 	payloads []string
+	errs     map[int]error
 	calls    int
 }
 
 func (f *fakeGraphQL) MakeRequest(_ context.Context, _ *graphql.Request, resp *graphql.Response) error {
-	payload := f.payloads[f.calls]
+	n := f.calls
 	f.calls++
-	return json.Unmarshal([]byte(payload), resp.Data)
+	if err := f.errs[n]; err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(f.payloads[n]), resp.Data)
 }
 
 func TestLoadTags_RefreshesCacheOnEveryCall(t *testing.T) {
