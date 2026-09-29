@@ -3,6 +3,7 @@ package heresphere
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -221,11 +222,8 @@ func TestPlaybackState_HandleStopCountsPlayOnce(t *testing.T) {
 }
 
 func TestEvents_ThresholdIncrementsPlayCountOnce(t *testing.T) {
-	stash := &fakeStash{}
+	stash := &fakeStash{minPlayPercent: 50.0}
 	h, clock := clockedHandler(stash)
-	half := 0.5
-	minPlayFraction = &half
-	t.Cleanup(func() { minPlayFraction = nil })
 
 	postClientEvent(t, h, "a", "7", evPlay, 0)
 	clock.advance(400 * time.Second)
@@ -244,6 +242,75 @@ func TestEvents_ThresholdIncrementsPlayCountOnce(t *testing.T) {
 	}
 	if got := stash.playedSeconds("7"); got != 900 {
 		t.Fatalf("expected 900 s played, got %v", got)
+	}
+}
+
+// No index request happened since the start (a headset resuming after a
+// restart): the threshold is read on the first event and kept.
+func TestEvents_MinPlayFractionIsReadLazilyOnce(t *testing.T) {
+	stash := &fakeStash{minPlayPercent: "25"}
+	h, clock := clockedHandler(stash)
+
+	postClientEvent(t, h, "a", "7", evPlay, 0)
+	if got := h.minPlayFraction.Load(); got == nil || *got != 0.25 {
+		t.Fatalf("expected the fraction read on the first event, got %v", got)
+	}
+	clock.advance(300 * time.Second)
+	postClientEvent(t, h, "a", "7", evClose, 300)
+	if got := stash.playCount("7"); got != 1 {
+		t.Fatalf("300 of 1000 s crosses 25 percent, got %d plays", got)
+	}
+	if got := stash.configQueries(); got != 1 {
+		t.Fatalf("expected the setting read once, got %d queries", got)
+	}
+}
+
+func TestIndex_RefreshesMinPlayFraction(t *testing.T) {
+	loadDefaultRules(t)
+	stash := &fakeStash{minPlayPercent: 50.0}
+	h, _ := clockedHandler(stash)
+
+	postClientEvent(t, h, "a", "7", evPlay, 0)
+	if got := h.minPlayFraction.Load(); got == nil || *got != 0.5 {
+		t.Fatalf("expected 0.5, got %v", got)
+	}
+	stash.setMinPlayPercent(10.0, nil)
+	h.indexHandler(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", nil))
+	if got := h.minPlayFraction.Load(); got == nil || *got != 0.1 {
+		t.Fatalf("expected the index request to refresh the fraction, got %v", got)
+	}
+}
+
+func TestEvents_FailedMinPlayReadIsNotCached(t *testing.T) {
+	stash := &fakeStash{minPlayPercent: 50.0, uiErr: errors.New("stash down")}
+	h, clock := clockedHandler(stash)
+
+	postClientEvent(t, h, "a", "7", evPlay, 0)
+	if h.minPlayFraction.Load() != nil {
+		t.Fatal("a failed read must not be cached")
+	}
+	clock.advance(900 * time.Second)
+	postClientEvent(t, h, "a", "7", evPause, 900)
+	if got := stash.playCount("7"); got != 0 {
+		t.Fatalf("without a threshold nothing counts, got %d", got)
+	}
+	// Stash is back: the next event reads it and the play counts.
+	stash.setMinPlayPercent(50.0, nil)
+	postClientEvent(t, h, "a", "7", evPlay, 900)
+	clock.advance(10 * time.Second)
+	postClientEvent(t, h, "a", "7", evClose, 910)
+	if got := stash.playCount("7"); got != 1 {
+		t.Fatalf("expected the play counted once the setting could be read, got %d", got)
+	}
+	if got := stash.configQueries(); got != 3 {
+		t.Fatalf("expected two failed reads and one good one, got %d", got)
+	}
+
+	// A refresh that fails keeps the value already held.
+	stash.setMinPlayPercent(50.0, errors.New("stash down again"))
+	h.refreshMinPlayFraction(t.Context())
+	if got := h.minPlayFraction.Load(); got == nil || *got != 0.5 {
+		t.Fatalf("expected the held value kept over a failed refresh, got %v", got)
 	}
 }
 

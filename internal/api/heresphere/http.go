@@ -13,6 +13,7 @@ import (
 	"stash-vr/internal/stash"
 	"stash-vr/internal/util"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,13 +26,40 @@ type httpHandler struct {
 	// the same cached markers and tags, so both created the same marker
 	// and the later one undid the earlier one's tag edits.
 	sceneLocks util.KeyedMutex
+	// minPlayFraction is the fraction of a scene's duration that counts
+	// as a play, from Stash's minimumPlayPercent; nil until it was read.
+	// Index requests refresh it and events read it, concurrently.
+	minPlayFraction atomic.Pointer[float64]
 }
 
 func newHttpHandler(libraryService *library.Service) *httpHandler {
 	return &httpHandler{libraryService: libraryService, playback: newPlaybackTracker()}
 }
 
-var minPlayFraction *float64
+// refreshMinPlayFraction reads minimumPlayPercent from Stash. When Stash
+// cannot be asked the value already held stays, so a blip does not turn
+// every stop into a counted play.
+func (h *httpHandler) refreshMinPlayFraction(ctx context.Context) *float64 {
+	pct, err := stash.GetMinPlayPercent(ctx, h.libraryService.Client())
+	if err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to read Stash's minimum play percent")
+		return h.minPlayFraction.Load()
+	}
+	mpf := pct / 100
+	h.minPlayFraction.Store(&mpf)
+	return &mpf
+}
+
+// minPlayFractionFor is the fraction for a playback stop: the one read on
+// the last index build, else read now, so a play reported before any
+// index was built since the start (a headset resuming after a restart)
+// still counts.
+func (h *httpHandler) minPlayFractionFor(ctx context.Context) *float64 {
+	if p := h.minPlayFraction.Load(); p != nil {
+		return p
+	}
+	return h.refreshMinPlayFraction(ctx)
+}
 
 const (
 	// prefetchTimeout bounds the scene prefetch an index request starts. It
@@ -48,8 +76,7 @@ func (h *httpHandler) indexHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	baseUrl := internal.GetBaseUrl(req)
 
-	mpf := stash.GetMinPlayPercent(ctx, h.libraryService.Client()) / 100
-	minPlayFraction = &mpf
+	h.refreshMinPlayFraction(ctx)
 
 	sections, err := h.libraryService.GetSectionsFor(ctx, "heresphere")
 	if err != nil {
@@ -298,11 +325,11 @@ func (h *httpHandler) eventsHandler(w http.ResponseWriter, req *http.Request) {
 
 	switch ev.Event {
 	case evPlay:
-		if prev := h.playback.play(key, vd, minPlayFraction); prev != nil {
+		if prev := h.playback.play(key, vd, h.minPlayFractionFor(ctx)); prev != nil {
 			h.reportStop(ctx, prev, nil)
 		}
 	case evPause, evClose:
-		stop := h.playback.stop(key, videoId, minPlayFraction)
+		stop := h.playback.stop(key, videoId, h.minPlayFractionFor(ctx))
 		if len(vd.SceneParts.Files) == 0 || vd.SceneParts.Files[0] == nil {
 			if stop != nil {
 				h.reportStop(ctx, stop, nil)

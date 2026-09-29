@@ -29,6 +29,11 @@ type fakeStash struct {
 	withSeconds int
 	seconds     map[string]float64
 	playCounts  map[string]int
+	// minPlayPercent is Stash's minimumPlayPercent UI setting (nil for
+	// unset), uiErr fails the configuration query and uiQueries counts it.
+	minPlayPercent any
+	uiErr          error
+	uiQueries      int
 }
 
 func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -91,6 +96,22 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 		f.playCounts[in.Id]++
 		f.mu.Unlock()
 		payload = `{"sceneAddPlay":null}`
+	case "UIConfiguration":
+		f.mu.Lock()
+		f.uiQueries++
+		err, pct := f.uiErr, f.minPlayPercent
+		f.mu.Unlock()
+		if err != nil {
+			return err
+		}
+		ui, _ := json.Marshal(map[string]any{"minimumPlayPercent": pct})
+		payload = `{"configuration":{"ui":` + string(ui) + `}}`
+	case "FindSavedSceneFilters":
+		payload = `{"findSavedFilters":[]}`
+	case "FindAllTags":
+		payload = `{"findTags":{"tags":[]}}`
+	case "FindAllSceneIds", "FindSceneIdsByFilter":
+		payload = `{"findScenes":{"scenes":[{"id":"7"}]}}`
 	default:
 		payload = `{"sceneSaveActivity":true}`
 	}
@@ -102,6 +123,20 @@ func (f *fakeStash) playedSeconds(id string) float64 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.seconds[id]
+}
+
+// configQueries is how often the UI configuration was asked for.
+func (f *fakeStash) configQueries() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.uiQueries
+}
+
+// setMinPlayPercent changes the setting and whether the query fails.
+func (f *fakeStash) setMinPlayPercent(pct any, err error) {
+	f.mu.Lock()
+	f.minPlayPercent, f.uiErr = pct, err
+	f.mu.Unlock()
 }
 
 // playCount is how often the play count of scene id was incremented.
