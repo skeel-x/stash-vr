@@ -11,6 +11,7 @@ const (
 	envKeyListenAddress      = "LISTEN_ADDRESS"
 	envKeyStashGraphQLUrl    = "STASH_GRAPHQL_URL"
 	envKeyStashApiKey        = "STASH_API_KEY"
+	envKeyStashTLSInsecure   = "STASH_TLS_INSECURE"
 	envKeyFavoriteTag        = "FAVORITE_TAG"
 	envKeyLogLevel           = "LOG_LEVEL"
 	envKeyDisableLogColor    = "DISABLE_LOG_COLOR"
@@ -39,9 +40,13 @@ const (
 )
 
 type ApplicationConfig struct {
-	ListenAddress      string
-	StashGraphQLUrl    string
-	StashApiKey        string
+	ListenAddress   string
+	StashGraphQLUrl string
+	StashApiKey     string
+	// StashTLSInsecure skips verifying the certificate of an https Stash,
+	// for self-signed certificates. Verification is on by default (see
+	// internal/stash/transport.go for the behaviour change).
+	StashTLSInsecure   bool
 	FavoriteTag        string
 	LogLevel           string
 	DisableLogColor    bool
@@ -80,6 +85,9 @@ func Init() error {
 
 	pflag.String(envKeyStashApiKey, "", "Stash API key")
 	_ = viper.BindPFlag(envKeyStashApiKey, pflag.Lookup(envKeyStashApiKey))
+
+	pflag.Bool(envKeyStashTLSInsecure, false, "Skip verifying the TLS certificate of an https Stash (self-signed certificates)")
+	_ = viper.BindPFlag(envKeyStashTLSInsecure, pflag.Lookup(envKeyStashTLSInsecure))
 
 	pflag.String(envKeyFavoriteTag, "FAVORITE", "Name of tag in Stash to hold scenes marked as favorites")
 	_ = viper.BindPFlag(envKeyFavoriteTag, pflag.Lookup(envKeyFavoriteTag))
@@ -172,6 +180,7 @@ func Init() error {
 		ListenAddress:      viper.GetString(envKeyListenAddress),
 		StashGraphQLUrl:    viper.GetString(envKeyStashGraphQLUrl),
 		StashApiKey:        viper.GetString(envKeyStashApiKey),
+		StashTLSInsecure:   viper.GetBool(envKeyStashTLSInsecure),
 		FavoriteTag:        viper.GetString(envKeyFavoriteTag),
 		LogLevel:           strings.ToLower(viper.GetString(envKeyLogLevel)),
 		DisableLogColor:    viper.GetBool(envKeyDisableLogColor),

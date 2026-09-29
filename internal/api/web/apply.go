@@ -14,8 +14,8 @@ import (
 // threshold changed, fresh cover renders when the cover badges changed, a
 // new effective log level when the level changed.
 func ApplyChanges(prev, next config.ApplicationConfig, lib *library.Service) {
-	if prev.StashGraphQLUrl != next.StashGraphQLUrl || prev.StashApiKey != next.StashApiKey {
-		lib.SetStashClient(stash.NewClient(next.StashGraphQLUrl, next.StashApiKey))
+	if prev.StashGraphQLUrl != next.StashGraphQLUrl || prev.StashApiKey != next.StashApiKey || prev.StashTLSInsecure != next.StashTLSInsecure {
+		lib.SetStashClient(stash.NewClient(next.StashGraphQLUrl, next.StashApiKey, next.StashTLSInsecure))
 		log.Info().Msg("Stash connection settings changed, caches cleared")
 	}
 	if prev.AutoStudioMin != next.AutoStudioMin || prev.AutoPerformerMin != next.AutoPerformerMin {

@@ -49,7 +49,8 @@ func Run(ctx context.Context) error {
 	}
 	log.Info().Str("config", fmt.Sprintf("%+v", config.Application().Redacted())).Send()
 
-	stashClient := stash.NewClient(config.Application().StashGraphQLUrl, config.Application().StashApiKey)
+	cfg := config.Application()
+	stashClient := stash.NewClient(cfg.StashGraphQLUrl, cfg.StashApiKey, cfg.StashTLSInsecure)
 	libraryService := library.NewService(stashClient)
 
 	return serve(ctx, config.Application().ListenAddress, stashClient, libraryService)

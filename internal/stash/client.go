@@ -2,7 +2,6 @@ package stash
 
 import (
 	"context"
-	"crypto/tls"
 	"github.com/Khan/genqlient/graphql"
 	"net/http"
 	"stash-vr/internal/stash/gql"
@@ -27,19 +26,15 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.rt.RoundTrip(req2)
 }
 
-func NewClient(graphqlUrl string, apiKey string) graphql.Client {
-	defaultTr, _ := http.DefaultTransport.(*http.Transport)
-	transport := defaultTr.Clone()
-	transport.TLSClientConfig = &tls.Config{
-		InsecureSkipVerify: true,
-	}
-	transport.ResponseHeaderTimeout = responseHeaderTimeout
-
-	var rt http.RoundTripper = transport
+// NewClient returns a GraphQL client for Stash at graphqlUrl on the shared
+// transport (see Transport). tlsInsecure skips verifying Stash's
+// certificate, for self-signed https.
+func NewClient(graphqlUrl string, apiKey string, tlsInsecure bool) graphql.Client {
+	var rt http.RoundTripper = Transport(tlsInsecure)
 	if apiKey != "" {
 		rt = &authTransport{
 			apiKey: apiKey,
-			rt:     transport,
+			rt:     rt,
 		}
 	}
 

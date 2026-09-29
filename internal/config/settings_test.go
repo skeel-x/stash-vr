@@ -826,3 +826,44 @@ func TestLoad_CorrectVerticalStereoSeedAndFile(t *testing.T) {
 		t.Fatal("expected the file to switch the correction off")
 	}
 }
+
+func TestLoad_StashTLSInsecureSeedAndFile(t *testing.T) {
+	seed := seedFor(t)
+	seed.StashTLSInsecure = true
+
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !Application().StashTLSInsecure {
+		t.Fatal("expected the insecure TLS setting on from the seed")
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"stash_tls_insecure": true`) {
+		t.Fatalf("expected stash_tls_insecure persisted, got %s", data)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"stash_tls_insecure":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if Application().StashTLSInsecure {
+		t.Fatal("expected the file to turn the insecure TLS setting off")
+	}
+
+	// A file without the key keeps the seed; the default seed verifies.
+	if err := os.WriteFile(FilePath(seed), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	seed.StashTLSInsecure = false
+	if err := Load(seed); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if Application().StashTLSInsecure {
+		t.Fatal("expected certificate verification on by default")
+	}
+}

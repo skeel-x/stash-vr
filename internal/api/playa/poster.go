@@ -21,8 +21,9 @@ import (
 
 var errPosterNotFound = errors.New("poster not found")
 
-// posterClient bounds the plain (non-heatmap) poster fetch from Stash.
-var posterClient = &http.Client{Timeout: 15 * time.Second}
+// posterClient bounds the plain (non-heatmap) poster fetch from Stash, on
+// the transport the GraphQL client uses (same TLS setting).
+var posterClient = stash.HTTPClient(15 * time.Second)
 
 // buildPoster returns the scene's poster as JPEG. Interactive scenes get
 // the heatmap and scenes with cover badges get the badges, rendered and

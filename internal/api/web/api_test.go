@@ -3,11 +3,15 @@ package web
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -1006,5 +1010,93 @@ func TestPutConfig_CorrectVerticalStereo(t *testing.T) {
 	body["correct_vertical_stereo"] = false
 	if rec, out := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 || config.Application().CorrectVerticalStereo || out["correct_vertical_stereo"] != false {
 		t.Fatal("expected the correction switched off")
+	}
+}
+
+// versionTLSServer is a Stash behind a self-signed certificate.
+func versionTLSServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"version":{"version":"v0.31.1"}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestTestConfig_SelfSignedCertificateHintsAtTLSSetting(t *testing.T) {
+	srv := versionTLSServer(t)
+	_, h := newEnv(t, &fakeStash{})
+
+	_, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
+		"stash_graphql_url": srv.URL + "/graphql", "stash_api_key": "k",
+	})
+
+	msg, _ := out["error"].(string)
+	if out["ok"] != false || !strings.Contains(msg, "certificate") || !strings.Contains(msg, "STASH_TLS_INSECURE") {
+		t.Fatalf("expected a certificate hint naming the setting, got %v", out)
+	}
+
+	// The probe honours the setting sent with it, before it is saved.
+	_, out = do(t, h, http.MethodPost, "/config/test", map[string]any{
+		"stash_graphql_url": srv.URL + "/graphql", "stash_api_key": "k", "stash_tls_insecure": true,
+	})
+	if out["ok"] != true || out["stash_version"] != "v0.31.1" {
+		t.Fatalf("expected the insecure probe to connect, got %v", out)
+	}
+	if config.Application().StashTLSInsecure {
+		t.Fatal("a test must not persist the TLS setting")
+	}
+}
+
+func TestPutConfig_PersistsTLSInsecureAndSwapsClient(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	before := lib.Client()
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"stash_tls_insecure": true,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["stash_tls_insecure"] != true {
+		t.Fatalf("expected 200 with stash_tls_insecure true, got %d %v", rec.Code, out)
+	}
+	if !config.Application().StashTLSInsecure {
+		t.Fatal("expected the setting stored")
+	}
+	if lib.Client() == before {
+		t.Fatal("expected the library client to be replaced after a TLS change")
+	}
+	data, _ := os.ReadFile(config.FilePath(config.Application()))
+	if !strings.Contains(string(data), `"stash_tls_insecure": true`) {
+		t.Fatalf("expected stash_tls_insecure persisted to config.json, got %s", data)
+	}
+
+	delete(body, "stash_tls_insecure")
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 || !config.Application().StashTLSInsecure {
+		t.Fatalf("expected the setting kept when the field is missing, got %d", rec.Code)
+	}
+}
+
+func TestDescribeStashError_CertificateProblems(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"unknown authority", &url.Error{Op: "Post", URL: "https://stash:9999/graphql", Err: &tls.CertificateVerificationError{Err: x509.UnknownAuthorityError{}}}, "certificate could not be verified"},
+		{"bare x509", x509.HostnameError{Certificate: &x509.Certificate{}, Host: "stash"}, "certificate could not be verified"},
+		{"invalid", x509.CertificateInvalidError{Reason: x509.Expired}, "certificate could not be verified"},
+		{"other", errors.New("connection refused"), "connection refused"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := describeStashError(c.err); !strings.Contains(got, c.want) {
+				t.Fatalf("describeStashError = %q, want it to contain %q", got, c.want)
+			}
+		})
 	}
 }

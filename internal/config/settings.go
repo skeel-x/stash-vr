@@ -270,6 +270,7 @@ var validLogLevels = map[string]struct{}{
 type fileConfig struct {
 	StashGraphQLUrl    *string          `json:"stash_graphql_url,omitempty"`
 	StashApiKey        *string          `json:"stash_api_key,omitempty"`
+	StashTLSInsecure   *bool            `json:"stash_tls_insecure,omitempty"`
 	FavoriteTag        *string          `json:"favorite_tag,omitempty"`
 	ExcludeSortName    *string          `json:"exclude_sort_name,omitempty"`
 	GenerateSummaryIds *bool            `json:"generate_summary_ids,omitempty"`
@@ -454,6 +455,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.StashApiKey != nil {
 		base.StashApiKey = *fc.StashApiKey
 	}
+	if fc.StashTLSInsecure != nil {
+		base.StashTLSInsecure = *fc.StashTLSInsecure
+	}
 	if fc.FavoriteTag != nil {
 		base.FavoriteTag = *fc.FavoriteTag
 	}
@@ -617,6 +621,7 @@ func write(path string, c ApplicationConfig) error {
 	fc := fileConfig{
 		StashGraphQLUrl:    &c.StashGraphQLUrl,
 		StashApiKey:        &c.StashApiKey,
+		StashTLSInsecure:   &c.StashTLSInsecure,
 		FavoriteTag:        &c.FavoriteTag,
 		ExcludeSortName:    &c.ExcludeSortName,
 		GenerateSummaryIds: &c.GenerateSummaryIds,

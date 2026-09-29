@@ -145,6 +145,8 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
   * Url to your Stash graphql - something like `http://<stash.host>:<9999>/graphql`.
 * `STASH_API_KEY`
   * Api key to your Stash if it's using authentication, otherwise not required.
+* `STASH_TLS_INSECURE`
+  * Default: `false`. Skip verifying the TLS certificate of an https Stash, for self-signed certificates. The certificate is verified otherwise (earlier releases never checked it). Runtime name: `stash_tls_insecure`.
 
 <details>
 <summary>More (click to expand)</summary>

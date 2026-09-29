@@ -100,7 +100,7 @@ func TestSetup_RendersFormWithoutApiKey(t *testing.T) {
 	rec := getPage(t, h, "/setup", nil)
 
 	body := rec.Body.String()
-	for _, want := range []string{`name="stash_graphql_url"`, `name="stash_api_key"`, `name="log_level"`, "leave blank to keep"} {
+	for _, want := range []string{`name="stash_graphql_url"`, `name="stash_api_key"`, `name="stash_tls_insecure"`, `name="log_level"`, "leave blank to keep"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("setup missing %q", want)
 		}

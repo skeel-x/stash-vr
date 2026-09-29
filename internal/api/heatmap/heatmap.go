@@ -24,8 +24,10 @@ import (
 	"time"
 )
 
-// httpClient bounds every screenshot and heatmap fetch from Stash.
-var httpClient = &http.Client{Timeout: 15 * time.Second}
+// httpClient bounds every screenshot and heatmap fetch from Stash. It runs
+// on the transport the GraphQL client uses, so an https Stash with a
+// self-signed certificate serves covers under the same TLS setting.
+var httpClient = stash.HTTPClient(15 * time.Second)
 
 // maxCoverBytes caps how much of a screenshot loadScreenshot buffers into
 // memory. A variable, not a constant, so tests can lower it.

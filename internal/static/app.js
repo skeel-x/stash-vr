@@ -87,6 +87,7 @@
     const read = () => ({
       stash_graphql_url: form.stash_graphql_url.value.trim(),
       stash_api_key: form.stash_api_key.value,
+      stash_tls_insecure: form.stash_tls_insecure.checked,
       favorite_tag: form.favorite_tag.value.trim(),
       exclude_sort_name: form.exclude_sort_name.value.trim(),
       generate_summary_ids: form.generate_summary_ids.checked,
@@ -115,7 +116,7 @@
     $('#test').addEventListener('click', async () => {
       setMsg($('#test-msg'), 'Testing');
       try {
-        const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: form.stash_api_key.value });
+        const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: form.stash_api_key.value, stash_tls_insecure: form.stash_tls_insecure.checked });
         setMsg($('#test-msg'), r.ok ? 'Connected to Stash ' + r.stash_version : r.error, r.ok ? 'ok' : 'err');
       } catch (e) { setMsg($('#test-msg'), e.message, 'err'); }
     });

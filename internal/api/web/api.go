@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -69,6 +71,7 @@ func randomScenes(ctx context.Context, lib *library.Service, baseUrl string, n i
 type ConfigView struct {
 	StashGraphQLUrl     string             `json:"stash_graphql_url"`
 	StashApiKeySet      bool               `json:"stash_api_key_set"`
+	StashTLSInsecure    bool               `json:"stash_tls_insecure"`
 	FavoriteTag         string             `json:"favorite_tag"`
 	ExcludeSortName     string             `json:"exclude_sort_name"`
 	GenerateSummaryIds  bool               `json:"generate_summary_ids"`
@@ -98,6 +101,7 @@ type ConfigView struct {
 type configInput struct {
 	StashGraphQLUrl    string            `json:"stash_graphql_url"`
 	StashApiKey        string            `json:"stash_api_key"`
+	StashTLSInsecure   *bool             `json:"stash_tls_insecure"`
 	FavoriteTag        string            `json:"favorite_tag"`
 	ExcludeSortName    string            `json:"exclude_sort_name"`
 	GenerateSummaryIds bool              `json:"generate_summary_ids"`
@@ -150,9 +154,12 @@ func (in *coverBadgesInput) apply(b *config.CoverBadges) {
 	}
 }
 
+// testInput is what POST /config/test accepts. A missing
+// stash_tls_insecure keeps the current setting.
 type testInput struct {
-	StashGraphQLUrl string `json:"stash_graphql_url"`
-	StashApiKey     string `json:"stash_api_key"`
+	StashGraphQLUrl  string `json:"stash_graphql_url"`
+	StashApiKey      string `json:"stash_api_key"`
+	StashTLSInsecure *bool  `json:"stash_tls_insecure"`
 }
 
 type testResult struct {
@@ -165,6 +172,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 	return ConfigView{
 		StashGraphQLUrl:     cfg.StashGraphQLUrl,
 		StashApiKeySet:      cfg.StashApiKey != "",
+		StashTLSInsecure:    cfg.StashTLSInsecure,
 		FavoriteTag:         cfg.FavoriteTag,
 		ExcludeSortName:     cfg.ExcludeSortName,
 		GenerateSummaryIds:  cfg.GenerateSummaryIds,
@@ -265,11 +273,36 @@ func describeStashError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Sprintf("timed out after %d seconds", int(stashProbeTimeout.Seconds()))
 	}
+	if reason, ok := certificateProblem(err); ok {
+		return "Stash's TLS certificate could not be verified (" + reason + "). For a self-signed certificate, switch on \"Skip TLS certificate verification\" on the Setup page or set STASH_TLS_INSECURE"
+	}
 	msg := err.Error()
 	if len(msg) > maxStashErrorLen {
 		msg = strings.ToValidUTF8(msg[:maxStashErrorLen], "") + "..."
 	}
 	return msg
+}
+
+// certificateProblem reports whether err is a failed TLS certificate check
+// (untrusted issuer, wrong host name, expired) and names the reason.
+func certificateProblem(err error) (string, bool) {
+	var certErr *tls.CertificateVerificationError
+	if errors.As(err, &certErr) {
+		return certErr.Err.Error(), true
+	}
+	var unknown x509.UnknownAuthorityError
+	if errors.As(err, &unknown) {
+		return unknown.Error(), true
+	}
+	var host x509.HostnameError
+	if errors.As(err, &host) {
+		return host.Error(), true
+	}
+	var invalid x509.CertificateInvalidError
+	if errors.As(err, &invalid) {
+		return invalid.Error(), true
+	}
+	return "", false
 }
 
 // settingsErrorCode maps a config.Set failure to a status code: a rejected
@@ -326,6 +359,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	next.StashGraphQLUrl = in.StashGraphQLUrl
 	if in.StashApiKey != "" {
 		next.StashApiKey = in.StashApiKey
+	}
+	if in.StashTLSInsecure != nil {
+		next.StashTLSInsecure = *in.StashTLSInsecure
 	}
 	next.FavoriteTag = in.FavoriteTag
 	next.ExcludeSortName = in.ExcludeSortName
@@ -401,6 +437,9 @@ func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 	// rather than as a missing API key.
 	probe := cur
 	probe.StashGraphQLUrl = in.StashGraphQLUrl
+	if in.StashTLSInsecure != nil {
+		probe.StashTLSInsecure = *in.StashTLSInsecure
+	}
 	if err := config.Validate(probe); err != nil {
 		writeJson(ctx, w, testResult{Ok: false, Error: err.Error()})
 		return
@@ -416,7 +455,7 @@ func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 
 	probeCtx, cancel := context.WithTimeout(ctx, stashProbeTimeout)
 	defer cancel()
-	version, err := stash.GetVersion(probeCtx, stash.NewClient(in.StashGraphQLUrl, key))
+	version, err := stash.GetVersion(probeCtx, stash.NewClient(in.StashGraphQLUrl, key, probe.StashTLSInsecure))
 	if err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("Stash connection test failed")
 		writeJson(ctx, w, testResult{Ok: false, Error: describeStashError(err)})
