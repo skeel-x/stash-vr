@@ -356,6 +356,7 @@ func Load(seed ApplicationConfig) error {
 		return fmt.Errorf("resolve config dir: %w", err)
 	}
 	seed.ConfigPath = dir
+	seed.StashGraphQLUrl = NormalizeStashURL(seed.StashGraphQLUrl)
 	if seed.Filters == nil {
 		seed.Filters = []Filter{}
 	}
@@ -389,6 +390,7 @@ func Load(seed ApplicationConfig) error {
 		return fmt.Errorf("parse config %s: %w", path, err)
 	}
 	merged := applyFile(seed, fc)
+	merged.StashGraphQLUrl = NormalizeStashURL(merged.StashGraphQLUrl)
 	if kept, dropped := dropLegacyLabelRules(merged.VideoRules); len(dropped) > 0 {
 		merged.VideoRules = kept
 		migrated = dropped
@@ -554,6 +556,7 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 		next.VideoRules = []VideoRule{}
 	}
 	normalizeVideoRules(next.VideoRules)
+	next.StashGraphQLUrl = NormalizeStashURL(next.StashGraphQLUrl)
 	var err error
 	if next.BasePath, err = NormalizeBasePath(next.BasePath); err != nil {
 		return ApplicationConfig{}, err
@@ -566,6 +569,24 @@ func Set(cfg ApplicationConfig) (ApplicationConfig, error) {
 	}
 	store(next)
 	return cloneConfig(next), nil
+}
+
+// NormalizeStashURL returns u trimmed and, when it names only a host
+// (http://stash:9999 or http://stash:9999/), with /graphql appended: the
+// address Stash shows is its site, the API lives at /graphql. Anything
+// else, including a value that does not parse, comes back as is for
+// Validate to judge.
+func NormalizeStashURL(u string) string {
+	u = strings.TrimSpace(u)
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Host == "" {
+		return u
+	}
+	if parsed.Path == "" || parsed.Path == "/" {
+		parsed.Path = "/graphql"
+		return parsed.String()
+	}
+	return u
 }
 
 // NormalizeBasePath returns "" or "/segment[/segment]" for p.

@@ -916,3 +916,59 @@ func TestSettingValues_CoverEveryPersistedSetting(t *testing.T) {
 		t.Fatalf("settingValues has %d keys, want %d", len(values), len(want))
 	}
 }
+
+func TestNormalizeStashURL(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"http://stash:9999", "http://stash:9999/graphql"},
+		{"http://stash:9999/", "http://stash:9999/graphql"},
+		{"  https://stash.example  ", "https://stash.example/graphql"},
+		{"http://stash:9999/graphql", "http://stash:9999/graphql"},
+		{"http://stash:9999/stash/graphql", "http://stash:9999/stash/graphql"},
+		{"http://stash:9999/other", "http://stash:9999/other"},
+		{"nope", "nope"},
+		{"http://[::1", "http://[::1"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := NormalizeStashURL(c.in); got != c.want {
+			t.Errorf("NormalizeStashURL(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestLoadAndSet_AppendGraphqlToBareHost(t *testing.T) {
+	seed := seedFor(t)
+	seed.StashGraphQLUrl = "http://stash:9999"
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().StashGraphQLUrl; got != "http://stash:9999/graphql" {
+		t.Fatalf("Load: expected /graphql appended to the seed, got %q", got)
+	}
+	data, _ := os.ReadFile(FilePath(seed))
+	if !strings.Contains(string(data), `"stash_graphql_url": "http://stash:9999/graphql"`) {
+		t.Fatalf("expected the normalised url persisted, got %s", data)
+	}
+
+	if err := os.WriteFile(FilePath(seed), []byte(`{"stash_graphql_url":"http://other:9999/"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().StashGraphQLUrl; got != "http://other:9999/graphql" {
+		t.Fatalf("Load: expected /graphql appended to the file value, got %q", got)
+	}
+
+	cfg := Application()
+	cfg.StashGraphQLUrl = "http://third:9999"
+	saved, err := Set(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.StashGraphQLUrl != "http://third:9999/graphql" || Application().StashGraphQLUrl != "http://third:9999/graphql" {
+		t.Fatalf("Set: expected /graphql appended, got %q", saved.StashGraphQLUrl)
+	}
+}

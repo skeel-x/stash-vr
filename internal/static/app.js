@@ -117,6 +117,8 @@
       setMsg($('#test-msg'), 'Testing');
       try {
         const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: form.stash_api_key.value, stash_tls_insecure: form.stash_tls_insecure.checked });
+        // The server appends /graphql to a bare host; show what it tested.
+        if (r.stash_graphql_url) form.stash_graphql_url.value = r.stash_graphql_url;
         setMsg($('#test-msg'), r.ok ? 'Connected to Stash ' + r.stash_version : r.error, r.ok ? 'ok' : 'err');
       } catch (e) { setMsg($('#test-msg'), e.message, 'err'); }
     });
@@ -125,6 +127,7 @@
       setMsg($('#save-msg'), 'Saving');
       try {
         const cfg = await api('PUT', '/config', read());
+        form.stash_graphql_url.value = cfg.stash_graphql_url;
         form.stash_api_key.value = '';
         form.stash_api_key.placeholder = cfg.stash_api_key_set ? 'set, leave blank to keep' : 'paste the key from Stash, Settings, Security';
         setMsg($('#save-msg'), 'Saved and applied', 'ok');

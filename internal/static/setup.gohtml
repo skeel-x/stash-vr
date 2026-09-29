@@ -5,7 +5,7 @@
   <h2>Connection</h2>
   <label>Stash GraphQL address
     <input name="stash_graphql_url" type="url" required value="{{.Config.StashGraphQLUrl}}" placeholder="http://localhost:9999/graphql">
-    <small>As reachable from where Stash-VR runs. Your headset must reach the same host for streams and covers.</small>
+    <small>As reachable from where Stash-VR runs; /graphql is added to a bare host address. Your headset must reach the same host for streams and covers.</small>
   </label>
   <label>API key
     <input name="stash_api_key" type="password" value="" placeholder="{{if .Config.StashApiKeySet}}set, leave blank to keep{{else}}paste the key from Stash, Settings, Security{{end}}">

@@ -1100,3 +1100,44 @@ func TestDescribeStashError_CertificateProblems(t *testing.T) {
 		})
 	}
 }
+
+func TestPutConfig_BareHostGetsGraphqlAndCountsAsSameHost(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	// Same host as before, so no key is needed, and the response carries
+	// the normalised address for the form.
+	if rec.Code != 200 || out["stash_graphql_url"] != "http://stash:9999/graphql" {
+		t.Fatalf("expected 200 with /graphql appended, got %d %v", rec.Code, out)
+	}
+	if config.Application().StashGraphQLUrl != "http://stash:9999/graphql" {
+		t.Fatalf("expected the normalised url stored, got %q", config.Application().StashGraphQLUrl)
+	}
+}
+
+func TestTestConfig_EchoesNormalisedUrl(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/graphql" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"version":{"version":"v0.31.1"}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, h := newEnv(t, &fakeStash{})
+
+	_, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
+		"stash_graphql_url": srv.URL, "stash_api_key": "k",
+	})
+
+	if out["ok"] != true || out["stash_graphql_url"] != srv.URL+"/graphql" {
+		t.Fatalf("expected the bare host probed at /graphql and echoed, got %v", out)
+	}
+}

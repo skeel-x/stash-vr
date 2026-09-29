@@ -162,10 +162,13 @@ type testInput struct {
 	StashTLSInsecure *bool  `json:"stash_tls_insecure"`
 }
 
+// testResult answers POST /config/test. StashGraphQLUrl echoes the address
+// as normalised (see config.NormalizeStashURL) so the form can show it.
 type testResult struct {
-	Ok           bool   `json:"ok"`
-	StashVersion string `json:"stash_version,omitempty"`
-	Error        string `json:"error,omitempty"`
+	Ok              bool   `json:"ok"`
+	StashVersion    string `json:"stash_version,omitempty"`
+	StashGraphQLUrl string `json:"stash_graphql_url,omitempty"`
+	Error           string `json:"error,omitempty"`
 }
 
 func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
@@ -356,7 +359,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 
 	prev := config.Application()
 	next := prev
-	next.StashGraphQLUrl = in.StashGraphQLUrl
+	// Normalised here, before the host rule, so http://stash:9999 and
+	// http://stash:9999/graphql count as the same host.
+	next.StashGraphQLUrl = config.NormalizeStashURL(in.StashGraphQLUrl)
 	if in.StashApiKey != "" {
 		next.StashApiKey = in.StashApiKey
 	}
@@ -410,7 +415,7 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if hostChanged(prev.StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
+	if hostChanged(prev.StashGraphQLUrl, next.StashGraphQLUrl) && in.StashApiKey == "" {
 		writeError(ctx, w, http.StatusBadRequest, "api key required when changing the Stash host")
 		return
 	}
@@ -432,6 +437,7 @@ func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cur := config.Application()
+	in.StashGraphQLUrl = config.NormalizeStashURL(in.StashGraphQLUrl)
 
 	// Validate before the host rule so an unusable URL is reported as such
 	// rather than as a missing API key.
@@ -458,10 +464,10 @@ func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 	version, err := stash.GetVersion(probeCtx, stash.NewClient(in.StashGraphQLUrl, key, probe.StashTLSInsecure))
 	if err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("Stash connection test failed")
-		writeJson(ctx, w, testResult{Ok: false, Error: describeStashError(err)})
+		writeJson(ctx, w, testResult{Ok: false, StashGraphQLUrl: in.StashGraphQLUrl, Error: describeStashError(err)})
 		return
 	}
-	writeJson(ctx, w, testResult{Ok: true, StashVersion: version})
+	writeJson(ctx, w, testResult{Ok: true, StashVersion: version, StashGraphQLUrl: in.StashGraphQLUrl})
 }
 
 func (h *apiHandler) putFilters(w http.ResponseWriter, r *http.Request) {
