@@ -263,7 +263,7 @@ func settingValues(c *ApplicationConfig) map[string]any {
 // store it, so a value that only differs in form is not reported.
 func ignoredOverrides(isSet func(string) bool, seed, loaded *ApplicationConfig) []string {
 	normalized := *seed
-	normalized.StashGraphQLUrl = NormalizeStashURL(normalized.StashGraphQLUrl)
+	normalize(&normalized)
 	if p, err := NormalizeBasePath(normalized.BasePath); err == nil {
 		normalized.BasePath = p
 	}

@@ -870,8 +870,8 @@ func TestLoad_StashTLSInsecureSeedAndFile(t *testing.T) {
 }
 
 func TestIgnoredOverrides(t *testing.T) {
-	seed := ApplicationConfig{StashGraphQLUrl: "http://env:9999/graphql", StashApiKey: "envkey", LogLevel: "debug", BasePath: "stashvr/", SmartSectionSize: 50, CoverBadges: CoverBadges{Quality: true}}
-	loaded := ApplicationConfig{StashGraphQLUrl: "http://file:9999/graphql", StashApiKey: "envkey", LogLevel: "info", BasePath: "/stashvr", SmartSectionSize: 120, CoverBadges: CoverBadges{Quality: false}}
+	seed := ApplicationConfig{StashGraphQLUrl: "http://env:9999/graphql", StashApiKey: " envkey ", FavoriteTag: "FAVORITE ", ExcludeSortName: "hidden", LogLevel: "debug", BasePath: "stashvr/", SmartSectionSize: 50, CoverBadges: CoverBadges{Quality: true}}
+	loaded := ApplicationConfig{StashGraphQLUrl: "http://file:9999/graphql", StashApiKey: "envkey", FavoriteTag: "FAVORITE", ExcludeSortName: "hidden", LogLevel: "info", BasePath: "/stashvr", SmartSectionSize: 120, CoverBadges: CoverBadges{Quality: false}}
 	cases := []struct {
 		name string
 		set  []string
@@ -879,9 +879,12 @@ func TestIgnoredOverrides(t *testing.T) {
 	}{
 		{"nothing set", nil, nil},
 		{"set and different", []string{"STASH_GRAPHQL_URL", "LOG_LEVEL"}, []string{"LOG_LEVEL", "STASH_GRAPHQL_URL"}},
-		{"set but equal", []string{"STASH_API_KEY"}, nil},
-		{"different but not set", []string{"STASH_API_KEY"}, nil},
+		{"set but equal", []string{"EXCLUDE_SORT_NAME"}, nil},
+		// LOG_LEVEL and STASH_GRAPHQL_URL differ but only an unrelated key is set.
+		{"different but not set", []string{"DEOVR_AUTOLOAD"}, nil},
 		{"base path compared normalised", []string{"BASE_PATH"}, nil},
+		{"key compared trimmed", []string{"STASH_API_KEY"}, nil},
+		{"tag compared trimmed", []string{"FAVORITE_TAG"}, nil},
 		{"numbers and badges", []string{"SMART_SECTION_SIZE", "COVER_BADGE_QUALITY", "COVER_BADGE_FORMAT"}, []string{"COVER_BADGE_QUALITY", "SMART_SECTION_SIZE"}},
 	}
 	for _, c := range cases {
