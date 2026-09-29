@@ -186,7 +186,11 @@ func (libraryService *Service) rebuildIndex(ctx context.Context) (indexResult, e
 		Int("scenes", scenesCount).Int("auto", len(auto)).
 		Msg("Index built")
 
-	_ = libraryService.LoadTags(ctx)
+	// The tag cache is not part of the index: a stale one is worth serving
+	// the scenes with, but not silently.
+	if err := libraryService.LoadTags(ctx); err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to refresh tags, keeping the cached ones")
+	}
 
 	libraryService.muTagCache.RLock()
 	tagCount := len(libraryService.tagCache)

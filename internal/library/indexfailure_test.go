@@ -1,6 +1,7 @@
 package library
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
+	"github.com/rs/zerolog"
 	"stash-vr/internal/config"
 )
 
@@ -147,4 +149,44 @@ func TestGetSections_ServesPreviousIndexWhenRebuildFails(t *testing.T) {
 	if _, err := svc.GetSections(context.Background()); !errors.Is(err, errStashDown) {
 		t.Fatalf("expected the rebuild error after a reset, got %v", err)
 	}
+}
+
+func TestIndex_WarnsWhenTagRefreshFails(t *testing.T) {
+	loadConfig(t, nil)
+	stash := &failingStash{inner: &routingStash{}, fail: map[string]error{"FindAllTags": errStashDown}}
+	svc := NewService(stash)
+
+	// The section resolvers log from their own goroutines.
+	var buf lockedBuffer
+	ctx := zerolog.New(&buf).WithContext(context.Background())
+
+	sections, err := svc.GetSections(ctx)
+	if err != nil {
+		t.Fatalf("a tag refresh failure must not fail the index build, got %v", err)
+	}
+	if len(sections) == 0 {
+		t.Fatal("expected the sections to be built without the tags")
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"level":"warn"`) || !strings.Contains(out, errStashDown.Error()) {
+		t.Fatalf("expected a warning carrying the tag error, got log %q", out)
+	}
+}
+
+// lockedBuffer is a bytes.Buffer safe to log to from several goroutines.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
