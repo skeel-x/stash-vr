@@ -208,6 +208,45 @@ func TestDraw_NoRoomAboveATallStrip(t *testing.T) {
 	}
 }
 
+func TestDrawOn_PaintsInPlace(t *testing.T) {
+	dst := solid(1000, 500, sky)
+	badges := []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}
+	want := Draw(solid(1000, 500, sky), badges, 0)
+
+	if !DrawOn(dst, badges, 0) {
+		t.Fatal("expected the badge drawn")
+	}
+
+	unchanged(t, dst, want, dst.Bounds(), "DrawOn must paint what Draw paints, onto the image given")
+	if !hasNear(dst, image.Rect(20, 445, 120, 480), Gold, 4) {
+		t.Fatal("expected the gold badge on the image given")
+	}
+}
+
+func TestDrawOn_NothingToDraw(t *testing.T) {
+	plain := solid(400, 200, sky)
+	badges := []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}
+	for name, c := range map[string]struct {
+		dst     *image.RGBA
+		badges  []Badge
+		reserve int
+	}{
+		"no badges":           {solid(400, 200, sky), nil, 0},
+		"tiny cover":          {solid(16, 12, sky), badges, 0},
+		"no room above strip": {solid(400, 200, sky), badges, 190},
+		"nothing fits":        {solid(12, 400, sky), badges, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if DrawOn(c.dst, c.badges, c.reserve) {
+				t.Fatal("expected nothing drawn")
+			}
+			if c.dst.Bounds() == plain.Bounds() {
+				unchanged(t, c.dst, plain, plain.Bounds(), "nothing drawn must leave the image as it was")
+			}
+		})
+	}
+}
+
 func TestDraw_NegativeReserveCountsAsNone(t *testing.T) {
 	src := solid(400, 200, sky)
 	badges := []Badge{{Kind: KindQuality, Label: "8K", Fill: Gold, Text: Dark}}

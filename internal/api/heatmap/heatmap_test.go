@@ -3,6 +3,7 @@ package heatmap
 import (
 	"bytes"
 	"context"
+	"errors"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -11,6 +12,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -123,6 +126,153 @@ func TestRenderCover_ReturnsErrorWhenScreenshotUndecodableAndHeatmapMissing(t *t
 	}
 	if coverbadge.Rendered.Len() != 0 {
 		t.Fatal("a failed render must not be cached")
+	}
+}
+
+// countingFixture serves the gif cover and png heatmap fixtures after delay
+// and counts the cover fetches.
+func countingFixture(t *testing.T, delay time.Duration) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+	var fetches atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/cover", func(w http.ResponseWriter, r *http.Request) {
+		fetches.Add(1)
+		time.Sleep(delay)
+		http.ServeFile(w, r, filepath.Join("testdata", "cover.gif"))
+	})
+	mux.HandleFunc("/heatmap", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, filepath.Join("testdata", "heatmap.png"))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv, &fetches
+}
+
+func TestRenderCover_ConcurrentRequestsShareOneFetchAndRender(t *testing.T) {
+	coverbadge.ResetCache()
+	t.Cleanup(coverbadge.ResetCache)
+	srv, fetches := countingFixture(t, 150*time.Millisecond)
+
+	const callers = 8
+	results := make([][]byte, callers)
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			results[i], errs[i] = RenderCover(context.Background(), "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
+		}(i)
+	}
+	wg.Wait()
+
+	for i := range results {
+		if errs[i] != nil {
+			t.Fatal(errs[i])
+		}
+		if !bytes.Equal(results[i], results[0]) {
+			t.Fatal("every caller must get the same cover")
+		}
+	}
+	if n := fetches.Load(); n != 1 {
+		t.Fatalf("expected one screenshot fetch for %d concurrent requests, got %d", callers, n)
+	}
+	if coverbadge.Rendered.Len() != 1 {
+		t.Fatalf("expected one rendered cover cached, got %d", coverbadge.Rendered.Len())
+	}
+}
+
+func TestRenderCover_CallerGivingUpDoesNotWaitForTheLeader(t *testing.T) {
+	coverbadge.ResetCache()
+	t.Cleanup(coverbadge.ResetCache)
+	srv, _ := countingFixture(t, 300*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := RenderCover(ctx, "1", srv.URL+"/cover", srv.URL+"/heatmap", nil)
+
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected the caller's deadline, got %v", err)
+	}
+	if time.Since(start) > 250*time.Millisecond {
+		t.Fatal("a caller that gave up must not wait for the render")
+	}
+	// The leader carries on detached from the caller, so the next request
+	// finds the cover rendered.
+	deadline := time.Now().Add(3 * time.Second)
+	for coverbadge.Rendered.Len() == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if coverbadge.Rendered.Len() != 1 {
+		t.Fatal("expected the leader to finish the render for the callers after it")
+	}
+}
+
+func TestRenderSlots_BoundRendersAndHonourTheContext(t *testing.T) {
+	if n := renderConcurrency(); n < 2 || n > 8 || cap(renderSlots) != n {
+		t.Fatalf("expected between 2 and 8 render slots, got %d (cap %d)", n, cap(renderSlots))
+	}
+	var releases []func()
+	for i := 0; i < cap(renderSlots); i++ {
+		release, err := acquireRenderSlot(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		releases = append(releases, release)
+	}
+	t.Cleanup(func() {
+		for _, r := range releases {
+			r()
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if _, err := acquireRenderSlot(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("with every slot taken the wait must end with the context, got %v", err)
+	}
+	if _, err := renderJPEG(ctx, skyPNG(t, 16, 12), nil, nil); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("a render must wait for a slot, got %v", err)
+	}
+
+	releases[0]()
+	releases = releases[1:]
+	release, err := acquireRenderSlot(context.Background())
+	if err != nil {
+		t.Fatalf("a released slot must be free again, got %v", err)
+	}
+	releases = append(releases, release)
+}
+
+func TestComposeCover_HeatmapAndBadgesLandOnOneImage(t *testing.T) {
+	setBadges(t, config.CoverBadges{})
+	heat, err := os.ReadFile(filepath.Join("testdata", "heatmap.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gold := []coverbadge.Badge{{Kind: coverbadge.KindQuality, Label: "8K", Fill: coverbadge.Gold, Text: coverbadge.Dark}}
+	var jpg bytes.Buffer
+	if err := jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 400, 200)), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, shot := range map[string][]byte{"png": skyPNG(t, 400, 200), "jpeg": jpg.Bytes()} {
+		t.Run(name, func(t *testing.T) {
+			img, err := composeCover(context.Background(), shot, heat, gold)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if img.Bounds() != image.Rect(0, 0, 400, 200) {
+				t.Fatalf("size changed: %v", img.Bounds())
+			}
+			if !hasColour(img, image.Rect(8, 170, 100, 188), coverbadge.Gold) {
+				t.Fatal("expected the gold badge above the strip")
+			}
+			if near(img.At(200, 199), sky, 12) || near(img.At(200, 199), color.RGBA{A: 255}, 12) {
+				t.Fatal("expected the heatmap across the bottom row")
+			}
+		})
 	}
 }
 

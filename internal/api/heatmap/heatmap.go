@@ -9,6 +9,7 @@ import (
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 	"image"
 	_ "image/gif"
 	"image/jpeg"
@@ -17,6 +18,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"runtime"
 	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/config"
 	"stash-vr/internal/stash"
@@ -122,13 +124,70 @@ func LoadScreenshot(ctx context.Context, fileUrl string) (contentType string, bo
 	return "image/jpeg", buf.Bytes(), nil
 }
 
+// renderGroup collapses concurrent requests for the same cover into one
+// fetch and render: a headset opening a page asks for many covers at once,
+// and two players may ask for the same scene.
+var renderGroup singleflight.Group
+
+// renderTimeout bounds the work a renderGroup leader does on behalf of the
+// callers sharing its result. The leader runs detached from the context of
+// whichever request started it, so that request dropping does not fail the
+// others, and under this deadline so it cannot hang them.
+const renderTimeout = 60 * time.Second
+
+// renderSlots bounds how many covers are decoded, composed and encoded at
+// once: each holds a full RGBA copy of its screenshot and takes a CPU for
+// a while, and a headset asks for a page of covers in one burst.
+var renderSlots = make(chan struct{}, renderConcurrency())
+
+// renderConcurrency is the number of renders allowed at once: one per
+// CPU, at least 2, at most 8.
+func renderConcurrency() int {
+	return min(8, max(2, runtime.NumCPU()))
+}
+
+// acquireRenderSlot waits for a render slot, or for ctx to end, and
+// returns the function that gives the slot back.
+func acquireRenderSlot(ctx context.Context) (release func(), err error) {
+	select {
+	case renderSlots <- struct{}{}:
+		return func() { <-renderSlots }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
 // RenderCover returns a scene's cover as JPEG: the screenshot at coverUrl
 // with the heatmap at heatmapUrl across the bottom (when heatmapUrl is
 // set and the heatmap loads) and badges drawn in the bottom left corner,
 // above the heatmap strip. Covers already rendered from the same
-// screenshot, heatmap and badges come from coverbadge.Rendered. A missing
-// screenshot is ErrImageNotFound.
+// screenshot, heatmap and badges come from coverbadge.Rendered, and
+// concurrent calls for the same cover share one fetch and render. A
+// missing screenshot is ErrImageNotFound.
 func RenderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
+	key := sceneId + "\x00" + coverbadge.Key(badges) + "\x00" + coverUrl + "\x00" + heatmapUrl
+	ch := renderGroup.DoChan(key, func() (interface{}, error) {
+		lctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), renderTimeout)
+		defer cancel()
+		return renderCover(lctx, sceneId, coverUrl, heatmapUrl, badges)
+	})
+	select {
+	case r := <-ch:
+		if r.Err != nil {
+			return nil, r.Err
+		}
+		if r.Shared {
+			log.Ctx(ctx).Trace().Msg("Rendered cover shared with a concurrent request")
+		}
+		return r.Val.([]byte), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// renderCover fetches the sources, answers from coverbadge.Rendered when
+// the same cover was rendered before, else renders and caches it.
+func renderCover(ctx context.Context, sceneId string, coverUrl string, heatmapUrl string, badges []coverbadge.Badge) ([]byte, error) {
 	shot, heat, err := fetchSources(ctx, coverUrl, heatmapUrl)
 	if err != nil {
 		return nil, err
@@ -188,8 +247,14 @@ func fetchSources(ctx context.Context, coverUrl string, heatmapUrl string) (shot
 	return shot, heat, nil
 }
 
-// renderJPEG composes the cover and encodes it as JPEG.
+// renderJPEG composes the cover and encodes it as JPEG, holding a render
+// slot meanwhile.
 func renderJPEG(ctx context.Context, shot, heat []byte, badges []coverbadge.Badge) ([]byte, error) {
+	release, err := acquireRenderSlot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	cover, err := composeCover(ctx, shot, heat, badges)
 	if err != nil {
 		return nil, err
@@ -201,33 +266,36 @@ func renderJPEG(ctx context.Context, shot, heat []byte, badges []coverbadge.Badg
 	return buf.Bytes(), nil
 }
 
-// composeCover decodes the screenshot, overlays the heatmap when heat is
-// set and decodes, and draws the badges above the heatmap strip.
-func composeCover(ctx context.Context, shot, heat []byte, badges []coverbadge.Badge) (image.Image, error) {
+// composeCover decodes the screenshot into one RGBA, overlays the heatmap
+// on it when heat is set and decodes, and draws the badges on it above the
+// heatmap strip. The decoded screenshot is copied at most once: not at all
+// when it decodes to RGBA already.
+func composeCover(ctx context.Context, shot, heat []byte, badges []coverbadge.Badge) (*image.RGBA, error) {
 	img, format, err := image.Decode(bytes.NewReader(shot))
 	if err != nil {
 		return nil, fmt.Errorf("decode screenshot: %w", err)
 	}
 	log.Ctx(ctx).Trace().Str("format", format).Msg("Decoded screenshot")
+	dst, ok := img.(*image.RGBA)
+	if !ok {
+		dst = image.NewRGBA(img.Bounds())
+		draw.Draw(dst, dst.Bounds(), img, img.Bounds().Min, draw.Src)
+	}
 	strip := 0
 	if heat != nil {
 		if heatmap, _, err := image.Decode(bytes.NewReader(heat)); err != nil {
 			log.Ctx(ctx).Debug().Err(err).Msg("Undecodable heatmap, leaving it out")
 		} else {
-			dest, ok := img.(draw.Image)
-			if !ok {
-				dest = image.NewRGBA(img.Bounds())
-				draw.Copy(dest, img.Bounds().Min, img, img.Bounds(), draw.Src, nil)
-			}
-			img, strip = overlay(dest, heatmap)
+			strip = overlay(dst, heatmap)
 		}
 	}
-	return coverbadge.Draw(img, badges, strip), nil
+	coverbadge.DrawOn(dst, badges, strip)
+	return dst, nil
 }
 
-// overlay scales heatmap across the bottom of dest and returns dest with
+// overlay scales heatmap across the bottom of dest, in place, and returns
 // the height of the strip it covers.
-func overlay(dest draw.Image, heatmap image.Image) (image.Image, int) {
+func overlay(dest draw.Image, heatmap image.Image) int {
 	destSize := dest.Bounds().Size()
 	heatmapHeight := config.Application().HeatmapHeightPx
 	if heatmapHeight == 0 {
@@ -235,5 +303,5 @@ func overlay(dest draw.Image, heatmap image.Image) (image.Image, int) {
 	}
 	heatmapHeight = int(math.Min(float64(destSize.Y), float64(heatmapHeight)))
 	draw.NearestNeighbor.Scale(dest, image.Rect(0, destSize.Y, destSize.X, destSize.Y-heatmapHeight), heatmap, heatmap.Bounds(), draw.Src, nil)
-	return dest, heatmapHeight
+	return heatmapHeight
 }

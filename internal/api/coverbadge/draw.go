@@ -40,39 +40,68 @@ var boldFont = sync.OnceValues(func() (*sfnt.Font, error) {
 	return opentype.Parse(gobold.TTF)
 })
 
-// Draw returns a copy of img with badges drawn left to right in its bottom
+// placement is where a cover's badges go: their height, the inset from the
+// edges and the row of their top edge.
+type placement struct {
+	h, inset, y int
+}
+
+// place sizes the badges for a cover of bounds b with bottomReserve rows
+// taken by the heatmap strip. ok is false when there is nothing to draw:
+// no badges, a cover too small for a legible badge, or no room above the
+// strip.
+func place(b image.Rectangle, badges []Badge, bottomReserve int) (p placement, ok bool) {
+	if len(badges) == 0 {
+		return placement{}, false
+	}
+	p.h = badgeHeight(b.Dy())
+	if p.h < minDrawable {
+		return placement{}, false
+	}
+	p.inset = max(2, int(math.Round(float64(b.Dx())*insetShare)))
+	p.y = b.Max.Y - max(0, bottomReserve) - p.inset - p.h
+	if p.y < b.Min.Y {
+		return placement{}, false
+	}
+	return p, true
+}
+
+// Draw returns a copy of img with badges drawn as DrawOn draws them. The
+// size is unchanged and img is not modified. With no badges, or no room
+// for one, img is returned as it is.
+func Draw(img image.Image, badges []Badge, bottomReserve int) image.Image {
+	b := img.Bounds()
+	if _, ok := place(b, badges, bottomReserve); !ok {
+		return img
+	}
+	dst := image.NewRGBA(b)
+	draw.Draw(dst, b, img, b.Min, draw.Src)
+	DrawOn(dst, badges, bottomReserve)
+	return dst
+}
+
+// DrawOn draws badges onto dst, in place, left to right in its bottom
 // left corner, clear of the top left corner where HereSphere draws its
 // own icons. bottomReserve is the height of the heatmap strip overlaid at
-// the bottom, 0 for none; the badges sit the inset above it. The size is
-// unchanged and img is not modified. Badges that do not fit the width
-// are dropped; with no badges, or no room for one, img is returned as it
-// is.
-func Draw(img image.Image, badges []Badge, bottomReserve int) image.Image {
-	if len(badges) == 0 {
-		return img
+// the bottom, 0 for none; the badges sit the inset above it. Badges that
+// do not fit the width are dropped; with no badges, or no room for one,
+// dst is left as it is. It reports whether anything was drawn.
+func DrawOn(dst draw.Image, badges []Badge, bottomReserve int) bool {
+	b := dst.Bounds()
+	p, ok := place(b, badges, bottomReserve)
+	if !ok {
+		return false
 	}
-	b := img.Bounds()
-	h := badgeHeight(b.Dy())
-	if h < minDrawable {
-		return img
-	}
-	inset := max(2, int(math.Round(float64(b.Dx())*insetShare)))
-	y := b.Max.Y - max(0, bottomReserve) - inset - h
-	if y < b.Min.Y {
-		return img
-	}
+	h, inset, y := p.h, p.inset, p.y
 	fnt, err := boldFont()
 	if err != nil {
-		return img
+		return false
 	}
 	face, err := opentype.NewFace(fnt, &opentype.FaceOptions{Size: float64(h) * textShare, DPI: 72, Hinting: font.HintingNone})
 	if err != nil {
-		return img
+		return false
 	}
 	defer func() { _ = face.Close() }()
-
-	dst := image.NewRGBA(b)
-	draw.Draw(dst, b, img, b.Min, draw.Src)
 
 	pad := int(math.Round(float64(h) * paddingShare))
 	gap := max(2, int(math.Round(float64(h)*gapShare)))
@@ -80,6 +109,7 @@ func Draw(img image.Image, badges []Badge, bottomReserve int) image.Image {
 	baseline := textBaseline(face, h)
 
 	x := b.Min.X + inset
+	drawn := false
 	for i := range badges {
 		bg := &badges[i]
 		w := font.MeasureString(face, bg.Label).Ceil() + 2*pad
@@ -90,8 +120,9 @@ func Draw(img image.Image, badges []Badge, bottomReserve int) image.Image {
 		d := font.Drawer{Dst: dst, Src: image.NewUniform(bg.Text), Face: face, Dot: fixed.P(x+pad, y+baseline)}
 		d.DrawString(bg.Label)
 		x += w + gap
+		drawn = true
 	}
-	return dst
+	return drawn
 }
 
 // badgeHeight is 7% of the cover height, at least minHeight, at most a
