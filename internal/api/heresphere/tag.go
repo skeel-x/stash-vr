@@ -8,6 +8,7 @@ import (
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/prefix"
+	"stash-vr/internal/stash/gql"
 	"stash-vr/internal/util"
 	"strconv"
 	"strings"
@@ -81,8 +82,20 @@ func addMultiTracks(target *[]tagDto, tags []tagDto, startTrack int) int {
 	return startTrack + tagCount
 }
 
+// firstFile returns the scene's primary file, or nil when the scene has
+// none (Stash lists a scene whose file has gone missing without one).
+func firstFile(vd *library.VideoData) *gql.ScenePartsFilesVideoFile {
+	if vd == nil || vd.SceneParts == nil || len(vd.SceneParts.Files) == 0 {
+		return nil
+	}
+	return vd.SceneParts.Files[0]
+}
+
 func getTags(vd *library.VideoData) []tagDto {
-	duration := vd.SceneParts.Files[0].Duration * 1000
+	var duration float64
+	if f := firstFile(vd); f != nil {
+		duration = f.Duration * 1000
+	}
 
 	var tags []tagDto
 
@@ -241,9 +254,11 @@ func getFields(vd *library.VideoData) []tagDto {
 	}
 	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%d", internal.LegendMetaOCount, seperator, oCount)})
 
-	resolution, tier := library.NearestResolution(vd.SceneParts.Files[0].Height)
-	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%dp", internal.LegendMetaResolution, seperator, resolution)})
-	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%s", internal.LegendMetaResolution, seperator, tier)})
+	if f := firstFile(vd); f != nil {
+		resolution, tier := library.NearestResolution(f.Height)
+		tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%dp", internal.LegendMetaResolution, seperator, resolution)})
+		tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%s", internal.LegendMetaResolution, seperator, tier)})
+	}
 
 	tags = append(tags, tagDto{Name: fmt.Sprintf("%s%s%v", internal.LegendMetaOrganized, seperator, vd.SceneParts.Organized)})
 

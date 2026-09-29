@@ -3,7 +3,6 @@ package library
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 	"stash-vr/internal/stash/gql"
 	"strconv"
@@ -135,10 +134,19 @@ func (libraryService *Service) ResetSections() {
 	libraryService.muSets.Unlock()
 }
 
+// snapshot copies the fetched scenes out of the cache. Ids the index lists
+// but no fetch has answered yet (or that Stash no longer returns) are held
+// as nil placeholders and left out, so callers never see a nil scene.
 func (libraryService *Service) snapshot() map[string]*VideoData {
 	libraryService.muVdCache.RLock()
 	defer libraryService.muVdCache.RUnlock()
-	return maps.Clone(libraryService.vdCache)
+	out := make(map[string]*VideoData, len(libraryService.vdCache))
+	for id, vd := range libraryService.vdCache {
+		if vd != nil {
+			out[id] = vd
+		}
+	}
+	return out
 }
 
 func NewService(client graphql.Client) *Service {

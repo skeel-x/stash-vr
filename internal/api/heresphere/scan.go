@@ -27,16 +27,26 @@ type scanDataDto struct {
 	Tags         []tagDto `json:"tags,omitempty"`
 }
 
+// buildScan lists every scene that has a file. A scene the cache could not
+// fetch or that Stash lists without a file is skipped, not fatal: one bad
+// scene must not cost the whole library.
 func buildScan(ctx context.Context, vds map[string]*library.VideoData, baseUrl string) (*scanDocDto, error) {
 	scanDoc := scanDocDto{ScanData: make([]scanDataDto, 0, len(vds))}
-	for _, vd := range vds {
+	skipped := 0
+	for id, vd := range vds {
+		if firstFile(vd) == nil {
+			log.Ctx(ctx).Debug().Str("id", id).Msg("/scan: scene without a file skipped")
+			skipped++
+			continue
+		}
 		scanData := videoDataToScanDataDto(ctx, vd, baseUrl)
 		scanDoc.ScanData = append(scanDoc.ScanData, scanData)
 	}
-	log.Ctx(ctx).Debug().Int("scenes", len(scanDoc.ScanData)).Msg("/scan")
+	log.Ctx(ctx).Debug().Int("scenes", len(scanDoc.ScanData)).Int("skipped", skipped).Msg("/scan")
 	return &scanDoc, nil
 }
 
+// videoDataToScanDataDto builds the scan entry; vd must have a file.
 func videoDataToScanDataDto(ctx context.Context, vd *library.VideoData, baseUrl string) scanDataDto {
 	id := vd.Id()
 	scanData := scanDataDto{

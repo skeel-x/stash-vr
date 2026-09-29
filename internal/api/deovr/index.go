@@ -24,28 +24,35 @@ type previewDataDto struct {
 	VideoUrl     string  `json:"video_url"`
 }
 
+// buildIndex lists each section's scenes. A scene id the cache could not
+// resolve, or a scene without a file, is left out of its section rather
+// than failing the whole index.
 func buildIndex(sections []library.Section, vds map[string]*library.VideoData, baseUrl string) (indexDto, error) {
 	index := indexDto{Authorized: "1", Scenes: make([]sceneDto, len(sections))}
 
 	for i, section := range sections {
 		s := sceneDto{
 			Name: section.Name,
-			List: make([]previewDataDto, len(section.Ids)),
+			List: make([]previewDataDto, 0, len(section.Ids)),
 		}
-		index.Scenes[i] = s
 
-		for j, sectionSceneId := range section.Ids {
+		for _, sectionSceneId := range section.Ids {
 			vd := vds[sectionSceneId]
-			s.List[j] = previewDataDto{
+			if vd == nil || vd.SceneParts == nil || len(vd.SceneParts.Files) == 0 || vd.SceneParts.Files[0] == nil {
+				continue
+			}
+			preview := previewDataDto{
 				Id:          vd.SceneParts.Id,
 				Title:       vd.Title(),
 				VideoLength: int(vd.SceneParts.Files[0].Duration),
 				VideoUrl:    getVideoDataUrl(baseUrl, vd.Id()),
 			}
 			if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
-				s.List[j].ThumbnailUrl = util.Ptr(heatmap.GetCoverUrl(baseUrl, vd.Id()))
+				preview.ThumbnailUrl = util.Ptr(heatmap.GetCoverUrl(baseUrl, vd.Id()))
 			}
+			s.List = append(s.List, preview)
 		}
+		index.Scenes[i] = s
 	}
 
 	return index, nil
