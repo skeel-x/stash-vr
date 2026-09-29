@@ -20,6 +20,11 @@ type httpHandler struct {
 	libraryService *library.Service
 	// playback tracks what every client is playing; see playbackTracker.
 	playback *playbackTracker
+	// sceneLocks serialises the write-backs of one scene: HereSphere
+	// sends a scene request per change, and two of them overlapping read
+	// the same cached markers and tags, so both created the same marker
+	// and the later one undid the earlier one's tag edits.
+	sceneLocks util.KeyedMutex
 }
 
 func newHttpHandler(libraryService *library.Service) *httpHandler {
@@ -162,7 +167,10 @@ func (h *httpHandler) videoDataHandler(w http.ResponseWriter, req *http.Request)
 // processUpdates writes the request's changes to Stash. It runs after the
 // response is sent, detached from the request's cancellation but bounded by
 // updateTimeout; reqCtx is the request context it keeps the values of.
+// Updates of the same scene run one at a time, in the order they get the
+// lock; the timeout starts once the update holds it.
 func (h *httpHandler) processUpdates(reqCtx context.Context, videoId string, vdReq videoDataRequestDto) {
+	defer h.sceneLocks.Lock(videoId)()
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), updateTimeout)
 	defer cancel()
 	defer util.RecoverLog(ctx, "process updates for scene "+videoId)
