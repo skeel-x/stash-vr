@@ -141,13 +141,28 @@ func buildVideoData(ctx context.Context, vd *library.VideoData, baseUrl string, 
 
 	dto.Tags = getTags(vd)
 
+	// The preview and media URLs carry the Stash API key; it must never
+	// reach the log or the Log page.
 	log.Ctx(ctx).Debug().
 		Str("thumbImage", derefOr(dto.ThumbnailImage)).
-		Str("thumbVideo", derefOr(dto.ThumbnailVideo)).
+		Str("thumbVideo", stash.Redacted(derefOr(dto.ThumbnailVideo))).
 		Str("codec", vd.SceneParts.Files[0].Video_codec).
-		Interface("media", dto.Media).Send()
+		Interface("media", redactedMedia(dto.Media)).Send()
 
 	return &dto, nil
+}
+
+// redactedMedia copies media with the Stash API key stripped from every
+// source URL, for the debug log.
+func redactedMedia(media []mediaDto) []mediaDto {
+	out := make([]mediaDto, len(media))
+	for i := range media {
+		out[i] = mediaDto{Name: media[i].Name, Sources: make([]sourceDto, len(media[i].Sources))}
+		for j, s := range media[i].Sources {
+			out[i].Sources[j] = sourceDto{Resolution: s.Resolution, Url: stash.Redacted(s.Url)}
+		}
+	}
+	return out
 }
 
 func derefOr(s *string) string {

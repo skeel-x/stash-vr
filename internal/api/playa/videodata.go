@@ -198,8 +198,21 @@ func buildVideoLinks(vd *library.VideoData, trailer bool) []VideoLinkView {
 		}
 	})
 	deduped := dedupeLinks(candidates)
-	log.Debug().Str("video_id", vd.Id()).Interface("links", deduped).Msg("Generated video links")
+	log.Debug().Str("video_id", vd.Id()).Interface("links", redactedLinks(deduped)).Msg("Generated video links")
 	return deduped
+}
+
+// redactedLinks copies links with the Stash API key stripped from their
+// URLs, for the debug log: the key must never reach the log or the Log page.
+func redactedLinks(links []VideoLinkView) []VideoLinkView {
+	out := make([]VideoLinkView, len(links))
+	for i := range links {
+		out[i] = links[i]
+		if links[i].URL != nil {
+			out[i].URL = util.Ptr(stash.Redacted(*links[i].URL))
+		}
+	}
+	return out
 }
 
 func buildPlayableLinkCandidates(vd *library.VideoData, projection string, stereo string) []videoLinkCandidate {

@@ -1,12 +1,14 @@
 package heresphere
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"stash-vr/internal/config"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash/gql"
@@ -275,5 +277,57 @@ func TestBuildVideoData_VerticalCorrectionLinksGeneratedProfile(t *testing.T) {
 		if got := hsp(scene(0.8, "DOME"), learnedProfiles{fakeProfiles{"20": true}, "20"}); got != "https://vr.example/hsp/scene/9" {
 			t.Errorf("on=%v: studio profile should win, got %q", on, got)
 		}
+	}
+}
+
+func TestBuildVideoData_LogNeverCarriesApiKey(t *testing.T) {
+	if err := config.Load(config.ApplicationConfig{
+		ListenAddress: ":9666", StashGraphQLUrl: "http://stash:9999/graphql", StashApiKey: "secret", FavoriteTag: "FAVORITE",
+		LogLevel: "debug", ExcludeSortName: "hidden", SmartSectionSize: 50, ConfigPath: t.TempDir(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	ctx := zerolog.New(&buf).Level(zerolog.DebugLevel).WithContext(context.Background())
+	// Stash keys the stream urls itself when it uses authentication; the
+	// preview is keyed by stash.ApiKeyed.
+	sp := &gql.SceneParts{Id: "9", Created_at: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		Files: []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4", Duration: 100, Height: 1080, Video_codec: "h264"}},
+		Paths: &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream?apikey=secret"), Preview: util.Ptr("http://stash/scene/9/preview")},
+		SceneStreams: []*gql.ScenePartsSceneStreamsSceneStreamEndpoint{
+			{Url: "http://stash/scene/9/stream?resolution=STANDARD&apikey=secret", Mime_type: util.Ptr("video/mp4"), Label: util.Ptr("MP4 (1080p)")},
+		},
+	}
+
+	dto, err := buildVideoData(ctx, &library.VideoData{SceneParts: sp}, "https://vr.example", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(dto.Media) != 2 || !strings.Contains(dto.Media[0].Sources[0].Url, "apikey=secret") || !strings.Contains(*dto.ThumbnailVideo, "apikey=secret") {
+		t.Fatalf("the response itself must stay keyed, got %+v", dto)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, `"media"`) || !strings.Contains(logged, `"thumbVideo"`) {
+		t.Fatalf("expected the media debug line, got %q", logged)
+	}
+	if strings.Contains(logged, "secret") {
+		t.Fatalf("api key leaked into the log: %s", logged)
+	}
+	if strings.Count(logged, "apikey=REDACTED") < 3 {
+		t.Fatalf("expected every keyed url redacted in the log, got %s", logged)
+	}
+}
+
+func TestRedactedMedia_CopiesWithoutTouchingTheOriginal(t *testing.T) {
+	in := []mediaDto{{Name: "direct", Sources: []sourceDto{{Resolution: 1080, Url: "http://stash/s?apikey=secret"}}}, {Name: "transcoding"}}
+
+	out := redactedMedia(in)
+
+	if len(out) != 2 || out[0].Name != "direct" || out[0].Sources[0].Resolution != 1080 || out[0].Sources[0].Url != "http://stash/s?apikey=REDACTED" || len(out[1].Sources) != 0 {
+		t.Fatalf("unexpected redaction %+v", out)
+	}
+	if in[0].Sources[0].Url != "http://stash/s?apikey=secret" {
+		t.Fatal("the original media must not be changed")
 	}
 }
