@@ -16,6 +16,7 @@ import (
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/go-chi/chi/v5"
+	"stash-vr/internal/hsp"
 	"stash-vr/internal/library"
 )
 
@@ -217,31 +218,66 @@ func TestEvents_PlayThenPauseReportsDurationAndResumeTogether(t *testing.T) {
 	}
 }
 
-func TestVideoData_StoresProfileFromRequest(t *testing.T) {
-	loadDefaultRules(t)
-	h := newHttpHandler(library.NewService(&fakeStash{}))
-	body, _ := json.Marshal(map[string]any{"hsp": base64.StdEncoding.EncodeToString([]byte("profile-bytes"))})
+// encodedProfile is a valid profile file titled title.
+func encodedProfile(t *testing.T, title string) []byte {
+	t.Helper()
+	p := hsp.Default()
+	p.Title = title
+	data, err := hsp.Encode(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// postProfile sends a scene request for scene 7 whose hsp field is value.
+func postProfile(t *testing.T, h *httpHandler, value string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, _ := json.Marshal(map[string]any{"hsp": value})
 	req := httptest.NewRequest(http.MethodPost, "/7", bytes.NewReader(body))
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"videoId"}, Values: []string{"7"}}}))
 	rec := httptest.NewRecorder()
-
 	h.videoDataHandler(rec, req)
+	return rec
+}
+
+func TestVideoData_StoresProfileFromRequest(t *testing.T) {
+	loadDefaultRules(t)
+	h := newHttpHandler(library.NewService(&fakeStash{}))
+	good := encodedProfile(t, "Tuned")
+
+	rec := postProfile(t, h, base64.StdEncoding.EncodeToString(good))
 	waitFor(t, func() bool { return h.libraryService.HasProfile("7") })
 
 	data, _ := os.ReadFile(h.libraryService.ProfilePath("7"))
-	if rec.Code != 200 || string(data) != "profile-bytes" {
-		t.Fatalf("code %d, stored %q", rec.Code, data)
+	if rec.Code != 200 || !bytes.Equal(data, good) {
+		t.Fatalf("code %d, stored %d bytes", rec.Code, len(data))
 	}
 
-	bad, _ := json.Marshal(map[string]any{"hsp": "%%%not-base64"})
-	req = httptest.NewRequest(http.MethodPost, "/7", bytes.NewReader(bad))
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{URLParams: chi.RouteParams{Keys: []string{"videoId"}, Values: []string{"7"}}}))
-	h.videoDataHandler(httptest.NewRecorder(), req)
-	time.Sleep(50 * time.Millisecond)
-	data, _ = os.ReadFile(h.libraryService.ProfilePath("7"))
-	if string(data) != "profile-bytes" {
-		t.Fatalf("malformed hsp must not overwrite the profile, got %q", data)
+	// Neither bad base64 nor a payload that is not a profile may replace
+	// the stored one.
+	for name, value := range map[string]string{
+		"not base64":    "%%%not-base64",
+		"not a profile": base64.StdEncoding.EncodeToString([]byte("profile-bytes")),
+		"truncated":     base64.StdEncoding.EncodeToString(good[:len(good)-5]),
+	} {
+		if rec := postProfile(t, h, value); rec.Code != 200 {
+			t.Fatalf("%s: the scene document must still be served, got %d", name, rec.Code)
+		}
+		time.Sleep(50 * time.Millisecond)
+		data, _ = os.ReadFile(h.libraryService.ProfilePath("7"))
+		if !bytes.Equal(data, good) {
+			t.Fatalf("%s: must not overwrite the profile, stored %d bytes", name, len(data))
+		}
 	}
+
+	// A valid replacement still lands.
+	next := encodedProfile(t, "Retuned")
+	postProfile(t, h, base64.StdEncoding.EncodeToString(next))
+	waitFor(t, func() bool {
+		data, _ := os.ReadFile(h.libraryService.ProfilePath("7"))
+		return bytes.Equal(data, next)
+	})
 }
 
 func waitFor(t *testing.T, cond func() bool) {

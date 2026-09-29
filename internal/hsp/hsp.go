@@ -801,3 +801,11 @@ func (p *Profile) ForScene(own *Profile) *Profile {
 	out.Tags = slices.Clone(own.Tags)
 	return &out
 }
+
+// Validate reports whether data is a complete profile this package can
+// read: a write-back that fails it is not worth storing, since HereSphere
+// would not load it either. Every error wraps ErrInvalid.
+func Validate(data []byte) error {
+	_, err := Decode(data)
+	return err
+}

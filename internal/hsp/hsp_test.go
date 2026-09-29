@@ -361,3 +361,32 @@ func TestProfile_ForScene(t *testing.T) {
 		t.Fatalf("round trip lost fields: %+v", back)
 	}
 }
+
+func TestValidate(t *testing.T) {
+	good, err := Encode(Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		data []byte
+		ok   bool
+	}{
+		{"encoded profile", good, true},
+		{"empty", nil, false},
+		{"text", []byte("not a profile"), false},
+		{"truncated", good[:len(good)-7], false},
+		{"trailing bytes", append(append([]byte{}, good...), 0), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := Validate(c.data)
+			if c.ok && err != nil {
+				t.Fatalf("expected valid, got %v", err)
+			}
+			if !c.ok && !errors.Is(err, ErrInvalid) {
+				t.Fatalf("expected ErrInvalid, got %v", err)
+			}
+		})
+	}
+}

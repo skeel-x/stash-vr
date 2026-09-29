@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"stash-vr/internal/api/internal"
+	"stash-vr/internal/hsp"
 	"stash-vr/internal/library"
 	"stash-vr/internal/stash"
 	"stash-vr/internal/util"
@@ -239,6 +240,12 @@ func (h *httpHandler) saveProfile(ctx context.Context, videoId, encoded string) 
 	data, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		log.Ctx(ctx).Warn().Err(err).Str("scene", videoId).Msg("Ignoring malformed HereSphere profile")
+		return
+	}
+	// A payload that does not decode as a profile would replace a good
+	// stored one with something HereSphere cannot load either.
+	if err := hsp.Validate(data); err != nil {
+		log.Ctx(ctx).Warn().Err(err).Str("scene", videoId).Msg("Ignoring HereSphere profile that does not decode")
 		return
 	}
 	if err := h.libraryService.SaveProfile(videoId, data); err != nil {
