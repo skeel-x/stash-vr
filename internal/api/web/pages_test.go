@@ -661,3 +661,23 @@ func TestSetup_RendersCorrectVerticalStereoCheckbox(t *testing.T) {
 		t.Fatal("expected the checkbox unticked")
 	}
 }
+
+func TestSetup_NoApiKeyBoxFollowsStoredKey(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	h := PagesRouter(lib)
+
+	body := getPage(t, h, "/setup", nil).Body.String()
+	if !strings.Contains(body, `name="stash_no_api_key" type="checkbox">`) {
+		t.Fatal("expected the No API key box unticked while a key is stored")
+	}
+
+	cfg := config.Application()
+	cfg.StashApiKey = ""
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body = getPage(t, h, "/setup", nil).Body.String()
+	if !strings.Contains(body, `name="stash_no_api_key" type="checkbox" checked>`) {
+		t.Fatal("expected the No API key box ticked without a stored key")
+	}
+}

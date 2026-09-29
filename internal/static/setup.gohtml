@@ -11,6 +11,7 @@
     <input name="stash_api_key" type="password" value="" placeholder="{{if .Config.StashApiKeySet}}set, leave blank to keep{{else}}paste the key from Stash, Settings, Security{{end}}">
     <small>Changing the Stash host needs the key again.</small>
   </label>
+  <label class="check"><input name="stash_no_api_key" type="checkbox"{{if not .Config.StashApiKeySet}} checked{{end}}> No API key (Stash without authentication; saving clears a stored key)</label>
   <label class="check"><input name="stash_tls_insecure" type="checkbox" {{if .Config.StashTLSInsecure}}checked{{end}}> Skip TLS certificate verification (self-signed https Stash; the certificate is checked otherwise)</label>
   <div class="row">
     <button type="button" id="test">Test connection</button>

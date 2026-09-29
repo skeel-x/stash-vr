@@ -84,9 +84,14 @@
   // Setup form.
   const form = $('#setup');
   if (form) {
+    // The key is left out to keep the stored one, sent empty to clear it
+    // ("No API key" ticked), else sent as typed.
+    const apiKey = () => (form.stash_no_api_key.checked ? '' : (form.stash_api_key.value.trim() || undefined));
+    form.stash_api_key.addEventListener('input', () => { if (form.stash_api_key.value.trim()) form.stash_no_api_key.checked = false; });
+    form.stash_no_api_key.addEventListener('change', () => { if (form.stash_no_api_key.checked) form.stash_api_key.value = ''; });
     const read = () => ({
       stash_graphql_url: form.stash_graphql_url.value.trim(),
-      stash_api_key: form.stash_api_key.value.trim(),
+      stash_api_key: apiKey(),
       stash_tls_insecure: form.stash_tls_insecure.checked,
       favorite_tag: form.favorite_tag.value.trim(),
       exclude_sort_name: form.exclude_sort_name.value.trim(),
@@ -116,7 +121,7 @@
     $('#test').addEventListener('click', async () => {
       setMsg($('#test-msg'), 'Testing');
       try {
-        const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: form.stash_api_key.value.trim(), stash_tls_insecure: form.stash_tls_insecure.checked });
+        const r = await api('POST', '/config/test', { stash_graphql_url: form.stash_graphql_url.value.trim(), stash_api_key: apiKey(), stash_tls_insecure: form.stash_tls_insecure.checked });
         // The server appends /graphql to a bare host; show what it tested.
         if (r.stash_graphql_url) form.stash_graphql_url.value = r.stash_graphql_url;
         setMsg($('#test-msg'), r.ok ? 'Connected to Stash ' + r.stash_version : r.error, r.ok ? 'ok' : 'err');
@@ -130,6 +135,7 @@
         form.stash_graphql_url.value = cfg.stash_graphql_url;
         form.stash_api_key.value = '';
         form.stash_api_key.placeholder = cfg.stash_api_key_set ? 'set, leave blank to keep' : 'paste the key from Stash, Settings, Security';
+        form.stash_no_api_key.checked = !cfg.stash_api_key_set;
         setMsg($('#save-msg'), 'Saved and applied', 'ok');
       } catch (e) { setMsg($('#save-msg'), e.message, 'err'); }
     });

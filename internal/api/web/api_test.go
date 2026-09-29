@@ -173,11 +173,11 @@ func TestGetConfig_NeverExposesApiKey(t *testing.T) {
 	}
 }
 
-func TestPutConfig_BlankKeyKeepsCurrentAndPersists(t *testing.T) {
+func TestPutConfig_MissingKeyKeepsCurrentAndPersists(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "LOVED", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "LOVED", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 	}
 
@@ -199,8 +199,8 @@ func TestPutConfig_BlankKeyKeepsCurrentAndPersists(t *testing.T) {
 func TestPutConfig_PersistsSmartSectionSize(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 120,
 	}
 
@@ -217,8 +217,8 @@ func TestPutConfig_PersistsSmartSectionSize(t *testing.T) {
 func TestPutConfig_PersistsDeovrAutoload(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"deovr_autoload": false,
 	}
@@ -250,8 +250,8 @@ func TestPutConfig_PersistsDeovrAutoload(t *testing.T) {
 func TestPutConfig_PersistsPerformerFacets(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"performer_facets": false,
 	}
@@ -283,8 +283,8 @@ func TestPutConfig_PersistsPerformerFacets(t *testing.T) {
 func TestPutConfig_PersistsDateSettings(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"date_lookup": false, "date_writeback": true,
 	}
@@ -330,8 +330,8 @@ func TestPutConfig_PersistsAutoSectionMinsAndRebuildsIndex(t *testing.T) {
 		t.Fatalf("thresholds default to 0: expected no grouping query, got %d", n)
 	}
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"auto_studio_min": 2, "auto_performer_min": 30,
 	}
@@ -377,8 +377,8 @@ func TestPutConfig_PersistsAutoSectionMinsAndRebuildsIndex(t *testing.T) {
 func TestPutConfig_MissingSmartSectionSizeKeepsCurrent(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info",
 	}
 
@@ -417,8 +417,8 @@ func TestPutConfig_NewUrlSwapsLibraryClient(t *testing.T) {
 func TestPutConfig_NewHostWithoutKeyIs400(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://elsewhere:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 	}
 
@@ -439,7 +439,7 @@ func TestTestConfig_NewHostWithoutKeyIsRefused(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 
 	rec, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
-		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
+		"stash_graphql_url": "http://elsewhere:9999/graphql",
 	})
 
 	if rec.Code != 200 || out["ok"] != false {
@@ -470,7 +470,7 @@ func TestMutation_RequiresJsonContentType(t *testing.T) {
 func TestPutConfig_InvalidIs400AndUnchanged(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "nope", "stash_api_key": "", "favorite_tag": "FAVORITE",
+		"stash_graphql_url": "nope", "favorite_tag": "FAVORITE",
 		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info", "smart_section_size": 50,
 	}
 
@@ -491,7 +491,7 @@ func TestTestConfig_DoesNotPersist(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 
 	rec, out := do(t, h, http.MethodPost, "/config/test", map[string]any{
-		"stash_graphql_url": "http://127.0.0.1:1/graphql", "stash_api_key": "",
+		"stash_graphql_url": "http://127.0.0.1:1/graphql", "stash_api_key": "k",
 	})
 
 	if msg, _ := out["error"].(string); rec.Code != 200 || out["ok"] != false || msg == "" {
@@ -575,7 +575,7 @@ func TestTestConfig_DoesNotEchoNonJsonResponseBody(t *testing.T) {
 
 func TestPutConfig_InvalidUrlReportsValidationNotHostRule(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
-	body := map[string]any{"stash_graphql_url": "nope", "stash_api_key": "", "favorite_tag": "FAVORITE",
+	body := map[string]any{"stash_graphql_url": "nope", "favorite_tag": "FAVORITE",
 		"exclude_sort_name": "hidden", "heatmap_height_px": 0, "log_level": "info", "smart_section_size": 50}
 
 	rec, out := do(t, h, http.MethodPut, "/config", body)
@@ -613,8 +613,8 @@ func TestPutConfig_LogLevelChangeSetsGlobalLevel(t *testing.T) {
 	t.Cleanup(func() { zerolog.SetGlobalLevel(zerolog.InfoLevel) })
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "debug", "smart_section_size": 50,
 	}
 
@@ -639,8 +639,8 @@ func TestPutConfig_LogLevelChangeSetsGlobalLevel(t *testing.T) {
 func TestPutConfig_PersistsFunscriptIndexPath(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"funscript_index_path": "/opt/stash/funscript_index.sqlite",
 	}
@@ -899,8 +899,8 @@ func TestPutConfig_CoverBadgesAreAdditive(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	base := func() map[string]any {
 		return map[string]any{
-			"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-			"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+			"stash_graphql_url": "http://stash:9999/graphql",
+			"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 			"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		}
 	}
@@ -972,8 +972,8 @@ func TestGetRandom_CoverUrlCarriesBadgeFingerprint(t *testing.T) {
 func TestPutConfig_LearnStudioProfiles(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"learn_studio_profiles": true,
 	}
@@ -992,8 +992,8 @@ func TestPutConfig_LearnStudioProfiles(t *testing.T) {
 func TestPutConfig_CorrectVerticalStereo(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"correct_vertical_stereo": true,
 	}
@@ -1053,8 +1053,8 @@ func TestPutConfig_PersistsTLSInsecureAndSwapsClient(t *testing.T) {
 	lib, h := newEnv(t, &fakeStash{})
 	before := lib.Client()
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 		"stash_tls_insecure": true,
 	}
@@ -1104,8 +1104,8 @@ func TestDescribeStashError_CertificateProblems(t *testing.T) {
 func TestPutConfig_BareHostGetsGraphqlAndCountsAsSameHost(t *testing.T) {
 	_, h := newEnv(t, &fakeStash{})
 	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999", "stash_api_key": "",
-		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"stash_graphql_url": "http://stash:9999",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
 	}
 
@@ -1139,5 +1139,151 @@ func TestTestConfig_EchoesNormalisedUrl(t *testing.T) {
 
 	if out["ok"] != true || out["stash_graphql_url"] != srv.URL+"/graphql" {
 		t.Fatalf("expected the bare host probed at /graphql and echoed, got %v", out)
+	}
+}
+
+func TestPutConfig_EmptyKeyClearsStoredKey(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	before := lib.Client()
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "log_level": "info",
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["stash_api_key_set"] != false {
+		t.Fatalf("expected 200 with the key reported unset, got %d %v", rec.Code, out)
+	}
+	if config.Application().StashApiKey != "" {
+		t.Fatalf("expected the key cleared, got %q", config.Application().StashApiKey)
+	}
+	data, _ := os.ReadFile(config.FilePath(config.Application()))
+	if !strings.Contains(string(data), `"stash_api_key": ""`) {
+		t.Fatalf("expected the empty key persisted, got %s", data)
+	}
+	if lib.Client() == before {
+		t.Fatal("expected the library client to be replaced after clearing the key")
+	}
+}
+
+func TestPutConfig_NewHostWithEmptyKeyIsAccepted(t *testing.T) {
+	// A Stash without authentication on another host: the caller says so
+	// with an explicit empty key, and nothing stored can leak.
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://elsewhere:9999/graphql", "stash_api_key": "",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "log_level": "info",
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["stash_api_key_set"] != false || out["stash_graphql_url"] != "http://elsewhere:9999/graphql" {
+		t.Fatalf("expected 200 with the new host and no key, got %d %v", rec.Code, out)
+	}
+	if cfg := config.Application(); cfg.StashGraphQLUrl != "http://elsewhere:9999/graphql" || cfg.StashApiKey != "" {
+		t.Fatalf("expected the new host stored without a key, got %+v", cfg)
+	}
+}
+
+func TestPutConfig_NewHostWithoutStoredKeyNeedsNone(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.StashApiKey = ""
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := map[string]any{
+		"stash_graphql_url": "http://elsewhere:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "log_level": "info",
+	}
+
+	rec, _ := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || config.Application().StashGraphQLUrl != "http://elsewhere:9999/graphql" {
+		t.Fatalf("with no key stored there is nothing to protect: expected 200, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPutConfig_WhitespaceInsideKeyIs400(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql", "stash_api_key": "ab cd",
+		"favorite_tag": "FAVORITE", "exclude_sort_name": "hidden", "log_level": "info",
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if msg, _ := out["error"].(string); rec.Code != 400 || !strings.Contains(msg, "whitespace") {
+		t.Fatalf("expected 400 naming whitespace, got %d %v", rec.Code, out)
+	}
+	if config.Application().StashApiKey != "secret" {
+		t.Fatal("store must be unchanged")
+	}
+}
+
+// keyRecordingStash answers the version query and records the ApiKey
+// header of the last request.
+func keyRecordingStash(t *testing.T) (*httptest.Server, func() (string, bool)) {
+	t.Helper()
+	var mu sync.Mutex
+	var key string
+	var seen bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		key, seen = r.Header.Get("ApiKey"), true
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"version":{"version":"v0.31.1"}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() (string, bool) { mu.Lock(); defer mu.Unlock(); return key, seen }
+}
+
+func TestTestConfig_KeyHandling(t *testing.T) {
+	cases := []struct {
+		name      string
+		sameHost  bool
+		body      map[string]any
+		wantOk    bool
+		wantKey   string
+		wantProbe bool
+		wantErr   string
+	}{
+		{name: "explicit empty key probes without one on a new host", body: map[string]any{"stash_api_key": ""}, wantOk: true, wantProbe: true},
+		{name: "given key is sent", body: map[string]any{"stash_api_key": "other"}, wantOk: true, wantKey: "other", wantProbe: true},
+		{name: "missing key on the same host sends the stored one", sameHost: true, body: map[string]any{}, wantOk: true, wantKey: "secret", wantProbe: true},
+		{name: "missing key on a new host is refused before probing", body: map[string]any{}, wantErr: "api key"},
+		{name: "whitespace inside the key is refused", body: map[string]any{"stash_api_key": "ab cd"}, wantErr: "whitespace"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			srv, lastKey := keyRecordingStash(t)
+			_, h := newEnv(t, &fakeStash{})
+			if c.sameHost {
+				cfg := config.Application()
+				cfg.StashGraphQLUrl = srv.URL + "/graphql"
+				if _, err := config.Set(cfg); err != nil {
+					t.Fatal(err)
+				}
+			}
+			body := map[string]any{"stash_graphql_url": srv.URL + "/graphql"}
+			for k, v := range c.body {
+				body[k] = v
+			}
+
+			_, out := do(t, h, http.MethodPost, "/config/test", body)
+
+			if out["ok"] != c.wantOk {
+				t.Fatalf("expected ok=%v, got %v", c.wantOk, out)
+			}
+			if msg, _ := out["error"].(string); c.wantErr != "" && !strings.Contains(msg, c.wantErr) {
+				t.Fatalf("expected an error mentioning %q, got %v", c.wantErr, out)
+			}
+			key, probed := lastKey()
+			if probed != c.wantProbe || key != c.wantKey {
+				t.Fatalf("expected probe=%v with ApiKey %q, got probe=%v key %q", c.wantProbe, c.wantKey, probed, key)
+			}
+		})
 	}
 }

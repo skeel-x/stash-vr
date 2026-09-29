@@ -96,11 +96,11 @@ type ConfigView struct {
 	VideoRules          []config.VideoRule `json:"video_rules"`
 }
 
-// configInput is what PUT /config accepts. An empty StashApiKey keeps the
-// current key.
+// configInput is what PUT /config accepts. A missing stash_api_key keeps
+// the current key; an empty one clears it (a Stash without authentication).
 type configInput struct {
 	StashGraphQLUrl    string            `json:"stash_graphql_url"`
-	StashApiKey        string            `json:"stash_api_key"`
+	StashApiKey        *string           `json:"stash_api_key"`
 	StashTLSInsecure   *bool             `json:"stash_tls_insecure"`
 	FavoriteTag        string            `json:"favorite_tag"`
 	ExcludeSortName    string            `json:"exclude_sort_name"`
@@ -154,12 +154,13 @@ func (in *coverBadgesInput) apply(b *config.CoverBadges) {
 	}
 }
 
-// testInput is what POST /config/test accepts. A missing
+// testInput is what POST /config/test accepts. A missing stash_api_key
+// probes with the current key and an empty one without any; a missing
 // stash_tls_insecure keeps the current setting.
 type testInput struct {
-	StashGraphQLUrl  string `json:"stash_graphql_url"`
-	StashApiKey      string `json:"stash_api_key"`
-	StashTLSInsecure *bool  `json:"stash_tls_insecure"`
+	StashGraphQLUrl  string  `json:"stash_graphql_url"`
+	StashApiKey      *string `json:"stash_api_key"`
+	StashTLSInsecure *bool   `json:"stash_tls_insecure"`
 }
 
 // testResult answers POST /config/test. StashGraphQLUrl echoes the address
@@ -265,6 +266,16 @@ func hostChanged(current, next string) bool {
 	return strings.EqualFold(cu.Scheme, "https") && !strings.EqualFold(nu.Scheme, "https")
 }
 
+// keyMustBeResupplied reports whether a request that keeps the stored key
+// (sent none, nil) would send it to a different host than current, or
+// downgrade it to http: the caller must then supply the key again, or say
+// explicitly that the new Stash has none (an empty key), which is never
+// refused because there is nothing to leak. With no key stored there is
+// nothing to protect either.
+func keyMustBeResupplied(sent *string, current config.ApplicationConfig, nextUrl string) bool {
+	return sent == nil && current.StashApiKey != "" && hostChanged(current.StashGraphQLUrl, nextUrl)
+}
+
 // describeStashError turns an error from the Stash client into a message that
 // is safe to show in the UI: a response body from an arbitrary host is never
 // echoed, only its status code.
@@ -362,8 +373,8 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	// Normalised here, before the host rule, so http://stash:9999 and
 	// http://stash:9999/graphql count as the same host.
 	next.StashGraphQLUrl = config.NormalizeStashURL(in.StashGraphQLUrl)
-	if in.StashApiKey != "" {
-		next.StashApiKey = in.StashApiKey
+	if in.StashApiKey != nil {
+		next.StashApiKey = *in.StashApiKey
 	}
 	if in.StashTLSInsecure != nil {
 		next.StashTLSInsecure = *in.StashTLSInsecure
@@ -415,8 +426,8 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if hostChanged(prev.StashGraphQLUrl, next.StashGraphQLUrl) && in.StashApiKey == "" {
-		writeError(ctx, w, http.StatusBadRequest, "api key required when changing the Stash host")
+	if keyMustBeResupplied(in.StashApiKey, prev, next.StashGraphQLUrl) {
+		writeError(ctx, w, http.StatusBadRequest, "api key required when changing the Stash host; tick \"No API key\" if the new Stash has none")
 		return
 	}
 
@@ -443,6 +454,9 @@ func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 	// rather than as a missing API key.
 	probe := cur
 	probe.StashGraphQLUrl = in.StashGraphQLUrl
+	if in.StashApiKey != nil {
+		probe.StashApiKey = strings.TrimSpace(*in.StashApiKey)
+	}
 	if in.StashTLSInsecure != nil {
 		probe.StashTLSInsecure = *in.StashTLSInsecure
 	}
@@ -450,14 +464,11 @@ func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 		writeJson(ctx, w, testResult{Ok: false, Error: err.Error()})
 		return
 	}
-	if hostChanged(cur.StashGraphQLUrl, in.StashGraphQLUrl) && in.StashApiKey == "" {
-		writeJson(ctx, w, testResult{Ok: false, Error: "api key required when testing a different Stash host"})
+	if keyMustBeResupplied(in.StashApiKey, cur, in.StashGraphQLUrl) {
+		writeJson(ctx, w, testResult{Ok: false, Error: "api key required when testing a different Stash host; tick \"No API key\" if that Stash has none"})
 		return
 	}
-	key := in.StashApiKey
-	if key == "" {
-		key = cur.StashApiKey
-	}
+	key := probe.StashApiKey
 
 	probeCtx, cancel := context.WithTimeout(ctx, stashProbeTimeout)
 	defer cancel()
