@@ -53,9 +53,9 @@ func CoverHandler(libraryService *library.Service) http.HandlerFunc {
 			return
 		}
 
-		ct, body, err := loadScreenshot(ctx, stash.ApiKeyed(*p.Screenshot))
+		ct, body, err := LoadScreenshot(ctx, stash.ApiKeyed(*p.Screenshot))
 		if err != nil {
-			log.Ctx(ctx).Err(err).Msg("loadScreenshot")
+			log.Ctx(ctx).Err(err).Msg("LoadScreenshot")
 			writeFailure(w, err)
 			return
 		}

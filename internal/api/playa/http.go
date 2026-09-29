@@ -99,7 +99,7 @@ func (h httpHandler) posterHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	poster, err := buildPoster(ctx, vd)
+	p, err := buildPoster(ctx, vd)
 	if err != nil {
 		if errors.Is(err, errPosterNotFound) {
 			w.WriteHeader(http.StatusNotFound)
@@ -109,10 +109,10 @@ func (h httpHandler) posterHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Content-Type", p.contentType)
 	w.Header().Set("Cache-Control", "private, max-age=3600")
-	w.Header().Set("Content-Length", strconv.Itoa(len(poster)))
-	if _, err := w.Write(poster); err != nil {
+	w.Header().Set("Content-Length", strconv.Itoa(len(p.body)))
+	if _, err := w.Write(p.body); err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("error writing Playa poster")
 	}
 }

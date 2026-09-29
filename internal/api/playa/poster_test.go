@@ -8,8 +8,13 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
@@ -21,17 +26,38 @@ import (
 
 var posterSky = color.RGBA{R: 40, G: 90, B: 160, A: 255}
 
-// posterStash answers FindScenes with one 8K scene whose screenshot is
-// served by base.
+// posterShots maps a scene id to the path its screenshot is served on:
+// 1 a JPEG, 2 a PNG, 3 a WebP, 4 missing, 5 a Stash error.
+var posterShots = map[string]string{"1": "/shot", "2": "/png", "3": "/webp", "4": "/missing", "5": "/broken"}
+
+// posterStash answers FindScenes with the requested 8K scene whose
+// screenshot is served by base on the path posterShots gives its id.
 type posterStash struct{ base string }
 
 func (s *posterStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
 	payload := `{}`
 	if req.OpName == "FindScenes" {
-		payload = fmt.Sprintf(`{"findScenes":{"scenes":[{"id":"1","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","width":8192,"height":4096,"video_codec":"hevc"}],"tags":[{"id":"8","name":"8K","sort_name":"","aliases":[],"parents":[]}],"interactive":false,"paths":{"screenshot":"%s/shot","stream":"%s/stream"}}]}}`, s.base, s.base)
+		raw, _ := json.Marshal(req.Variables)
+		var in struct {
+			SceneIDs []int `json:"scene_ids"`
+		}
+		_ = json.Unmarshal(raw, &in)
+		var scenes []string
+		for _, id := range in.SceneIDs {
+			shot, ok := posterShots[fmt.Sprint(id)]
+			if !ok {
+				continue
+			}
+			scenes = append(scenes, fmt.Sprintf(`{"id":"%d","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"s.mp4","duration":60,"path":"/s.mp4","width":8192,"height":4096,"video_codec":"hevc"}],"tags":[{"id":"8","name":"8K","sort_name":"","aliases":[],"parents":[]}],"interactive":false,"paths":{"screenshot":"%s%s","stream":"%s/stream"}}`, id, s.base, shot, s.base))
+		}
+		payload = `{"findScenes":{"scenes":[` + strings.Join(scenes, ",") + `]}}`
 	}
 	return json.Unmarshal([]byte(payload), resp.Data)
 }
+
+// posterFixtures are the bytes the fixture server serves as JPEG and PNG,
+// set by posterEnv.
+var posterFixtures struct{ jpg, png []byte }
 
 func posterEnv(t *testing.T, badges config.CoverBadges) httpHandler {
 	t.Helper()
@@ -41,14 +67,34 @@ func posterEnv(t *testing.T, badges config.CoverBadges) httpHandler {
 			img.SetRGBA(x, y, posterSky)
 		}
 	}
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 100}); err != nil {
+	var jpg, pn bytes.Buffer
+	if err := jpeg.Encode(&jpg, img, &jpeg.Options{Quality: 100}); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	if err := png.Encode(&pn, img); err != nil {
+		t.Fatal(err)
+	}
+	posterFixtures.jpg, posterFixtures.png = jpg.Bytes(), pn.Bytes()
+	webp, err := os.ReadFile(filepath.Join("..", "heatmap", "testdata", "cover.webp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/shot", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
-		_, _ = w.Write(buf.Bytes())
-	}))
+		_, _ = w.Write(jpg.Bytes())
+	})
+	mux.HandleFunc("/png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(pn.Bytes())
+	})
+	mux.HandleFunc("/webp", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/webp")
+		_, _ = w.Write(webp)
+	})
+	mux.HandleFunc("/missing", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
+	mux.HandleFunc("/broken", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "boom", http.StatusInternalServerError) })
+	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	if err := config.Load(config.ApplicationConfig{
 		ListenAddress: ":9666", StashGraphQLUrl: "http://stash:9999/graphql", LogLevel: "info",
@@ -114,12 +160,72 @@ func TestPosterHandler_WithoutBadges(t *testing.T) {
 	if w.Code != 200 || w.Header().Get("Content-Type") != "image/jpeg" {
 		t.Fatalf("got %d %q", w.Code, w.Header().Get("Content-Type"))
 	}
-	img, err := jpeg.Decode(bytes.NewReader(w.Body.Bytes()))
-	if err != nil {
-		t.Fatal(err)
+	if !bytes.Equal(w.Body.Bytes(), posterFixtures.jpg) {
+		t.Fatal("a plain JPEG poster must pass through byte-identical, not be re-encoded")
 	}
-	if goldCorner(img) {
-		t.Fatal("badges switched off must leave the poster plain")
+	if coverbadge.Rendered.Len() != 0 {
+		t.Fatal("a pass-through poster must not be cached")
+	}
+}
+
+func TestPosterHandler_PassesThroughAndTranscodesLikeCover(t *testing.T) {
+	for name, c := range map[string]struct {
+		id          string
+		contentType string
+	}{
+		"png passes through":     {"2", "image/png"},
+		"webp is transcoded":     {"3", "image/jpeg"},
+		"jpeg is byte-identical": {"1", "image/jpeg"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := posterEnv(t, config.CoverBadges{})
+			w := httptest.NewRecorder()
+
+			h.posterHandler(w, newPlayaRequestWithVideoId(c.id))
+
+			if w.Code != 200 || w.Header().Get("Content-Type") != c.contentType {
+				t.Fatalf("got %d %q, want 200 %q", w.Code, w.Header().Get("Content-Type"), c.contentType)
+			}
+			if w.Header().Get("Content-Length") != strconv.Itoa(w.Body.Len()) {
+				t.Fatalf("Content-Length %q does not match the %d byte body", w.Header().Get("Content-Length"), w.Body.Len())
+			}
+			switch c.id {
+			case "1":
+				if !bytes.Equal(w.Body.Bytes(), posterFixtures.jpg) {
+					t.Fatal("expected the JPEG as Stash serves it")
+				}
+			case "2":
+				if !bytes.Equal(w.Body.Bytes(), posterFixtures.png) {
+					t.Fatal("expected the PNG as Stash serves it")
+				}
+			case "3":
+				if _, err := jpeg.Decode(bytes.NewReader(w.Body.Bytes())); err != nil {
+					t.Fatalf("expected a JPEG, got %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestPosterHandler_ScreenshotFailures(t *testing.T) {
+	for name, c := range map[string]struct {
+		id   string
+		code int
+	}{
+		"missing screenshot is 404": {"4", http.StatusNotFound},
+		"stash error is 500":        {"5", http.StatusInternalServerError},
+		"unknown scene is 404":      {"9", http.StatusNotFound},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := posterEnv(t, config.CoverBadges{})
+			w := httptest.NewRecorder()
+
+			h.posterHandler(w, newPlayaRequestWithVideoId(c.id))
+
+			if w.Code != c.code {
+				t.Fatalf("got %d, want %d", w.Code, c.code)
+			}
+		})
 	}
 }
 

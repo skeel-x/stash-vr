@@ -29,7 +29,7 @@ import (
 // self-signed certificate serves covers under the same TLS setting.
 var httpClient = stash.HTTPClient(15 * time.Second)
 
-// maxCoverBytes caps how much of a screenshot loadScreenshot buffers into
+// maxCoverBytes caps how much of a screenshot LoadScreenshot buffers into
 // memory. A variable, not a constant, so tests can lower it.
 var maxCoverBytes int64 = 32 << 20
 
@@ -95,13 +95,14 @@ func fetchBytes(ctx context.Context, fileUrl string) (contentType string, body [
 	return resp.Header.Get("Content-Type"), b, nil
 }
 
-// loadScreenshot fetches the Stash screenshot fully into memory and returns
-// its content type and body. JPEG and PNG pass through unchanged; anything
-// else (WebP, GIF) is transcoded to JPEG because the players cannot display
-// it. Buffering the whole response lets the caller write the status,
-// headers and body atomically, so a fetch or transcode failure never leaves
-// a partially written, cacheable response on the wire.
-func loadScreenshot(ctx context.Context, fileUrl string) (contentType string, body []byte, err error) {
+// LoadScreenshot fetches the Stash screenshot fully into memory, at most
+// maxCoverBytes, and returns its content type and body. JPEG and PNG pass
+// through unchanged; anything else (WebP, GIF) is transcoded to JPEG
+// because the players cannot display it. Buffering the whole response lets
+// the caller write the status, headers and body atomically, so a fetch or
+// transcode failure never leaves a partially written, cacheable response
+// on the wire. A missing screenshot is ErrImageNotFound.
+func LoadScreenshot(ctx context.Context, fileUrl string) (contentType string, body []byte, err error) {
 	ct, b, err := fetchBytes(ctx, fileUrl)
 	if err != nil {
 		return "", nil, err
