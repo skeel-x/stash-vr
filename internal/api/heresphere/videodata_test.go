@@ -131,10 +131,10 @@ func TestSetScripts_StandardFromStashThenVariantsFromStashVr(t *testing.T) {
 	if dto.Scripts[0].Name != "Standard" || dto.Scripts[0].Url != "http://stash/scene/9/funscript" {
 		t.Fatalf("standard = %+v", dto.Scripts[0])
 	}
-	if dto.Scripts[1].Name != "AI" || dto.Scripts[1].Url != "https://vr.example/funscript/9/1" {
+	if dto.Scripts[1].Name != "AI" || dto.Scripts[1].Url != "https://vr.example/funscript/9/1?k="+variants[1].Key() {
 		t.Fatalf("variant = %+v", dto.Scripts[1])
 	}
-	if dto.Scripts[2].Name != "Alternate 1 (Goat)" || dto.Scripts[2].Url != "https://vr.example/funscript/9/2" {
+	if dto.Scripts[2].Name != "Alternate 1 (Goat)" || dto.Scripts[2].Url != "https://vr.example/funscript/9/2?k="+variants[2].Key() {
 		t.Fatalf("alternate = %+v", dto.Scripts[2])
 	}
 }
@@ -156,9 +156,10 @@ func TestSetScripts_NoVariantsFallsBackToStashScript(t *testing.T) {
 func TestSetScripts_StandardWithoutStashUrlIsServedByStashVr(t *testing.T) {
 	sp := &gql.SceneParts{Id: "9"}
 	var dto videoDataDto
-	setScripts(&library.VideoData{SceneParts: sp}, &dto, "https://vr.example", []library.ScriptVariant{{Label: "Standard", Path: "/v/nine.funscript"}})
+	standard := library.ScriptVariant{Label: "Standard", Path: "/v/nine.funscript"}
+	setScripts(&library.VideoData{SceneParts: sp}, &dto, "https://vr.example", []library.ScriptVariant{standard})
 
-	if len(dto.Scripts) != 1 || dto.Scripts[0].Url != "https://vr.example/funscript/9/0" {
+	if len(dto.Scripts) != 1 || dto.Scripts[0].Url != "https://vr.example/funscript/9/0?k="+standard.Key() {
 		t.Fatalf("got %+v", dto.Scripts)
 	}
 }
@@ -170,9 +171,10 @@ func TestSetScripts_KeepsStashScriptWhenScanFindsOnlyVariants(t *testing.T) {
 		Paths:       &gql.ScenePartsPathsScenePathsType{Funscript: util.Ptr("http://stash/scene/9/funscript")},
 	}
 	var dto videoDataDto
-	setScripts(&library.VideoData{SceneParts: sp}, &dto, "https://vr.example", []library.ScriptVariant{{Label: "AI", Path: "/v/nine.ai.funscript"}})
+	ai := library.ScriptVariant{Label: "AI", Path: "/v/nine.ai.funscript"}
+	setScripts(&library.VideoData{SceneParts: sp}, &dto, "https://vr.example", []library.ScriptVariant{ai})
 
-	if len(dto.Scripts) != 2 || dto.Scripts[0].Name != "Standard" || dto.Scripts[0].Url != "http://stash/scene/9/funscript" || dto.Scripts[1].Url != "https://vr.example/funscript/9/0" {
+	if len(dto.Scripts) != 2 || dto.Scripts[0].Name != "Standard" || dto.Scripts[0].Url != "http://stash/scene/9/funscript" || dto.Scripts[1].Url != "https://vr.example/funscript/9/0?k="+ai.Key() {
 		t.Fatalf("got %+v", dto.Scripts)
 	}
 }

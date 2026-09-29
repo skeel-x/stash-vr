@@ -2,6 +2,8 @@ package library
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +21,20 @@ import (
 type ScriptVariant struct {
 	Label string // "Standard", "AI", "V2", "Alternate 1 (Vurlix)"
 	Path  string // absolute path on disk
+}
+
+// scriptKeyLen is how many hex characters of the path hash a variant URL
+// carries: enough to tell variants apart, short enough for a query string.
+const scriptKeyLen = 12
+
+// Key identifies the variant's file in its URL without naming the path: the
+// first scriptKeyLen hex characters of the SHA-256 of the path. A variant URL
+// names a variant by index and by key, so when the list changes between the
+// scene document and the script request (a file added, removed or reindexed)
+// the index no longer serves a different file than the one the player chose.
+func (v ScriptVariant) Key() string {
+	sum := sha256.Sum256([]byte(v.Path))
+	return hex.EncodeToString(sum[:])[:scriptKeyLen]
 }
 
 const (

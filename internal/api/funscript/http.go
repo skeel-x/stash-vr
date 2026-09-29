@@ -1,6 +1,6 @@
 // Package funscript serves the script variants library.Service discovers
-// on disk. The client names a variant by its index in the list, never by
-// a path.
+// on disk. The client names a variant by its index in the list and the
+// variant's key (see library.ScriptVariant.Key), never by a path.
 package funscript
 
 import (
@@ -24,6 +24,13 @@ func Handler(libraryService *library.Service) http.HandlerFunc {
 		}
 		variants := libraryService.ScriptVariants(ctx, chi.URLParam(r, "videoId"))
 		if n >= len(variants) {
+			http.NotFound(w, r)
+			return
+		}
+		// The key ties the request to the file the scene document named:
+		// when the variant list changed since, index n is another file.
+		if key := r.URL.Query().Get("k"); key != variants[n].Key() {
+			log.Ctx(ctx).Debug().Int("n", n).Str("key", key).Msg("Script variant key does not match the list")
 			http.NotFound(w, r)
 			return
 		}

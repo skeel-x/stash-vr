@@ -2,9 +2,12 @@ package library
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Khan/genqlient/graphql"
@@ -130,5 +133,32 @@ func TestScriptVariants_UnknownSceneIsEmpty(t *testing.T) {
 
 	if got := s.ScriptVariants(context.Background(), "999"); len(got) != 0 {
 		t.Fatalf("expected no variants, got %v", labels(got))
+	}
+}
+
+func TestScriptVariant_Key(t *testing.T) {
+	a := ScriptVariant{Label: "Standard", Path: "/v/nine.funscript"}
+	b := ScriptVariant{Label: "AI", Path: "/v/nine.ai.funscript"}
+
+	// The key is the first 12 hex characters of sha256(path); it is part of
+	// the URL contract with the player, so it must not drift.
+	sum := sha256.Sum256([]byte(a.Path))
+	want := hex.EncodeToString(sum[:])[:12]
+	if got := a.Key(); got != want {
+		t.Fatalf("Key() = %q, want %q", got, want)
+	}
+	if got := a.Key(); len(got) != 12 || strings.Trim(got, "0123456789abcdef") != "" {
+		t.Fatalf("expected 12 lower hex characters, got %q", got)
+	}
+	if again := (ScriptVariant{Label: a.Label, Path: a.Path}); again.Key() != a.Key() {
+		t.Fatal("the key must be deterministic")
+	}
+	if a.Key() == b.Key() {
+		t.Fatal("different paths must give different keys")
+	}
+	// Only the path counts: a relabelled variant of the same file keeps its
+	// key, so a URL survives a label change.
+	if (ScriptVariant{Label: "Renamed", Path: a.Path}).Key() != a.Key() {
+		t.Fatal("the key must depend on the path only")
 	}
 }

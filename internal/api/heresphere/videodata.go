@@ -197,7 +197,8 @@ func isFavorite(vd *library.VideoData) bool {
 
 // setScripts lists every funscript for the scene. Standard keeps the URL
 // Stash serves (API-keyed) when Stash knows it; every other variant is
-// served by stash-vr from disk by its index in the variant list.
+// served by stash-vr from disk by its index in the variant list, with the
+// variant's key so a changed list cannot serve the wrong script.
 func setScripts(vd *library.VideoData, dto *videoDataDto, baseUrl string, variants []library.ScriptVariant) {
 	stashUrl := ""
 	if vd.SceneParts.Paths != nil && vd.SceneParts.Paths.Funscript != nil && *vd.SceneParts.Paths.Funscript != "" {
@@ -211,7 +212,7 @@ func setScripts(vd *library.VideoData, dto *videoDataDto, baseUrl string, varian
 	}
 	hasStandard := false
 	for i, v := range variants {
-		u := fmt.Sprintf("%s/funscript/%s/%d", baseUrl, vd.Id(), i)
+		u := fmt.Sprintf("%s/funscript/%s/%d?k=%s", baseUrl, vd.Id(), i, v.Key())
 		if v.Label == "Standard" {
 			hasStandard = true
 			if stashUrl != "" {
