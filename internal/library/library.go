@@ -211,19 +211,6 @@ type Studio struct {
 	SceneCount int
 }
 
-func (libraryService *Service) GetAllSceneIDs(ctx context.Context) ([]string, error) {
-	resp, err := gql.FindAllSceneIds(ctx, libraryService.Client())
-	if err != nil {
-		return nil, fmt.Errorf("FindAllSceneIds: %w", err)
-	}
-
-	ids := make([]string, len(resp.FindScenes.Scenes))
-	for i, scene := range resp.FindScenes.Scenes {
-		ids[i] = scene.Id
-	}
-	return ids, nil
-}
-
 func (libraryService *Service) GetScenesByIDs(ctx context.Context, sceneIDs []string) ([]*VideoData, error) {
 	if len(sceneIDs) == 0 {
 		return []*VideoData{}, nil

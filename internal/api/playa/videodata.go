@@ -28,7 +28,10 @@ type videoLinkCandidate struct {
 	isDirect   bool
 }
 
-func buildVideoListView(vd *library.VideoData, baseURL string) VideoListView {
+// buildVideoListView is one /videos row. posterQuery is the cover
+// fingerprint query (coverbadge.CurrentURLQuery), taken once per page by
+// the caller rather than per row.
+func buildVideoListView(vd *library.VideoData, baseURL string, posterQuery string) VideoListView {
 	var releaseDate *int64
 	if vd != nil && vd.SceneParts != nil {
 		releaseDate = releaseDateUnix(vd.SceneParts.Date)
@@ -36,7 +39,7 @@ func buildVideoListView(vd *library.VideoData, baseURL string) VideoListView {
 	view := VideoListView{
 		ID:           vd.Id(),
 		Title:        vd.Title(),
-		PreviewImage: previewImage(vd, baseURL),
+		PreviewImage: previewImage(vd, baseURL, posterQuery),
 		HasScripts:   hasScripts(vd),
 		ReleaseDate:  releaseDate,
 		Details:      buildVideoListDetails(vd),
@@ -56,7 +59,7 @@ func buildVideoView(vd *library.VideoData, savedFilters []library.SavedFilterSce
 	view := VideoView{
 		ID:           videoID,
 		Title:        vd.Title(),
-		PreviewImage: previewImage(vd, baseURL),
+		PreviewImage: previewImage(vd, baseURL, coverbadge.CurrentURLQuery()),
 		ReleaseDate:  releaseDate,
 		Views:        views,
 		Details:      buildVideoDetails(vd),
@@ -430,12 +433,14 @@ func keyedURL(value *string) *string {
 	return &keyed
 }
 
-func previewImage(vd *library.VideoData, baseURL string) *string {
+// previewImage is the scene's poster URL with posterQuery (the cover
+// fingerprint query) appended, or its preview when it has no screenshot.
+func previewImage(vd *library.VideoData, baseURL string, posterQuery string) *string {
 	if vd == nil || vd.SceneParts == nil || vd.SceneParts.Paths == nil || baseURL == "" {
 		return nil
 	}
 	if vd.SceneParts.Paths.Screenshot != nil && *vd.SceneParts.Paths.Screenshot != "" {
-		posterURL := baseURL + "/api/playa/v2/poster/" + vd.Id() + coverbadge.CurrentURLQuery()
+		posterURL := baseURL + "/api/playa/v2/poster/" + vd.Id() + posterQuery
 		return &posterURL
 	}
 	return keyedURL(vd.SceneParts.Paths.Preview)

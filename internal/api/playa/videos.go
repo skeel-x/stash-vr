@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"slices"
+	"stash-vr/internal/api/coverbadge"
 	"stash-vr/internal/library"
 	"strings"
 	"time"
@@ -38,18 +39,28 @@ type videoQuery struct {
 	ExcludedStatuses   []string
 }
 
+// buildVideoPage answers /videos: the scenes of the index (the scene cache,
+// which GetScenes fills) narrowed by the query, ordered, and cut to the
+// requested page. List views are built for that page only; the rest of the
+// library is filtered and sorted as bare scene data.
 func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseURL string) (Page[VideoListView], error) {
-	allIDs, err := h.libraryService.GetAllSceneIDs(ctx)
+	startFetch := time.Now()
+	allScenesMap, err := h.libraryService.GetScenes(ctx)
 	if err != nil {
 		return Page[VideoListView]{}, err
 	}
-	candidateSet := sliceToSet(allIDs)
+	log.Ctx(ctx).Debug().Dur("duration", time.Since(startFetch)).Msg("Successfully fetched scenes from cache")
+
 	savedFilters, err := h.libraryService.GetSavedFilterSceneSetsFor(ctx, "playa")
 	if err != nil {
 		return Page[VideoListView]{}, err
 	}
 	filterLookup := savedFilterLookup(savedFilters)
 
+	candidateSet := make(map[string]struct{}, len(allScenesMap))
+	for id := range allScenesMap {
+		candidateSet[id] = struct{}{}
+	}
 	for _, category := range query.IncludedCategories {
 		ids, err := resolveCategorySceneSet(ctx, h.libraryService, category, filterLookup)
 		if err != nil {
@@ -79,20 +90,14 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseU
 		candidateSet = map[string]struct{}{}
 	}
 
-	startFetch := time.Now()
-	allScenesMap, err := h.libraryService.GetScenes(ctx)
-	if err != nil {
-		return Page[VideoListView]{}, err
-	}
-	log.Ctx(ctx).Debug().Dur("duration", time.Since(startFetch)).Msg("Successfully fetched scenes from cache")
-
+	lowerTitle := strings.ToLower(query.Title)
 	filtered := make([]*library.VideoData, 0, len(candidateSet))
 	for id := range candidateSet {
 		vd := allScenesMap[id]
 		if vd == nil {
 			continue
 		}
-		if query.Title != "" && !strings.Contains(strings.ToLower(vd.Title()), strings.ToLower(query.Title)) {
+		if lowerTitle != "" && !strings.Contains(strings.ToLower(vd.Title()), lowerTitle) {
 			continue
 		}
 		if query.ActorID != "" && !sceneHasActor(vd, query.ActorID) {
@@ -109,11 +114,14 @@ func (h httpHandler) buildVideoPage(ctx context.Context, query videoQuery, baseU
 	} else {
 		sortVideoData(filtered, query.Order, query.Direction)
 	}
-	items := make([]VideoListView, 0, len(filtered))
-	for _, vd := range filtered {
-		items = append(items, buildVideoListView(vd, baseURL))
+
+	start, end, pageTotal := pageBounds(len(filtered), query.PageIndex, query.PageSize)
+	posterQuery := coverbadge.CurrentURLQuery()
+	items := make([]VideoListView, 0, end-start)
+	for _, vd := range filtered[start:end] {
+		items = append(items, buildVideoListView(vd, baseURL, posterQuery))
 	}
-	return paginate(items, query.PageIndex, query.PageSize), nil
+	return Page[VideoListView]{PageIndex: query.PageIndex, PageSize: query.PageSize, PageTotal: pageTotal, ItemTotal: len(filtered), Content: items}, nil
 }
 
 func shuffleVideoData(items []*library.VideoData) {
@@ -218,25 +226,23 @@ func sceneHasStudio(vd *library.VideoData, studioID string) bool {
 	return vd.SceneParts.Studio != nil && vd.SceneParts.Studio.Id == studioID
 }
 
-func paginate[T any](items []T, pageIndex int, pageSize int) Page[T] {
-	itemTotal := len(items)
-	pageTotal := 1
+// pageBounds is the half-open slice [start, end) of page pageIndex in
+// itemTotal items, and how many pages there are (at least one).
+func pageBounds(itemTotal int, pageIndex int, pageSize int) (start, end, pageTotal int) {
+	pageTotal = 1
 	if itemTotal > 0 {
 		pageTotal = (itemTotal + pageSize - 1) / pageSize
 	}
-	start := pageIndex * pageSize
-	if start > itemTotal {
-		start = itemTotal
-	}
-	end := start + pageSize
-	if end > itemTotal {
-		end = itemTotal
-	}
+	start = min(pageIndex*pageSize, itemTotal)
+	end = min(start+pageSize, itemTotal)
+	return start, end, pageTotal
+}
+
+func paginate[T any](items []T, pageIndex int, pageSize int) Page[T] {
+	start, end, pageTotal := pageBounds(len(items), pageIndex, pageSize)
 	content := make([]T, 0, end-start)
-	if start < end {
-		content = append(content, items[start:end]...)
-	}
-	return Page[T]{PageIndex: pageIndex, PageSize: pageSize, PageTotal: pageTotal, ItemTotal: itemTotal, Content: content}
+	content = append(content, items[start:end]...)
+	return Page[T]{PageIndex: pageIndex, PageSize: pageSize, PageTotal: pageTotal, ItemTotal: len(items), Content: content}
 }
 
 func validateVideoOrder(order string) error {
