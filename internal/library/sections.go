@@ -10,6 +10,7 @@ import (
 	"stash-vr/internal/stash/gql"
 	"stash-vr/internal/util"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -102,91 +103,120 @@ func (libraryService *Service) index(ctx context.Context) (indexResult, error) {
 		ctx, cancel := leaderContext(ctx)
 		defer cancel()
 
-		libraryService.muSets.Lock()
-		gen := libraryService.setsGen
-		libraryService.muSets.Unlock()
-
-		// A failed grouping query costs the auto sections, not the index.
-		auto, err := libraryService.fetchAutoSections(ctx)
+		r, err := libraryService.rebuildIndex(ctx)
 		if err != nil {
-			log.Ctx(ctx).Warn().Err(err).Msg("Failed to group scenes by studio and performer, skipping auto sections")
-			auto = nil
-		}
-
-		sources, err := libraryService.getSources(ctx, auto)
-		if err != nil {
+			// A rebuild that fails (Stash down, every section query failed)
+			// keeps serving the index built before it rather than an error,
+			// and never caches an empty library. The next request past the
+			// TTL tries again.
+			if prev, ok := libraryService.previousIndex(); ok {
+				log.Ctx(ctx).Warn().Err(err).Msg("Index rebuild failed, serving the previous index")
+				return prev, nil
+			}
 			return nil, err
 		}
-
-		var sets []SavedFilterSceneSet
-		var sections []Section
-		if len(sources) > 0 {
-			if sets, err = libraryService.resolveSections(ctx, sources); err != nil {
-				return nil, err
-			}
-		}
-		// A computed section is empty because of what was watched, not what
-		// the user chose: with nothing else enabled, fall back to All.
-		if len(sources) == 0 || len(sets) == 0 && onlyComputed(sources) {
-			log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
-			if sections, err = libraryService.getDefaultSections(ctx); err != nil {
-				return nil, err
-			}
-			sets = []SavedFilterSceneSet{}
-		} else {
-			sections = make([]Section, len(sets))
-			for i, set := range sets {
-				sections[i] = Section{ID: set.ID, Name: set.Name, Ids: slices.Clone(set.SceneIDs), HiddenIn: set.HiddenIn}
-			}
-		}
-
-		// Reseed the scene cache with the ids players may ask for, recompute
-		// the stats and refresh the tag hierarchy - once for this rebuild.
-		libraryService.muVdCache.Lock()
-		for k := range libraryService.vdCache {
-			delete(libraryService.vdCache, k)
-		}
-		libraryService.Stats.Links = 0
-		for _, v := range sections {
-			libraryService.Stats.Links += len(v.Ids)
-			for _, id := range v.Ids {
-				libraryService.vdCache[id] = nil
-			}
-		}
-		libraryService.Stats.Scenes = len(libraryService.vdCache)
-		links := libraryService.Stats.Links
-		scenesCount := libraryService.Stats.Scenes
-		libraryService.muVdCache.Unlock()
-
-		log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", links).
-			Int("scenes", scenesCount).Int("auto", len(auto)).
-			Msg("Index built")
-
-		_ = libraryService.LoadTags(ctx)
-
-		libraryService.muTagCache.RLock()
-		tagCount := len(libraryService.tagCache)
-		libraryService.muTagCache.RUnlock()
-		log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
-
-		libraryService.muSets.Lock()
-		if libraryService.setsGen == gen {
-			libraryService.sets = sets
-			libraryService.sections = sections
-			libraryService.auto = auto
-			libraryService.setsAt = time.Now()
-		}
-		libraryService.muSets.Unlock()
-
-		// Undated scenes may have joined the index: walk it for release dates.
-		libraryService.kickDateSweeper()
-
-		return indexResult{sets: sets, sections: sections, auto: auto}, nil
+		return r, nil
 	})
 	if err != nil {
 		return indexResult{}, err
 	}
 	return res.(indexResult), nil
+}
+
+// rebuildIndex queries Stash for the whole index and, unless a reset landed
+// meanwhile, stores it as the cached one. See index.
+func (libraryService *Service) rebuildIndex(ctx context.Context) (indexResult, error) {
+	libraryService.muSets.Lock()
+	gen := libraryService.setsGen
+	libraryService.muSets.Unlock()
+
+	// A failed grouping query costs the auto sections, not the index.
+	auto, err := libraryService.fetchAutoSections(ctx)
+	if err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to group scenes by studio and performer, skipping auto sections")
+		auto = nil
+	}
+
+	sources, err := libraryService.getSources(ctx, auto)
+	if err != nil {
+		return indexResult{}, err
+	}
+
+	var sets []SavedFilterSceneSet
+	var sections []Section
+	if len(sources) > 0 {
+		if sets, err = libraryService.resolveSections(ctx, sources); err != nil {
+			return indexResult{}, err
+		}
+	}
+	// A computed section is empty because of what was watched, not what
+	// the user chose: with nothing else enabled, fall back to All.
+	if len(sources) == 0 || len(sets) == 0 && onlyComputed(sources) {
+		log.Ctx(ctx).Info().Msg("No saved filters or smart sections enabled, creating default section with ALL scenes")
+		if sections, err = libraryService.getDefaultSections(ctx); err != nil {
+			return indexResult{}, err
+		}
+		sets = []SavedFilterSceneSet{}
+	} else {
+		sections = make([]Section, len(sets))
+		for i, set := range sets {
+			sections[i] = Section{ID: set.ID, Name: set.Name, Ids: slices.Clone(set.SceneIDs), HiddenIn: set.HiddenIn}
+		}
+	}
+
+	// Reseed the scene cache with the ids players may ask for, recompute
+	// the stats and refresh the tag hierarchy - once for this rebuild.
+	libraryService.muVdCache.Lock()
+	for k := range libraryService.vdCache {
+		delete(libraryService.vdCache, k)
+	}
+	libraryService.Stats.Links = 0
+	for _, v := range sections {
+		libraryService.Stats.Links += len(v.Ids)
+		for _, id := range v.Ids {
+			libraryService.vdCache[id] = nil
+		}
+	}
+	libraryService.Stats.Scenes = len(libraryService.vdCache)
+	links := libraryService.Stats.Links
+	scenesCount := libraryService.Stats.Scenes
+	libraryService.muVdCache.Unlock()
+
+	log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", links).
+		Int("scenes", scenesCount).Int("auto", len(auto)).
+		Msg("Index built")
+
+	_ = libraryService.LoadTags(ctx)
+
+	libraryService.muTagCache.RLock()
+	tagCount := len(libraryService.tagCache)
+	libraryService.muTagCache.RUnlock()
+	log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
+
+	libraryService.muSets.Lock()
+	if libraryService.setsGen == gen {
+		libraryService.sets = sets
+		libraryService.sections = sections
+		libraryService.auto = auto
+		libraryService.setsAt = time.Now()
+	}
+	libraryService.muSets.Unlock()
+
+	// Undated scenes may have joined the index: walk it for release dates.
+	libraryService.kickDateSweeper()
+
+	return indexResult{sets: sets, sections: sections, auto: auto}, nil
+}
+
+// previousIndex returns the cached index whatever its age, so a failed
+// rebuild can keep serving it; a reset since the last build leaves none.
+func (libraryService *Service) previousIndex() (indexResult, bool) {
+	libraryService.muSets.Lock()
+	defer libraryService.muSets.Unlock()
+	if libraryService.sets == nil {
+		return indexResult{}, false
+	}
+	return indexResult{sets: libraryService.sets, sections: libraryService.sections, auto: libraryService.auto}, true
 }
 
 // onlyComputed reports whether every source is a smart section computed
@@ -484,17 +514,24 @@ func (libraryService *Service) getSources(ctx context.Context, auto []AutoSectio
 	return sources, nil
 }
 
+// resolveSections queries the scenes of every source. A source that fails
+// is skipped; only when every source that had to be queried (auto sections
+// already know their scenes) failed is the index itself the failure, so a
+// Stash that answers nothing is not cached as an empty library.
 func (libraryService *Service) resolveSections(ctx context.Context, sources []sectionSource) ([]SavedFilterSceneSet, error) {
 	size := config.Application().SmartSectionSize
 	sections := make([]SavedFilterSceneSet, len(sources))
 
 	wg := sync.WaitGroup{}
+	queried := 0
+	var errored atomic.Int32
 	for i, src := range sources {
 		// Auto sections already know their scenes from the grouping query.
 		if src.auto != nil {
 			sections[i] = SavedFilterSceneSet{ID: src.row.ID, Name: src.row.Name, SceneIDs: slices.Clone(src.auto.Ids), HiddenIn: src.row.HiddenIn}
 			continue
 		}
+		queried++
 		wg.Add(1)
 		go func(i int, src sectionSource) {
 			defer wg.Done()
@@ -506,6 +543,7 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 			if src.smart != nil && src.smart.ids != nil {
 				ids, err := src.smart.ids(libraryService, ctx, size)
 				if err != nil {
+					errored.Add(1)
 					flog.Err(err).Msg("Failed to compute section, skipping")
 					return
 				}
@@ -525,6 +563,7 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 			} else {
 				converted, err := filter.SavedFilterToSceneFilter(ctx, *src.saved)
 				if err != nil {
+					errored.Add(1)
 					flog.Warn().Err(err).Msg("Failed to convert filter, skipping")
 					return
 				}
@@ -533,6 +572,7 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 
 			resp, err := gql.FindSceneIdsByFilter(ctx, libraryService.Client(), sceneFilter, opts)
 			if err != nil {
+				errored.Add(1)
 				flog.Err(err).Msg("Failed to find scenes by filter, skipping")
 				return
 			}
@@ -548,6 +588,9 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 		}(i, src)
 	}
 	wg.Wait()
+	if failed := int(errored.Load()); queried > 0 && failed == queried {
+		return nil, fmt.Errorf("every section query failed (%d of %d)", failed, queried)
+	}
 	return slices.DeleteFunc(sections, func(s SavedFilterSceneSet) bool { return len(s.SceneIDs) == 0 }), nil
 }
 
