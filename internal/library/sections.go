@@ -19,6 +19,20 @@ import (
 // queries run; players request the index far more often than sections change.
 const sectionCacheTTL = 60 * time.Second
 
+// leaderTimeout bounds the work a singleflight leader does on behalf of
+// every concurrent caller: the index build and the scene fetch. The leader
+// runs detached from the context of whichever request happened to start it,
+// so a headset dropping that request does not fail or truncate the result
+// for the callers waiting on it, and under this deadline so a silent Stash
+// cannot hold them all until the process restarts.
+const leaderTimeout = 5 * time.Minute
+
+// leaderContext derives the context a singleflight leader runs under from
+// the context of the caller that started it; see leaderTimeout.
+func leaderContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), leaderTimeout)
+}
+
 type Section struct {
 	ID   string
 	Name string
@@ -85,6 +99,9 @@ func (libraryService *Service) index(ctx context.Context) (indexResult, error) {
 		if r, ok := libraryService.freshIndex(); ok {
 			return r, nil
 		}
+		ctx, cancel := leaderContext(ctx)
+		defer cancel()
+
 		libraryService.muSets.Lock()
 		gen := libraryService.setsGen
 		libraryService.muSets.Unlock()

@@ -97,11 +97,7 @@ func BuildStatus(ctx context.Context, lib *library.Service) Status {
 	s.Connection = ConnectionOk
 	s.StashVersion = version
 
-	// GetSections runs its build under a singleflight shared with player index
-	// requests (HereSphere/DeoVR); the probe timeout must not govern that
-	// shared build, so the original request context is used here, not
-	// probeCtx.
-	sections, err := lib.GetSections(ctx)
+	sections, err := lib.GetSections(probeCtx)
 	if err != nil {
 		log.Ctx(ctx).Warn().Err(err).Msg("Failed to retrieve sections")
 	} else {

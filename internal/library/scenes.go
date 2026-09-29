@@ -74,6 +74,8 @@ func (libraryService *Service) GetScenes(ctx context.Context) (map[string]*Video
 	}
 
 	res, err, _ := libraryService.single.Do("scenes", func() (interface{}, error) {
+		ctx, cancel := leaderContext(ctx)
+		defer cancel()
 		start := time.Now()
 		libraryService.muVdCache.RLock()
 		toFetch := make([]int, 0, len(libraryService.vdCache))
