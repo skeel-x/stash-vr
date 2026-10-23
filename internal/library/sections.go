@@ -576,7 +576,11 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 			var sceneFilter *gql.SceneFilterType
 			var opts *gql.FindFilterType
 			if src.smart != nil {
-				sceneFilter, opts = src.smart.query(size)
+				var ok bool
+				if sceneFilter, opts, ok = src.smart.query(libraryService, size); !ok {
+					flog.Debug().Msg("Section skipped: nothing to query for")
+					return
+				}
 			} else {
 				converted, err := filter.SavedFilterToSceneFilter(ctx, *src.saved)
 				if err != nil {

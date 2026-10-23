@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"time"
 
 	"stash-vr/internal/stash/gql"
 )
@@ -23,6 +24,11 @@ type SmartSection struct {
 	After  string
 	filter gql.SceneFilterType
 	sort   string
+	// dynFilter, when set, builds the filter at query time instead of
+	// filter: for a threshold that moves with the clock or ids that only
+	// the library knows. ok false means the section has nothing to show
+	// right now and is skipped quietly.
+	dynFilter func(svc *Service, now time.Time) (filter gql.SceneFilterType, ok bool)
 	// ids, when set, computes the section's scenes in stash-vr instead of
 	// querying Stash with filter and sort.
 	ids func(svc *Service, ctx context.Context, size int) ([]string, error)
@@ -42,6 +48,25 @@ func intCriterion(value int, modifier gql.CriterionModifier) *gql.IntCriterionIn
 
 func boolPtr(b bool) *bool { return &b }
 
+// rewatchAfter is how long a scene with an o-count must have gone unplayed
+// before Worth a rewatch lists it.
+const rewatchAfter = 30 * 24 * time.Hour
+
+// stashTimestamp formats t the way Stash stores timestamps, so a
+// timestamp criterion compares as its columns do.
+func stashTimestamp(t time.Time) string {
+	return t.UTC().Format("2006-01-02 15:04:05")
+}
+
+// rewatchFilter lists scenes with an o-count last played before
+// now-rewatchAfter.
+func rewatchFilter(_ *Service, now time.Time) (gql.SceneFilterType, bool) {
+	return gql.SceneFilterType{
+		O_counter:      intCriterion(0, gql.CriterionModifierGreaterThan),
+		Last_played_at: &gql.TimestampCriterionInput{Value: stashTimestamp(now.Add(-rewatchAfter)), Modifier: gql.CriterionModifierLessThan},
+	}, true
+}
+
 // smartSections lists the computed sections in their default display order.
 func smartSections() []SmartSection {
 	return []SmartSection{
@@ -59,16 +84,29 @@ func smartSections() []SmartSection {
 			filter: gql.SceneFilterType{Interactive: boolPtr(true)}},
 		{Key: "noscript", Name: "Without script", Playa: true, sort: "created_at",
 			filter: gql.SceneFilterType{Interactive: boolPtr(false)}},
+		{Key: "favperf", Name: "From your favourite performers", Playa: true, After: "noscript", sort: "created_at",
+			filter: gql.SceneFilterType{Performer_favorite: boolPtr(true)}},
+		// Rated 80 or more and played at most once: Stash has no >= or <=
+		// modifier, so the bounds are shifted by one.
+		{Key: "gems", Name: "Hidden gems", Playa: true, After: "favperf", sort: "rating",
+			filter: gql.SceneFilterType{Rating100: intCriterion(79, gql.CriterionModifierGreaterThan), Play_count: intCriterion(2, gql.CriterionModifierLessThan)}},
+		{Key: "rewatch", Name: "Worth a rewatch", Playa: true, After: "gems", sort: "o_counter", dynFilter: rewatchFilter},
 	}
 }
 
 // SmartSections returns the definitions, for display.
 func SmartSections() []SmartSection { return smartSections() }
 
-// query builds the Stash query for this section with the given size.
-func (s SmartSection) query(size int) (*gql.SceneFilterType, *gql.FindFilterType) {
+// query builds the Stash query for this section with the given size. ok is
+// false when the section's dynFilter has nothing to query for right now.
+func (s SmartSection) query(svc *Service, size int) (filter *gql.SceneFilterType, opts *gql.FindFilterType, ok bool) {
 	f := s.filter
+	if s.dynFilter != nil {
+		if f, ok = s.dynFilter(svc, svc.now()); !ok {
+			return nil, nil, false
+		}
+	}
 	sort := s.sort
 	dir := gql.SortDirectionEnumDesc
-	return &f, &gql.FindFilterType{Per_page: &size, Sort: &sort, Direction: &dir}
+	return &f, &gql.FindFilterType{Per_page: &size, Sort: &sort, Direction: &dir}, true
 }

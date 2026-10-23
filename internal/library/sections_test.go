@@ -255,19 +255,19 @@ func TestSectionRows_MixesSavedFiltersAndSmartSections(t *testing.T) {
 		got[i] = r.ID
 	}
 	// Un-overridden smart sections first (continue, recommended after it,
-	// unwatched, toprated, withscript, noscript), then overrides in order
-	// (99 dropped), then the remaining saved filter.
-	want := []string{"smart:continue", "smart:recommended", "smart:unwatched", "smart:toprated", "smart:withscript", "smart:noscript", "11", "smart:random", "smart:recent", "10"}
+	// unwatched, toprated, withscript, noscript and the rest), then
+	// overrides in order (99 dropped), then the remaining saved filter.
+	want := []string{"smart:continue", "smart:recommended", "smart:unwatched", "smart:toprated", "smart:withscript", "smart:noscript", "smart:favperf", "smart:gems", "smart:rewatch", "11", "smart:random", "smart:recent", "10"}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
-	if rows[6].Name != "Anal (2D)" || rows[6].SourceName != "2D Anal" || rows[6].Smart {
-		t.Fatalf("renamed saved filter row wrong: %+v", rows[6])
+	if rows[9].Name != "Anal (2D)" || rows[9].SourceName != "2D Anal" || rows[9].Smart {
+		t.Fatalf("renamed saved filter row wrong: %+v", rows[9])
 	}
 	if !rows[2].Disabled {
 		t.Fatal("unwatched should be off by default")
 	}
-	if !rows[8].Disabled {
+	if !rows[11].Disabled {
 		t.Fatal("recent was disabled by its override")
 	}
 }
@@ -300,7 +300,7 @@ func TestSectionRows_ListsEverySmartSectionWithDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "[smart:continue smart:recommended smart:recent smart:unwatched smart:toprated smart:random smart:withscript smart:noscript]"
+	want := "[smart:continue smart:recommended smart:recent smart:unwatched smart:toprated smart:random smart:withscript smart:noscript smart:favperf smart:gems smart:rewatch]"
 	if got := rowIDs(rows); fmt.Sprint(got) != want {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
