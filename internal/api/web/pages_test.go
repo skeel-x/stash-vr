@@ -189,7 +189,7 @@ func TestSections_BlocksSaveAndResetWhenRowsCannotLoad(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
-	if strings.Contains(body, "<tr data-id=") {
+	if strings.Contains(body, `<tbody class="sec drag" data-id=`) {
 		t.Fatal("expected no rows when the filters cannot be loaded")
 	}
 
@@ -237,7 +237,7 @@ func TestSections_ShowsRecommendedAfterContinueWatching(t *testing.T) {
 
 	body := getPage(t, h, "/sections", nil).Body.String()
 
-	start := strings.Index(body, `<tr data-id="smart:recommended">`)
+	start := strings.Index(body, `<tbody class="sec drag" data-id="smart:recommended">`)
 	if start < 0 {
 		t.Fatal("expected a Recommended for you row")
 	}
@@ -249,8 +249,8 @@ func TestSections_ShowsRecommendedAfterContinueWatching(t *testing.T) {
 		t.Fatalf("expected the row to be on by default, got %s", row)
 	}
 	// Its override-less default places it right after Continue watching.
-	cont := strings.Index(body, `<tr data-id="smart:continue">`)
-	recent := strings.Index(body, `<tr data-id="smart:recent">`)
+	cont := strings.Index(body, `<tbody class="sec drag" data-id="smart:continue">`)
+	recent := strings.Index(body, `<tbody class="sec drag" data-id="smart:recent">`)
 	if cont < 0 || recent < 0 || cont > start || start > recent {
 		t.Fatalf("expected continue < recommended < recent, got %d %d %d", cont, start, recent)
 	}
@@ -817,5 +817,49 @@ func TestSetup_NoApiKeyBoxFollowsStoredKey(t *testing.T) {
 	body = getPage(t, h, "/setup", nil).Body.String()
 	if !strings.Contains(body, `name="stash_no_api_key" type="checkbox" checked>`) {
 		t.Fatal("expected the No API key box ticked without a stored key")
+	}
+}
+
+func TestSections_RendersSettingsRowsFromSchema(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.SmartSectionSize = 60
+	cfg.Filters = append(cfg.Filters,
+		config.Filter{ID: "smart:rewatch", Options: &config.SectionOptions{Days: intp(45)}},
+		config.Filter{ID: config.FamilyStudio, Options: &config.SectionOptions{MinScenes: intp(2)}},
+	)
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := getPage(t, PagesRouter(lib), "/sections", nil).Body.String()
+	for _, want := range []string{
+		`<tbody class="sec drag" data-id="smart:rewatch">`,
+		`data-key="days" data-kind="int" min="1" max="3650" value="45" placeholder="30"`,
+		`data-key="size" data-kind="int" min="10" max="500" value="" placeholder="60"`,
+		`class="gear set"`, // rewatch has a setting
+		`class="gear" aria-expanded="false" aria-label="Settings for Hidden gems"`,
+		`<tbody class="sec drag" data-id="auto:studio">`,
+		`<span class="badge">family</span>`,
+		`data-key="min_scenes" data-kind="int" min="1" max="10000" value="2" placeholder="1"`,
+		`<tr class="child">`, // the generated studio row under its family
+		`data-key="unwatched_only" data-kind="bool"`,
+		`data-key="tags" data-kind="tags" value="" placeholder="8K, 7K"`,
+		`name="smart_section_size" id="smart-section-size" type="number" min="10" max="500" value="60"`,
+		`id="save-filters" class="primary">Save<`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sections page lacks %q", want)
+		}
+	}
+	// A generated section gets no settings row.
+	for _, id := range []string{"studio:7"} {
+		at := strings.Index(body, `data-id="`+id+`"`)
+		if at < 0 {
+			t.Fatalf("row %s missing", id)
+		}
+		next := strings.Index(body[at:], "</tbody>")
+		if strings.Contains(body[at:at+next], `class="opts"`) || strings.Contains(body[at:at+next], `class="gear`) {
+			t.Errorf("row %s must have no settings row or gear", id)
+		}
 	}
 }

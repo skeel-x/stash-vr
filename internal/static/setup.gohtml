@@ -144,7 +144,7 @@
 {{/* rule-row renders one editable rule; the inputs carry classes, not
      names, so the settings form's read() leaves them alone. */}}
 {{define "rule-row"}}{{$r := .Rule}}
-      <div class="rule" data-rule>
+      <div class="rule drag" data-rule>
         <div class="rule-head">
           <span class="handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</span>
           <input class="tag" value="{{$r.Tag}}" placeholder="Stash tag" aria-label="Tag">

@@ -31,7 +31,8 @@ const logPageLines = 300
 
 var logLevels = []string{"trace", "debug", "info", "warn", "error"}
 
-// FilterRow is one saved filter with its current override, for the Filters page.
+// FilterRow is one section with its current override and settings, for
+// the Sections page.
 type FilterRow struct {
 	ID         string
 	SourceName string
@@ -39,11 +40,35 @@ type FilterRow struct {
 	Disabled   bool
 	Smart      bool
 	Auto       bool
+	Family     bool   // carries an auto section family's settings, lists no scenes itself
+	Parent     string // a generated section's family row id
 	// Landing marks the first row shown in HereSphere: the section the
 	// player opens on.
 	Landing  bool
 	HiddenIn []string
+	Options  *config.SectionOptions
+	Schema   []config.OptionField
+	// globalSize backs the size field's placeholder.
+	globalSize int
 }
+
+// Value is the input value for the setting key: the saved value or empty.
+func (r FilterRow) Value(key string) string { return r.Options.Value(key) }
+
+// Checked reports whether the bool setting key is on.
+func (r FilterRow) Checked(key string) bool { return r.Options.Value(key) == "true" }
+
+// Placeholder is what an empty input stands for: the schema default, or
+// the global size for the size field.
+func (r FilterRow) Placeholder(f config.OptionField) string {
+	if f.Key == "size" {
+		return strconv.Itoa(r.globalSize)
+	}
+	return f.Default
+}
+
+// Tuned reports whether any setting is saved for the row.
+func (r FilterRow) Tuned() bool { return r.Options != nil }
 
 // ShowIn reports whether the section is listed in player: it must be
 // enabled and not hidden for that player.
@@ -63,24 +88,26 @@ type ProfileOption struct {
 const randomDetailSize = 1
 
 type pageData struct {
-	Title       string
-	Base        string
-	Active      string
-	Version     string
-	Status      Status
-	Links       PlayerLinks
-	Config      ConfigView
-	LogLevels   []string
-	FilterRows  []FilterRow
-	FilterError string
-	VideoRules  []config.VideoRule
-	Profiles    []ProfileOption
-	Projections []string
-	Stereos     []string
-	Lenses      []string
-	LogLines    []string
-	Random      []RandomScene
-	DateStats   library.DateStats
+	Title      string
+	Base       string
+	Active     string
+	Version    string
+	Status     Status
+	Links      PlayerLinks
+	Config     ConfigView
+	LogLevels  []string
+	FilterRows []FilterRow
+	// SmartSectionSize is the global section size the Sections page edits.
+	SmartSectionSize int
+	FilterError      string
+	VideoRules       []config.VideoRule
+	Profiles         []ProfileOption
+	Projections      []string
+	Stereos          []string
+	Lenses           []string
+	LogLines         []string
+	Random           []RandomScene
+	DateStats        library.DateStats
 }
 
 // ruleRow is what the rule-row template renders: one rule with the option
@@ -310,11 +337,23 @@ func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data.FilterError = err.Error()
 	}
-	for _, row := range rows {
-		data.FilterRows = append(data.FilterRows, FilterRow{ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled, Smart: row.Smart, Auto: row.Auto, HiddenIn: row.HiddenIn})
+	cfg := config.Application()
+	data.SmartSectionSize = cfg.SmartSectionSize
+	options := make(map[string]*config.SectionOptions, len(cfg.Filters))
+	for i := range cfg.Filters {
+		options[cfg.Filters[i].ID] = cfg.Filters[i].Options
 	}
+	for _, row := range rows {
+		data.FilterRows = append(data.FilterRows, FilterRow{
+			ID: row.ID, SourceName: row.SourceName, Name: row.Name, Disabled: row.Disabled,
+			Smart: row.Smart, Auto: row.Auto, Family: row.Family, Parent: row.Parent, HiddenIn: row.HiddenIn,
+			Options: options[row.ID], Schema: config.SectionSchema(row.ID), globalSize: cfg.SmartSectionSize,
+		})
+	}
+	// The landing row is the first section HereSphere lists; a family row
+	// is settings only and never a section.
 	for i := range data.FilterRows {
-		if data.FilterRows[i].ShowIn("heresphere") {
+		if !data.FilterRows[i].Family && data.FilterRows[i].ShowIn("heresphere") {
 			data.FilterRows[i].Landing = true
 			break
 		}

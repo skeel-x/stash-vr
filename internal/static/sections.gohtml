@@ -1,32 +1,52 @@
 {{define "content"}}
 <section class="form">
   <h1>Sections</h1>
-  <p class="lead">Each saved scene filter in Stash is a section in your player, and the smart sections are computed for you. Drag to reorder, rename, and tick where each section should show. The first section shown in HereSphere is the one it opens on. An empty name keeps the original name.</p>
+  <p class="lead">Each saved scene filter in Stash is a section in your player, and the smart sections are computed for you. Drag to reorder, rename, tick where each section should show, and open ⚙ to tune a section. The first section shown in HereSphere is the one it opens on. An empty name keeps the original name; an empty setting keeps its default.</p>
   {{if .FilterError}}<p class="note warn">Could not load saved filters from Stash: {{.FilterError}}</p>{{end}}
   {{/* With no rows there is nothing to save: a save would replace the
        stored order and names with an empty list. */}}
   {{$blocked := or .FilterError (not .FilterRows)}}
-  <table class="sections">
-    <thead><tr><th></th><th>HS</th><th>DeoVR</th><th>Playa</th><th>Stash filter</th><th>Name in player</th></tr></thead>
-    <tbody id="rows">
+  <label>Scenes per smart section
+    <input name="smart_section_size" id="smart-section-size" type="number" min="10" max="500" value="{{.SmartSectionSize}}">
+    <small>The default for every computed section; a section's own Scenes shown overrides it.</small>
+  </label>
+  <table class="sections" id="sections">
+    <thead><tr><th></th><th>HS</th><th>DeoVR</th><th>Playa</th><th>Section</th><th>Name in player</th><th></th></tr></thead>
     {{range .FilterRows}}
-      <tr data-id="{{.ID}}">
+    <tbody class="sec drag" data-id="{{.ID}}">
+      <tr{{if .Parent}} class="child"{{end}}>
         <td><span class="handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</span></td>
         <td><input type="checkbox" class="show-heresphere" aria-label="Show {{.SourceName}} in HereSphere" {{if .ShowIn "heresphere"}}checked{{end}}></td>
         <td><input type="checkbox" class="show-deovr" aria-label="Show {{.SourceName}} in DeoVR" {{if .ShowIn "deovr"}}checked{{end}}></td>
         <td><input type="checkbox" class="show-playa" aria-label="Show {{.SourceName}} in Playa" {{if .ShowIn "playa"}}checked{{end}}></td>
-        <td><span class="src">{{.SourceName}}</span>{{if .Auto}}<span class="badge">auto</span>{{else if .Smart}}<span class="badge">smart</span>{{else}}<code class="id">{{.ID}}</code>{{end}}<span class="badge landing" title="HereSphere opens on this section"{{if not .Landing}} hidden{{end}}>Opens first in HereSphere</span></td>
+        <td><span class="src">{{.SourceName}}</span>{{if .Family}}<span class="badge">family</span>{{else if .Auto}}<span class="badge">auto</span>{{else if .Smart}}<span class="badge">smart</span>{{else}}<code class="id">{{.ID}}</code>{{end}}<span class="badge landing" title="HereSphere opens on this section"{{if not .Landing}} hidden{{end}}>Opens first in HereSphere</span></td>
         <td><input class="name" placeholder="{{.SourceName}}" value="{{if ne .Name .SourceName}}{{.Name}}{{end}}"></td>
+        <td>{{if .Schema}}<button type="button" class="gear{{if .Tuned}} set{{end}}" aria-expanded="false" aria-label="Settings for {{.SourceName}}" title="Settings">⚙</button>{{end}}</td>
       </tr>
-    {{end}}
+      {{if .Schema}}{{$row := .}}
+      <tr class="opts" hidden>
+        <td colspan="7"><div class="fields">
+          {{range .Schema}}
+          {{if .Kind.Is "bool"}}
+          <label class="field check"><input type="checkbox" data-key="{{.Key}}" data-kind="bool" {{if $row.Checked .Key}}checked{{end}}> {{.Label}}</label>
+          {{else if .Kind.Is "tags"}}
+          <label class="field">{{.Label}}<input type="text" data-key="{{.Key}}" data-kind="tags" value="{{$row.Value .Key}}" placeholder="{{$row.Placeholder .}}">{{if .Help}}<small>{{.Help}}</small>{{end}}</label>
+          {{else}}
+          <label class="field">{{.Label}}<input type="number" data-key="{{.Key}}" data-kind="int" min="{{.Min}}" max="{{.Max}}" value="{{$row.Value .Key}}" placeholder="{{$row.Placeholder .}}">{{if .Help}}<small>{{.Help}}</small>{{end}}</label>
+          {{end}}
+          {{end}}
+        </div></td>
+      </tr>
+      {{end}}
     </tbody>
+    {{end}}
   </table>
   <div class="row">
-    <button type="button" id="save-filters" class="primary"{{if $blocked}} disabled{{end}}>Save order</button>
-    <span class="msg{{if $blocked}} warn{{end}}" id="filters-msg">{{if $blocked}}Nothing to save: the sections could not be loaded. Reload this page once Stash is reachable; the saved order and names are kept until then.{{end}}</span>
+    <button type="button" id="save-filters" class="primary"{{if $blocked}} disabled{{end}}>Save</button>
+    <span class="msg{{if $blocked}} warn{{end}}" id="filters-msg">{{if $blocked}}Nothing to save: the sections could not be loaded. Reload this page once Stash is reachable; the saved order, names and settings are kept until then.{{end}}</span>
   </div>
   <div class="row reset-row">
-    <button type="button" data-confirm="Drop the saved order and names? Click again" id="reset-filters"{{if $blocked}} disabled{{end}}>Reset to Stash order</button>
+    <button type="button" data-confirm="Drop the saved order, names and settings? Click again" id="reset-filters"{{if $blocked}} disabled{{end}}>Reset to Stash order</button>
   </div>
 </section>
 {{end}}

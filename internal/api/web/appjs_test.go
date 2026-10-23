@@ -27,7 +27,7 @@ func TestAppJS_EmptySavesNeverWipeSilently(t *testing.T) {
 	js := appJS(t)
 	for _, want := range []string{
 		"if (!list.length) { setMsg($('#filters-msg'), 'Nothing to save: reload this page once Stash is reachable.', 'warn'); return; }",
-		"await api('PUT', '/filters', list)",
+		"await api('PUT', '/sections', { smart_section_size: size, filters: list })",
 		"showDefaultRules = () => {",
 		"$('#default-rules').content.querySelectorAll('[data-rule]')",
 		"await api('PUT', '/video-rules', list);\n        rulesDirty = false;\n        if (!list.length) {\n          showDefaultRules();\n          setMsg($('#rules-msg'), 'Defaults restored: the table was empty, so the default rules were saved instead.', 'ok');",

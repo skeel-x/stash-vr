@@ -214,48 +214,51 @@
 
   // makeSortable lets the rows of tbody be reordered by dragging their
   // .handle, with mouse or touch.
-  function makeSortable(tbody) {
+  // makeSortable lets the .drag children of container be reordered by their
+  // .handle, with a mouse or a finger. A drag unit may hold several rows
+  // (a section and its settings row), so units are matched by class.
+  function makeSortable(container) {
     let dragRow = null;
-    tbody.addEventListener('dragstart', (e) => {
+    container.addEventListener('dragstart', (e) => {
       const handle = e.target.closest('.handle');
       if (!handle) return;
-      dragRow = handle.closest('tr, .rule');
+      dragRow = handle.closest('.drag');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', '');
       dragRow.classList.add('dragging');
     });
-    tbody.addEventListener('dragend', () => { if (dragRow) dragRow.classList.remove('dragging'); dragRow = null; });
-    tbody.addEventListener('dragover', (e) => {
+    container.addEventListener('dragend', () => { if (dragRow) dragRow.classList.remove('dragging'); dragRow = null; });
+    container.addEventListener('dragover', (e) => {
       if (!dragRow) return;
       e.preventDefault();
-      const over = e.target.closest('tr, .rule');
+      const over = e.target.closest('.drag');
       if (!over || over === dragRow) return;
       const rect = over.getBoundingClientRect();
-      tbody.insertBefore(dragRow, (e.clientY - rect.top) < rect.height / 2 ? over : over.nextSibling);
+      container.insertBefore(dragRow, (e.clientY - rect.top) < rect.height / 2 ? over : over.nextSibling);
     });
-    tbody.addEventListener('drop', (e) => e.preventDefault());
+    container.addEventListener('drop', (e) => e.preventDefault());
     let touchRow = null;
-    tbody.addEventListener('touchstart', (e) => {
+    container.addEventListener('touchstart', (e) => {
       const handle = e.target.closest('.handle');
       if (!handle) return;
-      touchRow = handle.closest('tr, .rule');
+      touchRow = handle.closest('.drag');
       touchRow.classList.add('dragging');
       e.preventDefault();
     }, { passive: false });
-    tbody.addEventListener('touchmove', (e) => {
+    container.addEventListener('touchmove', (e) => {
       if (!touchRow) return;
       const t = e.touches[0];
       const el = document.elementFromPoint(t.clientX, t.clientY);
-      const over = el && el.closest('tr, .rule');
+      const over = el && el.closest('.drag');
       if (over && over !== touchRow) {
         const rect = over.getBoundingClientRect();
-        tbody.insertBefore(touchRow, (t.clientY - rect.top) < rect.height / 2 ? over : over.nextSibling);
+        container.insertBefore(touchRow, (t.clientY - rect.top) < rect.height / 2 ? over : over.nextSibling);
       }
       e.preventDefault();
     }, { passive: false });
     const endTouch = () => { if (touchRow) touchRow.classList.remove('dragging'); touchRow = null; };
-    tbody.addEventListener('touchend', endTouch);
-    tbody.addEventListener('touchcancel', endTouch);
+    container.addEventListener('touchend', endTouch);
+    container.addEventListener('touchcancel', endTouch);
   }
 
   // Setup page: video rules table.
@@ -593,32 +596,69 @@
   }
 
   // Sections page: drag to reorder, save, reset.
-  const tbody = $('#rows');
-  if (tbody) {
-    makeSortable(tbody);
+  const table = $('#sections');
+  if (table) {
+    makeSortable(table);
     const players = ['heresphere', 'deovr', 'playa'];
-    // The first row shown in HereSphere is where the player lands; keep
-    // the badge on it as rows are reordered or unticked.
+    const families = ['auto:studio', 'auto:performer', 'auto:morefrom'];
+    const secs = () => Array.from(table.querySelectorAll('tbody.sec'));
+    const shown = (sec) => players.some((p) => sec.querySelector('.show-' + p).checked);
+    // The first section shown in HereSphere is where the player lands; keep
+    // the badge on it as rows are reordered or unticked. A family row is
+    // settings only, never a section.
     const markLanding = () => {
       let found = false;
-      tbody.querySelectorAll('tr').forEach((tr) => {
-        const first = !found && tr.querySelector('.show-heresphere').checked;
-        tr.querySelector('.landing').hidden = !first;
+      secs().forEach((sec) => {
+        const first = !found && !families.includes(sec.dataset.id) && sec.querySelector('.show-heresphere').checked;
+        sec.querySelector('.landing').hidden = !first;
         if (first) found = true;
       });
     };
-    tbody.addEventListener('change', (e) => { if (e.target.classList.contains('show-heresphere')) markLanding(); });
-    tbody.addEventListener('dragend', markLanding);
-    tbody.addEventListener('touchend', markLanding);
+    table.addEventListener('change', (e) => { if (e.target.classList.contains('show-heresphere')) markLanding(); });
+    table.addEventListener('dragend', markLanding);
+    table.addEventListener('touchend', markLanding);
     markLanding();
-    const rows = () => Array.from(tbody.querySelectorAll('tr')).map((tr) => {
-      const on = players.filter((p) => tr.querySelector('.show-' + p).checked);
+    // A gear opens its section's settings row and stays highlighted while
+    // any setting has a value, so tuned sections stand out in the list.
+    const markSet = (sec) => {
+      const gear = sec.querySelector('.gear');
+      if (!gear) return;
+      const any = Array.from(sec.querySelectorAll('.opts [data-key]')).some((i) => (i.type === 'checkbox' ? i.checked : i.value.trim() !== ''));
+      gear.classList.toggle('set', any);
+    };
+    table.addEventListener('click', (e) => {
+      const gear = e.target.closest('.gear');
+      if (!gear) return;
+      const opts = gear.closest('tbody').querySelector('.opts');
+      opts.hidden = !opts.hidden;
+      gear.setAttribute('aria-expanded', String(!opts.hidden));
+    });
+    table.addEventListener('input', (e) => { if (e.target.closest('.opts')) markSet(e.target.closest('tbody')); });
+    // An empty input means the default and is left out, so the stored
+    // options hold only what was set.
+    const options = (sec) => {
+      const out = {};
+      sec.querySelectorAll('.opts [data-key]').forEach((i) => {
+        const k = i.dataset.key;
+        if (i.dataset.kind === 'bool') { if (i.checked) out[k] = true; return; }
+        if (i.dataset.kind === 'tags') {
+          const tags = i.value.split(',').map((s) => s.trim()).filter(Boolean);
+          if (tags.length) out[k] = tags;
+          return;
+        }
+        if (i.value.trim() !== '') out[k] = Number(i.value);
+      });
+      return Object.keys(out).length ? out : undefined;
+    };
+    const rows = () => secs().map((sec) => {
+      const on = players.filter((p) => sec.querySelector('.show-' + p).checked);
       const off = players.filter((p) => !on.includes(p));
       return {
-        id: tr.dataset.id,
-        name: tr.querySelector('.name').value.trim(),
+        id: sec.dataset.id,
+        name: sec.querySelector('.name').value.trim(),
         disabled: on.length === 0,
         hidden_in: on.length === 0 ? [] : off,
+        options: options(sec),
       };
     });
     $('#save-filters').addEventListener('click', async () => {
@@ -627,12 +667,19 @@
       // nothing; without rows there is nothing to save.
       if (!list.length) { setMsg($('#filters-msg'), 'Nothing to save: reload this page once Stash is reachable.', 'warn'); return; }
       setMsg($('#filters-msg'), 'Saving');
-      try { await api('PUT', '/filters', list); setMsg($('#filters-msg'), 'Saved. Players pick it up on their next index load.', 'ok'); }
-      catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
+      const size = Number($('#smart-section-size').value || 50);
+      // A family that is on only has sections once the index is rebuilt.
+      const familyOn = secs().some((sec) => families.includes(sec.dataset.id) && shown(sec));
+      try {
+        await api('PUT', '/sections', { smart_section_size: size, filters: list });
+        setMsg($('#filters-msg'), familyOn
+          ? 'Saved. Reload this page to see the generated sections; players pick it up on their next index load.'
+          : 'Saved. Players pick it up on their next index load.', 'ok');
+      } catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
     });
     confirmClick($('#reset-filters'), async () => {
       setMsg($('#filters-msg'), 'Resetting');
-      try { await api('PUT', '/filters', []); location.reload(); }
+      try { await api('PUT', '/sections', { filters: [] }); location.reload(); }
       catch (e) { setMsg($('#filters-msg'), e.message, 'err'); }
     });
   }
