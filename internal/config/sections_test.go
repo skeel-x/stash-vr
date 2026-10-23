@@ -96,3 +96,16 @@ func TestCloneConfig_CopiesOptionTagLists(t *testing.T) {
 		t.Fatal("clone must not share the tag list")
 	}
 }
+
+func TestSectionSchema_ExcludeMaleOnlyForPerformerGroup(t *testing.T) {
+	if err := validateFilters([]Filter{{ID: FamilyPerformer, Options: &SectionOptions{ExcludeMale: boolp(true)}}}); err != nil {
+		t.Fatal(err)
+	}
+	err := validateFilters([]Filter{{ID: FamilyStudio, Options: &SectionOptions{ExcludeMale: boolp(true)}}})
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "options.exclude_male is not a setting of auto:studio") {
+		t.Fatalf("err = %v", err)
+	}
+	if (&SectionOptions{ExcludeMale: boolp(true)}).Value("exclude_male") != "true" {
+		t.Fatal("Value must report the tick")
+	}
+}

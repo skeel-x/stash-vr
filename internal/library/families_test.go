@@ -177,3 +177,33 @@ func TestSectionRows_MigratedFamilyAloneKeepsDefaultPlacement(t *testing.T) {
 		t.Fatalf("saved order must win: %v", ids)
 	}
 }
+
+func TestGroupScenes_PerformerGroupCanLeaveOutMalePerformers(t *testing.T) {
+	male, female, unknown := gql.GenderEnumMale, gql.GenderEnumFemale, gql.GenderEnum("")
+	row := func(id string, performers ...*groupingPerformer) *groupingScene {
+		return &groupingScene{Id: id, Performers: performers}
+	}
+	bob := &groupingPerformer{Id: "p2", Name: "Bob", Gender: &male}
+	alice := &groupingPerformer{Id: "p1", Name: "Alice", Gender: &female}
+	nobody := &groupingPerformer{Id: "p3", Name: "Nobody", Gender: &unknown}
+	nilGender := &groupingPerformer{Id: "p4", Name: "Dee"}
+	scenes := []*groupingScene{row("1", alice, bob), row("2", bob, nobody, nilGender)}
+
+	all := groupScenes(scenes, fam(0), fam(1))
+	if got := fmt.Sprint(autoIDs(all)); got != "[performer:p2 performer:p1 performer:p4 performer:p3]" {
+		t.Fatalf("default keeps everyone: %s", got)
+	}
+	spec := fam(1)
+	spec.excludeMale = true
+	kept := groupScenes(scenes, fam(0), spec)
+	if got := fmt.Sprint(autoIDs(kept)); got != "[performer:p1 performer:p4 performer:p3]" {
+		t.Fatalf("male left out, unknown and missing gender kept: %s", got)
+	}
+}
+
+func TestFamilyFor_ReadsExcludeMale(t *testing.T) {
+	cfg := config.ApplicationConfig{Filters: []config.Filter{{ID: config.FamilyPerformer, Options: &config.SectionOptions{ExcludeMale: boolp(true)}}}}
+	if !familyFor(cfg, config.FamilyPerformer).excludeMale {
+		t.Fatal("excludeMale must come from the row")
+	}
+}

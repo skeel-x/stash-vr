@@ -48,6 +48,7 @@ type SectionOptions struct {
 	ExcludeTags   []string `json:"exclude_tags,omitempty"`
 	MinScenes     *int     `json:"min_scenes,omitempty"`
 	Limit         *int     `json:"limit,omitempty"`
+	ExcludeMale   *bool    `json:"exclude_male,omitempty"`
 }
 
 // OptionKind is how a setting is entered: a number, a tick, or tag names.
@@ -98,10 +99,15 @@ func SectionSchema(id string) []OptionField {
 			{Key: "exclude_tags", Label: "But none of these", Kind: OptionTags, Default: joinTags(DefaultTopQualityExclude)}}
 	case "smart:passthrough":
 		return []OptionField{sizeField, {Key: "tags", Label: "Any of these tags", Kind: OptionTags, Default: joinTags(DefaultPassthroughTags), Help: "Comma separated."}}
-	case FamilyStudio, FamilyPerformer:
+	case FamilyStudio:
 		return []OptionField{
 			{Key: "min_scenes", Label: "From N scenes", Kind: OptionInt, Min: 1, Max: MaxAutoSectionMin, Default: strconv.Itoa(DefaultFamilyMinScenes)},
 			{Key: "limit", Label: "At most N sections", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultFamilyLimit), Help: "Largest first."}}
+	case FamilyPerformer:
+		return []OptionField{
+			{Key: "min_scenes", Label: "From N scenes", Kind: OptionInt, Min: 1, Max: MaxAutoSectionMin, Default: strconv.Itoa(DefaultFamilyMinScenes)},
+			{Key: "limit", Label: "At most N sections", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultFamilyLimit), Help: "Largest first."},
+			{Key: "exclude_male", Label: "Leave out male performers", Kind: OptionBool}}
 	case FamilyMoreFrom:
 		return []OptionField{
 			{Key: "limit", Label: "At most N performers", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultMoreFromLimit), Help: "The ones you watch most."},
@@ -141,6 +147,7 @@ func (o *SectionOptions) set() []setOption {
 	add("exclude_tags", nil, nil, o.ExcludeTags)
 	add("min_scenes", o.MinScenes, nil, nil)
 	add("limit", o.Limit, nil, nil)
+	add("exclude_male", nil, o.ExcludeMale, nil)
 	return out
 }
 

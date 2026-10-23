@@ -30,11 +30,13 @@ type AutoSection struct {
 	Family string
 }
 
-// familySpec is what a family row says: whether the family is on, the
-// scene threshold, how many sections at most, and how many scenes each.
+// familySpec is what a group row says: whether the group is on, the
+// scene threshold, how many sections at most, how many scenes each, and
+// for performers whether male ones are left out.
 type familySpec struct {
 	on               bool
 	min, limit, size int
+	excludeMale      bool
 }
 
 // familyFor reads the family's row from cfg. No row or a disabled row
@@ -54,10 +56,11 @@ func familyFor(cfg config.ApplicationConfig, id string) familySpec {
 			limit = config.DefaultMoreFromLimit
 		}
 		return familySpec{
-			on:    !f.Disabled,
-			min:   intOr(o.MinScenes, config.DefaultFamilyMinScenes),
-			limit: intOr(o.Limit, limit),
-			size:  intOr(o.Size, cfg.SmartSectionSize),
+			on:          !f.Disabled,
+			min:         intOr(o.MinScenes, config.DefaultFamilyMinScenes),
+			limit:       intOr(o.Limit, limit),
+			size:        intOr(o.Size, cfg.SmartSectionSize),
+			excludeMale: boolOr(o.ExcludeMale, false),
 		}
 	}
 	return familySpec{}
@@ -71,11 +74,12 @@ type autoGroup struct {
 }
 
 // groupScenes turns the grouping query result into auto sections: every
-// studio with at least the studio family's threshold and every performer
-// with at least the performer family's (a family that is off contributes
-// none), largest first and then by name, at most the family's limit of
-// each. Studios come before performers; performer sections are named
-// "@ <name>".
+// studio with at least the studio group's threshold and every performer
+// with at least the performer group's (a group that is off contributes
+// none; the performer group can leave out male performers, ones of
+// unknown gender are kept), largest first and then by name, at most the
+// group's limit of each. Studios come before performers; performer
+// sections are named "@ <name>".
 func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene, studio, performer familySpec) []AutoSection {
 	studios := map[string]*autoGroup{}
 	performers := map[string]*autoGroup{}
@@ -100,9 +104,10 @@ func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeS
 		}
 		if performer.on {
 			for _, p := range s.Performers {
-				if p != nil {
-					add(performers, p.Id, p.Name, s.Id)
+				if p == nil || performer.excludeMale && p.Gender != nil && *p.Gender == gql.GenderEnumMale {
+					continue
 				}
+				add(performers, p.Id, p.Name, s.Id)
 			}
 		}
 	}

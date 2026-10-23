@@ -839,7 +839,8 @@ func TestSections_RendersSettingsRowsFromSchema(t *testing.T) {
 		`class="gear set"`, // rewatch has a setting
 		`class="gear" aria-expanded="false" aria-label="Settings for Hidden gems"`,
 		`<tbody class="sec drag" data-id="auto:studio">`,
-		`<span class="badge">family</span>`,
+		`<span class="badge">group</span>`,
+		`data-key="exclude_male" data-kind="bool"`,
 		`data-key="min_scenes" data-kind="int" min="1" max="10000" value="2" placeholder="1"`,
 		`<tr class="child">`, // the generated studio row under its family
 		`data-key="unwatched_only" data-kind="bool"`,

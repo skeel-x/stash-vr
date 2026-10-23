@@ -1236,8 +1236,9 @@ func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene) GetPerform
 
 // FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer includes the requested fields of the GraphQL type Performer.
 type FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
+	Id     string      `json:"id"`
+	Name   string      `json:"name"`
+	Gender *GenderEnum `json:"gender"`
 }
 
 // GetId returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Id, and is useful for accessing the field via an interface.
@@ -1248,6 +1249,11 @@ func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPe
 // GetName returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Name, and is useful for accessing the field via an interface.
 func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetName() string {
 	return v.Name
+}
+
+// GetGender returns FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Gender, and is useful for accessing the field via an interface.
+func (v *FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetGender() *GenderEnum {
+	return v.Gender
 }
 
 // FindSceneGroupingsFindScenesFindScenesResultTypeScenesSceneStudio includes the requested fields of the GraphQL type Studio.
@@ -5904,6 +5910,7 @@ query FindSceneGroupings {
 			performers {
 				id
 				name
+				gender
 			}
 		}
 	}
