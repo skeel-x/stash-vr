@@ -16,25 +16,31 @@ import (
 	"sync/atomic"
 )
 
-// Filter is a per-saved-filter override: display order, optional rename,
-// whether the section is hidden from every player, and which players it
-// is hidden from while staying on for the others.
+// Filter is a per-section override: display order, optional rename,
+// whether the section is hidden from every player, which players it is
+// hidden from while staying on for the others, and the section's own
+// settings (see SectionSchema for what each section accepts).
 type Filter struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Disabled bool     `json:"disabled"`
-	HiddenIn []string `json:"hidden_in,omitempty"`
+	ID       string          `json:"id"`
+	Name     string          `json:"name"`
+	Disabled bool            `json:"disabled"`
+	HiddenIn []string        `json:"hidden_in,omitempty"`
+	Options  *SectionOptions `json:"options,omitempty"`
 }
 
 // Players lists the player names a Filter.HiddenIn entry may name.
 var Players = []string{"heresphere", "deovr", "playa"}
 
 func validateFilters(filters []Filter) error {
-	for i, f := range filters {
+	for i := range filters {
+		f := &filters[i]
 		for _, v := range f.HiddenIn {
 			if !slices.Contains(Players, v) {
 				return fmt.Errorf("%w: filters[%d].hidden_in contains unknown player %q", ErrInvalid, i, v)
 			}
+		}
+		if err := validateOptions(i, f); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -327,6 +333,14 @@ func cloneConfig(c ApplicationConfig) ApplicationConfig {
 	copy(out.Filters, c.Filters)
 	for i := range out.Filters {
 		out.Filters[i].HiddenIn = slices.Clone(out.Filters[i].HiddenIn)
+		// Int and bool pointers are never written through, so sharing
+		// them is safe; the tag lists are.
+		if o := out.Filters[i].Options; o != nil {
+			c := *o
+			c.Tags = slices.Clone(o.Tags)
+			c.ExcludeTags = slices.Clone(o.ExcludeTags)
+			out.Filters[i].Options = &c
+		}
 	}
 	out.VideoRules = make([]VideoRule, len(c.VideoRules))
 	copy(out.VideoRules, c.VideoRules)
@@ -589,6 +603,7 @@ func normalize(c *ApplicationConfig) {
 	c.ExcludeSortName = strings.TrimSpace(c.ExcludeSortName)
 	c.FunscriptIndexPath = strings.TrimSpace(c.FunscriptIndexPath)
 	normalizeVideoRules(c.VideoRules)
+	normalizeFilters(c.Filters)
 }
 
 // NormalizeStashURL returns u trimmed and, when it names only a host
