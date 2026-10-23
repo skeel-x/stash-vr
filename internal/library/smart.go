@@ -2,6 +2,8 @@ package library
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"time"
 
 	"stash-vr/internal/stash/gql"
@@ -67,6 +69,63 @@ func rewatchFilter(_ *Service, now time.Time) (gql.SceneFilterType, bool) {
 	}, true
 }
 
+// Tag names the tag-based sections look for; vrQualityTags manages the
+// tier tags, the passthrough ones are the usual names for an alpha matte
+// or chroma key.
+var (
+	topQualityTags    = []string{"8K", "7K"}
+	topQualityExclude = []string{"Low Detail"}
+	passthroughTags   = []string{"Alpha", "Chroma Key", "Passthrough"}
+)
+
+// tagIDsNamed returns the ids of the cached tags with one of the names,
+// compared case-insensitively, in id order. It is nil while the tag cache
+// has not been loaded, and empty when none of the names is a tag.
+func (libraryService *Service) tagIDsNamed(names []string) []string {
+	libraryService.muTagCache.RLock()
+	defer libraryService.muTagCache.RUnlock()
+	if libraryService.tagCache == nil {
+		return nil
+	}
+	ids := []string{}
+	for _, t := range libraryService.tagCache {
+		if t == nil {
+			continue
+		}
+		for _, n := range names {
+			if strings.EqualFold(t.Name, n) {
+				ids = append(ids, t.Id)
+				break
+			}
+		}
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+// tagFilter lists scenes with any of the include tags and none of the
+// exclude tags, resolved through the tag cache; a library without any of
+// the include tags (or no cache yet) has nothing to list.
+func tagFilter(svc *Service, include, exclude []string) (gql.SceneFilterType, bool) {
+	ids := svc.tagIDsNamed(include)
+	if len(ids) == 0 {
+		return gql.SceneFilterType{}, false
+	}
+	return gql.SceneFilterType{Tags: &gql.HierarchicalMultiCriterionInput{
+		Modifier: gql.CriterionModifierIncludes,
+		Value:    ids,
+		Excludes: svc.tagIDsNamed(exclude),
+	}}, true
+}
+
+func topQualityFilter(svc *Service, _ time.Time) (gql.SceneFilterType, bool) {
+	return tagFilter(svc, topQualityTags, topQualityExclude)
+}
+
+func passthroughFilter(svc *Service, _ time.Time) (gql.SceneFilterType, bool) {
+	return tagFilter(svc, passthroughTags, nil)
+}
+
 // smartSections lists the computed sections in their default display order.
 func smartSections() []SmartSection {
 	return []SmartSection{
@@ -91,6 +150,8 @@ func smartSections() []SmartSection {
 		{Key: "gems", Name: "Hidden gems", Playa: true, After: "favperf", sort: "rating",
 			filter: gql.SceneFilterType{Rating100: intCriterion(79, gql.CriterionModifierGreaterThan), Play_count: intCriterion(2, gql.CriterionModifierLessThan)}},
 		{Key: "rewatch", Name: "Worth a rewatch", Playa: true, After: "gems", sort: "o_counter", dynFilter: rewatchFilter},
+		{Key: "topquality", Name: "Top quality", Playa: true, After: "rewatch", sort: "created_at", dynFilter: topQualityFilter},
+		{Key: "passthrough", Name: "Passthrough", Playa: true, After: "topquality", sort: "created_at", dynFilter: passthroughFilter},
 	}
 }
 

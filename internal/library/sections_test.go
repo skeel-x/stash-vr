@@ -27,6 +27,8 @@ type routingStash struct {
 	queries  []*sceneIdQuery
 	allIds   int
 	tagLoads int
+	// tags is the FindAllTags answer (tags array JSON), empty by default.
+	tags string
 
 	// groupings is the FindSceneGroupings answer (scenes array JSON);
 	// groupingLoads counts how often it was asked.
@@ -59,8 +61,12 @@ func (r *routingStash) MakeRequest(_ context.Context, req *graphql.Request, resp
 	case "FindAllTags":
 		r.mu.Lock()
 		r.tagLoads++
+		tags := r.tags
 		r.mu.Unlock()
-		payload = `{"findTags":{"tags":[]}}`
+		if tags == "" {
+			tags = "[]"
+		}
+		payload = `{"findTags":{"tags":` + tags + `}}`
 	case "FindSceneGroupings":
 		r.mu.Lock()
 		r.groupingLoads++
@@ -257,17 +263,17 @@ func TestSectionRows_MixesSavedFiltersAndSmartSections(t *testing.T) {
 	// Un-overridden smart sections first (continue, recommended after it,
 	// unwatched, toprated, withscript, noscript and the rest), then
 	// overrides in order (99 dropped), then the remaining saved filter.
-	want := []string{"smart:continue", "smart:recommended", "smart:unwatched", "smart:toprated", "smart:withscript", "smart:noscript", "smart:favperf", "smart:gems", "smart:rewatch", "11", "smart:random", "smart:recent", "10"}
+	want := []string{"smart:continue", "smart:recommended", "smart:unwatched", "smart:toprated", "smart:withscript", "smart:noscript", "smart:favperf", "smart:gems", "smart:rewatch", "smart:topquality", "smart:passthrough", "11", "smart:random", "smart:recent", "10"}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
-	if rows[9].Name != "Anal (2D)" || rows[9].SourceName != "2D Anal" || rows[9].Smart {
-		t.Fatalf("renamed saved filter row wrong: %+v", rows[9])
+	if rows[11].Name != "Anal (2D)" || rows[11].SourceName != "2D Anal" || rows[11].Smart {
+		t.Fatalf("renamed saved filter row wrong: %+v", rows[11])
 	}
 	if !rows[2].Disabled {
 		t.Fatal("unwatched should be off by default")
 	}
-	if !rows[11].Disabled {
+	if !rows[13].Disabled {
 		t.Fatal("recent was disabled by its override")
 	}
 }
@@ -300,7 +306,7 @@ func TestSectionRows_ListsEverySmartSectionWithDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "[smart:continue smart:recommended smart:recent smart:unwatched smart:toprated smart:random smart:withscript smart:noscript smart:favperf smart:gems smart:rewatch]"
+	want := "[smart:continue smart:recommended smart:recent smart:unwatched smart:toprated smart:random smart:withscript smart:noscript smart:favperf smart:gems smart:rewatch smart:topquality smart:passthrough]"
 	if got := rowIDs(rows); fmt.Sprint(got) != want {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}

@@ -87,9 +87,9 @@ func (libraryService *Service) buildIndex(ctx context.Context) (sets []SavedFilt
 	return res.sets, res.sections, nil
 }
 
-// index returns the cached index, rebuilding the whole of it - auto
-// sections, sets, sections, the reseeded scene cache, Stats and the tag
-// hierarchy - at most once per sectionCacheTTL. Concurrent callers share
+// index returns the cached index, rebuilding the whole of it - the tag
+// hierarchy, auto sections, sets, sections, the reseeded scene cache and
+// Stats - at most once per sectionCacheTTL. Concurrent callers share
 // one rebuild and its side effects run exactly once per rebuild, never once
 // per caller.
 func (libraryService *Service) index(ctx context.Context) (indexResult, error) {
@@ -129,6 +129,18 @@ func (libraryService *Service) rebuildIndex(ctx context.Context) (indexResult, e
 	libraryService.muSets.Lock()
 	gen := libraryService.setsGen
 	libraryService.muSets.Unlock()
+
+	// The tag cache is not part of the index: a stale one is worth serving
+	// the scenes with, but not silently. It is refreshed first because the
+	// tag-based smart sections resolve their tags through it.
+	if err := libraryService.LoadTags(ctx); err != nil {
+		log.Ctx(ctx).Warn().Err(err).Msg("Failed to refresh tags, keeping the cached ones")
+	}
+
+	libraryService.muTagCache.RLock()
+	tagCount := len(libraryService.tagCache)
+	libraryService.muTagCache.RUnlock()
+	log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
 
 	// A failed grouping query costs the auto sections, not the index.
 	auto, err := libraryService.fetchAutoSections(ctx)
@@ -185,17 +197,6 @@ func (libraryService *Service) rebuildIndex(ctx context.Context) (indexResult, e
 	log.Ctx(ctx).Info().Int("sections", len(sections)).Int("links", links).
 		Int("scenes", scenesCount).Int("auto", len(auto)).
 		Msg("Index built")
-
-	// The tag cache is not part of the index: a stale one is worth serving
-	// the scenes with, but not silently.
-	if err := libraryService.LoadTags(ctx); err != nil {
-		log.Ctx(ctx).Warn().Err(err).Msg("Failed to refresh tags, keeping the cached ones")
-	}
-
-	libraryService.muTagCache.RLock()
-	tagCount := len(libraryService.tagCache)
-	libraryService.muTagCache.RUnlock()
-	log.Ctx(ctx).Debug().Int("tags", tagCount).Msg("Cached tags")
 
 	libraryService.muSets.Lock()
 	if libraryService.setsGen == gen {
