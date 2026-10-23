@@ -26,3 +26,19 @@ func intOr(p *int, def int) int {
 	}
 	return *p
 }
+
+func boolOr(p *bool, def bool) bool {
+	if p == nil {
+		return def
+	}
+	return *p
+}
+
+// tagsOr is tags, or def when the list is empty: a cleared field means
+// the default, there is no way to ask for no tags.
+func tagsOr(tags, def []string) []string {
+	if len(tags) == 0 {
+		return def
+	}
+	return tags
+}

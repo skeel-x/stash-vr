@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"stash-vr/internal/config"
 	"stash-vr/internal/stash/gql"
 )
 
@@ -50,33 +51,42 @@ func intCriterion(value int, modifier gql.CriterionModifier) *gql.IntCriterionIn
 
 func boolPtr(b bool) *bool { return &b }
 
-// rewatchAfter is how long a scene with an o-count must have gone unplayed
-// before Worth a rewatch lists it.
-const rewatchAfter = 30 * 24 * time.Hour
-
 // stashTimestamp formats t the way Stash stores timestamps, so a
 // timestamp criterion compares as its columns do.
 func stashTimestamp(t time.Time) string {
 	return t.UTC().Format("2006-01-02 15:04:05")
 }
 
-// rewatchFilter lists scenes with an o-count last played before
-// now-rewatchAfter.
+// rewatchFilter lists scenes with an o-count last played more than the
+// section's days ago.
 func rewatchFilter(_ *Service, now time.Time) (gql.SceneFilterType, bool) {
+	days := intOr(sectionOptions("smart:rewatch").Days, config.DefaultRewatchDays)
 	return gql.SceneFilterType{
 		O_counter:      intCriterion(0, gql.CriterionModifierGreaterThan),
-		Last_played_at: &gql.TimestampCriterionInput{Value: stashTimestamp(now.Add(-rewatchAfter)), Modifier: gql.CriterionModifierLessThan},
+		Last_played_at: &gql.TimestampCriterionInput{Value: stashTimestamp(now.Add(-time.Duration(days) * 24 * time.Hour)), Modifier: gql.CriterionModifierLessThan},
 	}, true
 }
 
-// Tag names the tag-based sections look for; vrQualityTags manages the
-// tier tags, the passthrough ones are the usual names for an alpha matte
-// or chroma key.
-var (
-	topQualityTags    = []string{"8K", "7K"}
-	topQualityExclude = []string{"Low Detail"}
-	passthroughTags   = []string{"Alpha", "Chroma Key", "Passthrough"}
-)
+// favPerfFilter lists scenes with a favourite performer, only the unplayed
+// ones when the section says so.
+func favPerfFilter(_ *Service, _ time.Time) (gql.SceneFilterType, bool) {
+	f := gql.SceneFilterType{Performer_favorite: boolPtr(true)}
+	if boolOr(sectionOptions("smart:favperf").UnwatchedOnly, false) {
+		f.Play_count = intCriterion(0, gql.CriterionModifierEquals)
+	}
+	return f, true
+}
+
+// gemsFilter lists scenes rated at least min_rating and played at most
+// max_plays times. Stash has no >= or <= modifier, so both bounds are
+// shifted by one here and nowhere else.
+func gemsFilter(_ *Service, _ time.Time) (gql.SceneFilterType, bool) {
+	o := sectionOptions("smart:gems")
+	return gql.SceneFilterType{
+		Rating100:  intCriterion(intOr(o.MinRating, config.DefaultGemsMinRating)-1, gql.CriterionModifierGreaterThan),
+		Play_count: intCriterion(intOr(o.MaxPlays, config.DefaultGemsMaxPlays)+1, gql.CriterionModifierLessThan),
+	}, true
+}
 
 // tagIDsNamed returns the ids of the cached tags with one of the names,
 // compared case-insensitively, in id order. It is nil while the tag cache
@@ -118,12 +128,15 @@ func tagFilter(svc *Service, include, exclude []string) (gql.SceneFilterType, bo
 	}}, true
 }
 
+// topQualityFilter and passthroughFilter look for the section's tags,
+// falling back to the usual names.
 func topQualityFilter(svc *Service, _ time.Time) (gql.SceneFilterType, bool) {
-	return tagFilter(svc, topQualityTags, topQualityExclude)
+	o := sectionOptions("smart:topquality")
+	return tagFilter(svc, tagsOr(o.Tags, config.DefaultTopQualityTags), tagsOr(o.ExcludeTags, config.DefaultTopQualityExclude))
 }
 
 func passthroughFilter(svc *Service, _ time.Time) (gql.SceneFilterType, bool) {
-	return tagFilter(svc, passthroughTags, nil)
+	return tagFilter(svc, tagsOr(sectionOptions("smart:passthrough").Tags, config.DefaultPassthroughTags), nil)
 }
 
 // smartSections lists the computed sections in their default display order.
@@ -143,12 +156,8 @@ func smartSections() []SmartSection {
 			filter: gql.SceneFilterType{Interactive: boolPtr(true)}},
 		{Key: "noscript", Name: "Without script", Playa: true, sort: "created_at",
 			filter: gql.SceneFilterType{Interactive: boolPtr(false)}},
-		{Key: "favperf", Name: "From your favourite performers", Playa: true, After: "noscript", sort: "created_at",
-			filter: gql.SceneFilterType{Performer_favorite: boolPtr(true)}},
-		// Rated 80 or more and played at most once: Stash has no >= or <=
-		// modifier, so the bounds are shifted by one.
-		{Key: "gems", Name: "Hidden gems", Playa: true, After: "favperf", sort: "rating",
-			filter: gql.SceneFilterType{Rating100: intCriterion(79, gql.CriterionModifierGreaterThan), Play_count: intCriterion(2, gql.CriterionModifierLessThan)}},
+		{Key: "favperf", Name: "From your favourite performers", Playa: true, After: "noscript", sort: "created_at", dynFilter: favPerfFilter},
+		{Key: "gems", Name: "Hidden gems", Playa: true, After: "favperf", sort: "rating", dynFilter: gemsFilter},
 		{Key: "rewatch", Name: "Worth a rewatch", Playa: true, After: "gems", sort: "o_counter", dynFilter: rewatchFilter},
 		{Key: "topquality", Name: "Top quality", Playa: true, After: "rewatch", sort: "created_at", dynFilter: topQualityFilter},
 		{Key: "passthrough", Name: "Passthrough", Playa: true, After: "topquality", sort: "created_at", dynFilter: passthroughFilter},
