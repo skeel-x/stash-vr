@@ -10,17 +10,17 @@ import (
 )
 
 // ApplyChanges performs the side effects of a settings change: a new Stash
-// client when the connection changed, a rebuilt index when an auto section
-// threshold changed, fresh cover renders when the cover badges or the
+// client when the connection changed, a rebuilt index when the section
+// size changed, fresh cover renders when the cover badges or the
 // heatmap height changed, a new effective log level when the level changed.
 func ApplyChanges(prev, next config.ApplicationConfig, lib *library.Service) {
 	if prev.StashGraphQLUrl != next.StashGraphQLUrl || prev.StashApiKey != next.StashApiKey || prev.StashTLSInsecure != next.StashTLSInsecure {
 		lib.SetStashClient(stash.NewClient(next.StashGraphQLUrl, next.StashApiKey, next.StashTLSInsecure))
 		log.Info().Msg("Stash connection settings changed, caches cleared")
 	}
-	if prev.AutoStudioMin != next.AutoStudioMin || prev.AutoPerformerMin != next.AutoPerformerMin || prev.MoreFromPerformers != next.MoreFromPerformers {
+	if prev.SmartSectionSize != next.SmartSectionSize {
 		lib.ResetSections()
-		log.Info().Int("studio_min", next.AutoStudioMin).Int("performer_min", next.AutoPerformerMin).Int("more_from_performers", next.MoreFromPerformers).Msg("Auto section settings changed, index will be rebuilt")
+		log.Info().Int("size", next.SmartSectionSize).Msg("Section size changed, index will be rebuilt")
 	}
 	if prev.CoverBadges != next.CoverBadges {
 		coverbadge.ResetCache()

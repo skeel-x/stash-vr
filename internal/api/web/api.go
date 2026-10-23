@@ -85,9 +85,6 @@ type ConfigView struct {
 	FunscriptIndexPath  string             `json:"funscript_index_path"`
 	LogLevel            string             `json:"log_level"`
 	SmartSectionSize    int                `json:"smart_section_size"`
-	AutoStudioMin       int                `json:"auto_studio_min"`
-	AutoPerformerMin    int                `json:"auto_performer_min"`
-	MoreFromPerformers  int                `json:"more_from_performers"`
 	CoverBadges         config.CoverBadges `json:"cover_badges"`
 	LearnStudioProfiles bool               `json:"learn_studio_profiles"`
 	CorrectVertical     bool               `json:"correct_vertical_stereo"`
@@ -118,9 +115,6 @@ type configInput struct {
 	FunscriptIndexPath *string             `json:"funscript_index_path"`
 	LogLevel           string              `json:"log_level"`
 	SmartSectionSize   *int                `json:"smart_section_size"`
-	AutoStudioMin      *int                `json:"auto_studio_min"`
-	AutoPerformerMin   *int                `json:"auto_performer_min"`
-	MoreFromPerformers *int                `json:"more_from_performers"`
 	CoverBadges        *coverBadgesInput   `json:"cover_badges"`
 	LearnStudio        *bool               `json:"learn_studio_profiles"`
 	CorrectVertical    *bool               `json:"correct_vertical_stereo"`
@@ -195,9 +189,6 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		FunscriptIndexPath:  cfg.FunscriptIndexPath,
 		LogLevel:            cfg.LogLevel,
 		SmartSectionSize:    cfg.SmartSectionSize,
-		AutoStudioMin:       cfg.AutoStudioMin,
-		AutoPerformerMin:    cfg.AutoPerformerMin,
-		MoreFromPerformers:  cfg.MoreFromPerformers,
 		CoverBadges:         cfg.CoverBadges,
 		LearnStudioProfiles: cfg.LearnStudioProfiles,
 		CorrectVertical:     cfg.CorrectVerticalStereo,
@@ -229,6 +220,7 @@ func ApiRouter(lib *library.Service) http.Handler {
 	r.Put("/config", h.putConfig)
 	r.Post("/config/test", h.testConfig)
 	r.Put("/filters", h.putFilters)
+	r.Put("/sections", h.putSections)
 	r.Put("/video-rules", h.putVideoRules)
 	r.Get("/profiles/{id}", h.getProfile)
 	r.Delete("/profiles/{id}", h.deleteProfile)
@@ -415,15 +407,6 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	if in.SmartSectionSize != nil {
 		next.SmartSectionSize = *in.SmartSectionSize
 	}
-	if in.AutoStudioMin != nil {
-		next.AutoStudioMin = *in.AutoStudioMin
-	}
-	if in.AutoPerformerMin != nil {
-		next.AutoPerformerMin = *in.AutoPerformerMin
-	}
-	if in.MoreFromPerformers != nil {
-		next.MoreFromPerformers = *in.MoreFromPerformers
-	}
 	in.CoverBadges.apply(&next.CoverBadges)
 	if in.LearnStudio != nil {
 		next.LearnStudioProfiles = *in.LearnStudio
@@ -496,6 +479,44 @@ func (h *apiHandler) testConfig(w http.ResponseWriter, r *http.Request) {
 	writeJson(ctx, w, testResult{Ok: true, StashVersion: version, StashGraphQLUrl: in.StashGraphQLUrl})
 }
 
+// sectionsInput is what PUT /sections accepts: the global section size and
+// the override rows, either optional. A filters key that is present but
+// empty resets the rows; a missing one keeps them.
+type sectionsInput struct {
+	SmartSectionSize *int            `json:"smart_section_size"`
+	Filters          []config.Filter `json:"filters"`
+}
+
+// putSections saves the Sections page in one request, so the size and the
+// rows are validated and written together.
+func (h *apiHandler) putSections(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	in, err := internal.UnmarshalBody[sectionsInput](r)
+	if err != nil {
+		writeError(ctx, w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
+		return
+	}
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+
+	cfg := config.Application()
+	if in.SmartSectionSize != nil {
+		cfg.SmartSectionSize = *in.SmartSectionSize
+	}
+	if in.Filters != nil {
+		cfg.Filters = in.Filters
+	}
+	saved, err := config.Set(cfg)
+	if err != nil {
+		writeError(ctx, w, settingsErrorCode(err), err.Error())
+		return
+	}
+	h.lib.ResetSections()
+	writeJson(ctx, w, map[string]any{"smart_section_size": saved.SmartSectionSize, "filters": saved.Filters})
+}
+
+// putFilters is the older form of putSections: the rows alone. Kept for a
+// Sections page cached in a headset browser.
 func (h *apiHandler) putFilters(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	in, err := internal.UnmarshalBody[[]config.Filter](r)

@@ -334,36 +334,38 @@ func (f *fakeStash) callCount(op string) int {
 	return f.calls[op]
 }
 
-func TestPutConfig_PersistsAutoSectionMinsAndRebuildsIndex(t *testing.T) {
+func TestPutSections_SavesSizeAndOptionsAndRebuildsIndex(t *testing.T) {
 	stash := &fakeStash{}
 	lib, h := newEnv(t, stash)
 	if _, err := lib.GetSections(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if n := stash.callCount("FindSceneGroupings"); n != 0 {
-		t.Fatalf("thresholds default to 0: expected no grouping query, got %d", n)
-	}
-	body := map[string]any{
-		"stash_graphql_url": "http://stash:9999/graphql",
-		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
-		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
-		"auto_studio_min": 2, "auto_performer_min": 30,
+		t.Fatalf("families default to off: expected no grouping query, got %d", n)
 	}
 
-	rec, out := do(t, h, http.MethodPut, "/config", body)
+	rec, out := do(t, h, http.MethodPut, "/sections", map[string]any{
+		"smart_section_size": 40,
+		"filters": []map[string]any{
+			{"id": "smart:gems", "options": map[string]any{"min_rating": 90}},
+			{"id": "smart:recent", "options": map[string]any{"size": 20}},
+			{"id": "auto:studio", "options": map[string]any{"min_scenes": 2}},
+		},
+	})
 
-	if rec.Code != 200 || out["auto_studio_min"] != float64(2) || out["auto_performer_min"] != float64(30) {
-		t.Fatalf("expected 200 with both thresholds, got %d %v", rec.Code, out)
+	if rec.Code != 200 || out["smart_section_size"] != float64(40) {
+		t.Fatalf("expected 200 with the size, got %d %v", rec.Code, out)
 	}
-	if cfg := config.Application(); cfg.AutoStudioMin != 2 || cfg.AutoPerformerMin != 30 {
-		t.Fatal("expected the thresholds stored")
+	cfg := config.Application()
+	if cfg.SmartSectionSize != 40 || len(cfg.Filters) != 3 || *cfg.Filters[0].Options.MinRating != 90 || *cfg.Filters[1].Options.Size != 20 {
+		t.Fatalf("saved %+v", cfg.Filters)
 	}
 	sections, err := lib.GetSections(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if n := stash.callCount("FindSceneGroupings"); n != 1 {
-		t.Fatalf("changing a threshold must rebuild the index: expected one grouping query, got %d", n)
+		t.Fatalf("switching a family on must rebuild the index: expected one grouping query, got %d", n)
 	}
 	found := false
 	for _, s := range sections {
@@ -372,60 +374,82 @@ func TestPutConfig_PersistsAutoSectionMinsAndRebuildsIndex(t *testing.T) {
 	if !found {
 		t.Fatalf("expected the studio section after the change, got %+v", sections)
 	}
+}
 
-	delete(body, "auto_studio_min")
-	delete(body, "auto_performer_min")
-	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 {
-		t.Fatalf("expected 200 without the fields, got %d %s", rec.Code, rec.Body.String())
-	}
-	if cfg := config.Application(); cfg.AutoStudioMin != 2 || cfg.AutoPerformerMin != 30 {
-		t.Fatal("expected the thresholds kept when the fields are missing")
-	}
+func TestPutSections_RejectsBadOptionWithoutSaving(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	before := config.Application()
 
-	body["auto_studio_min"] = -1
-	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for a negative threshold, got %d", rec.Code)
+	rec, out := do(t, h, http.MethodPut, "/sections", map[string]any{
+		"smart_section_size": 40,
+		"filters":            []map[string]any{{"id": "smart:gems", "options": map[string]any{"days": 5}}},
+	})
+
+	if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(out["error"]), "options.days is not a setting of smart:gems") {
+		t.Fatalf("code %d: %v", rec.Code, out)
+	}
+	if after := config.Application(); after.SmartSectionSize != before.SmartSectionSize || len(after.Filters) != len(before.Filters) {
+		t.Fatal("a rejected save must change nothing")
 	}
 }
 
-func TestPutConfig_MoreFromPerformersRoundTrip(t *testing.T) {
-	lib, h := newEnv(t, &fakeStash{})
-	if _, out := do(t, h, http.MethodGet, "/config", nil); out["more_from_performers"] != float64(0) {
-		t.Fatalf("expected more_from_performers 0 by default, got %v", out["more_from_performers"])
+func TestPutSections_EmptyFiltersResetsAndMissingKeepsThem(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	if rec, _ := do(t, h, http.MethodPut, "/sections", map[string]any{"filters": []map[string]any{{"id": "smart:gems"}}}); rec.Code != 200 {
+		t.Fatalf("code %d", rec.Code)
+	}
+	if rec, _ := do(t, h, http.MethodPut, "/sections", map[string]any{"smart_section_size": 30}); rec.Code != 200 {
+		t.Fatalf("code %d", rec.Code)
+	}
+	if cfg := config.Application(); len(cfg.Filters) != 1 || cfg.SmartSectionSize != 30 {
+		t.Fatalf("a missing filters key must keep the rows: %+v", cfg.Filters)
+	}
+	if rec, _ := do(t, h, http.MethodPut, "/sections", map[string]any{"filters": []map[string]any{}}); rec.Code != 200 {
+		t.Fatalf("code %d", rec.Code)
+	}
+	if len(config.Application().Filters) != 0 {
+		t.Fatal("an empty list must reset the rows")
+	}
+}
+
+func TestGetConfig_NoLegacyAutoKeysAndPutIgnoresThem(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+	before := len(config.Application().Filters)
+	_, out := do(t, h, http.MethodGet, "/config", nil)
+	for _, k := range []string{"auto_studio_min", "auto_performer_min", "more_from_performers"} {
+		if _, ok := out[k]; ok {
+			t.Fatalf("GET /config still exposes %s", k)
+		}
 	}
 	body := map[string]any{
 		"stash_graphql_url": "http://stash:9999/graphql",
 		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
 		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
-		"more_from_performers": 5,
+		"auto_studio_min": 5, "more_from_performers": 3,
 	}
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 {
+		t.Fatalf("old keys must be ignored: %d %s", rec.Code, rec.Body.String())
+	}
+	if f := config.Application().Filters; len(f) != before {
+		t.Fatalf("old keys on PUT /config must not create rows, got %+v", f)
+	}
+}
 
-	rec, out := do(t, h, http.MethodPut, "/config", body)
-
-	if rec.Code != 200 || out["more_from_performers"] != float64(5) {
-		t.Fatalf("expected 200 with the setting, got %d %v", rec.Code, out)
+func TestPutConfig_SizeChangeDropsIndex(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	if _, err := lib.GetSections(context.Background()); err != nil {
+		t.Fatal(err)
 	}
-	if cfg := config.Application(); cfg.MoreFromPerformers != 5 {
-		t.Fatalf("expected the setting stored, got %d", cfg.MoreFromPerformers)
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 60,
 	}
-	if _, out := do(t, h, http.MethodGet, "/config", nil); out["more_from_performers"] != float64(5) {
-		t.Fatalf("expected GET to return 5, got %v", out["more_from_performers"])
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 {
+		t.Fatalf("code %d %s", rec.Code, rec.Body.String())
 	}
 	if lib.IndexBuiltAt() != (time.Time{}) {
-		t.Fatal("changing the setting must drop the index")
-	}
-
-	delete(body, "more_from_performers")
-	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 {
-		t.Fatalf("expected 200 without the field, got %d %s", rec.Code, rec.Body.String())
-	}
-	if cfg := config.Application(); cfg.MoreFromPerformers != 5 {
-		t.Fatal("expected the setting kept when the field is missing")
-	}
-
-	body["more_from_performers"] = 51
-	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 above the limit, got %d", rec.Code)
+		t.Fatal("changing the section size must drop the index")
 	}
 }
 

@@ -16,6 +16,8 @@ import (
 	"stash-vr/internal/static"
 )
 
+func intp(v int) *int { return &v }
+
 func getPage(t *testing.T, h http.Handler, path string, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -124,24 +126,10 @@ func TestSetup_RendersDateSettingsAndStats(t *testing.T) {
 	}
 }
 
-func TestSetup_RendersAutoSectionInputs(t *testing.T) {
-	lib, _ := newEnv(t, &fakeStash{})
-	h := PagesRouter(lib)
-
-	body := getPage(t, h, "/setup", nil).Body.String()
-
-	for _, want := range []string{`name="auto_studio_min"`, `name="auto_performer_min"`, "Studio sections from N scenes", "Performer sections from N scenes", "0 turns it off. Up to 50 of each, largest first.",
-		`name="more_from_performers" type="number" min="0" max="50"`, "More from your performers"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("setup missing %q", want)
-		}
-	}
-}
-
 func TestSections_ShowsAutoBadge(t *testing.T) {
 	lib, _ := newEnv(t, &fakeStash{})
 	cfg := config.Application()
-	cfg.AutoStudioMin = 2
+	cfg.Filters = append(cfg.Filters, config.Filter{ID: config.FamilyStudio, Options: &config.SectionOptions{MinScenes: intp(2)}})
 	if _, err := config.Set(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -661,7 +649,7 @@ func TestPlayers_DetailsShowLibraryStatus(t *testing.T) {
 	y := 4.78
 	yes := true
 	cfg := config.Application()
-	cfg.AutoStudioMin = 2
+	cfg.Filters = append(cfg.Filters, config.Filter{ID: config.FamilyStudio, Options: &config.SectionOptions{MinScenes: intp(2)}})
 	cfg.VideoRules = []config.VideoRule{{Tag: "A", PositionY: &y}, {Tag: "RL", EyeSwap: &yes}, {Tag: "DOME", Projection: "equirectangular"}}
 	if _, err := config.Set(cfg); err != nil {
 		t.Fatal(err)
