@@ -132,8 +132,9 @@ query FindSceneGroupings {
   }
 }
 
-# Everything the Recommended for you section scores on, for every scene,
-# newest first so equal scores keep the newest scene first.
+# Everything the Recommended for you and More from <performer> sections
+# score on, for every scene, newest first so equal scores keep the newest
+# scene first.
 query FindRecommendationScenes {
   findScenes(filter: { per_page: -1, sort: "created_at", direction: DESC }) {
     scenes {
@@ -145,6 +146,8 @@ query FindRecommendationScenes {
       }
       performers {
         id
+        name
+        gender
       }
       studio {
         id

@@ -942,12 +942,24 @@ func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneFilesV
 
 // FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer includes the requested fields of the GraphQL type Performer.
 type FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer struct {
-	Id string `json:"id"`
+	Id     string      `json:"id"`
+	Name   string      `json:"name"`
+	Gender *GenderEnum `json:"gender"`
 }
 
 // GetId returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Id, and is useful for accessing the field via an interface.
 func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetId() string {
 	return v.Id
+}
+
+// GetName returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Name, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetName() string {
+	return v.Name
+}
+
+// GetGender returns FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer.Gender, and is useful for accessing the field via an interface.
+func (v *FindRecommendationScenesFindScenesFindScenesResultTypeScenesScenePerformersPerformer) GetGender() *GenderEnum {
+	return v.Gender
 }
 
 // FindRecommendationScenesFindScenesFindScenesResultTypeScenesSceneStudio includes the requested fields of the GraphQL type Studio.
@@ -5719,6 +5731,8 @@ query FindRecommendationScenes {
 			}
 			performers {
 				id
+				name
+				gender
 			}
 			studio {
 				id
@@ -5737,8 +5751,9 @@ query FindRecommendationScenes {
 }
 `
 
-// Everything the Recommended for you section scores on, for every scene,
-// newest first so equal scores keep the newest scene first.
+// Everything the Recommended for you and More from <performer> sections
+// score on, for every scene, newest first so equal scores keep the newest
+// scene first.
 func FindRecommendationScenes(
 	ctx_ context.Context,
 	client_ graphql.Client,
