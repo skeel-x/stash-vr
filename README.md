@@ -134,7 +134,7 @@ If your proxy cannot send the header, set the prefix as `base_path` on the Setup
 
 ### Settings and the web UI
 
-Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash, and lists the auto section count, release dates found, missing and unchecked, stored HereSphere profiles and how many video rules generate profiles. Smart sections (Continue watching, Recommended for you, Recently added, Random, Unwatched, Top rated, With script, Without script, From your favourite performers, Hidden gems, Worth a rewatch, Top quality and Passthrough) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. Hidden gems lists scenes rated 80 or more and played at most once, Worth a rewatch scenes with an o-count not played for 30 days, Top quality scenes tagged 8K or 7K (minus Low Detail) and Passthrough scenes tagged Alpha, Chroma Key or Passthrough; the tag-based ones stay empty until the library has those tags. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, filterable by level and text, with optional auto-refresh.
+Open Stash-VR in a browser (for example `http://localhost:9666`). The Players page shows whether Stash is reachable and gives one-tap links for HereSphere and DeoVR and the address for Playa. Under Details the page offers one random scene with a Shuffle button, linking to the scene in Stash, and lists the auto section count, release dates found, missing and unchecked, stored HereSphere profiles and how many video rules generate profiles. Smart sections (Continue watching, Recommended for you, Recently added, Random, Unwatched, Top rated, With script, Without script, From your favourite performers, Hidden gems, Worth a rewatch, Top quality and Passthrough) can be switched on, ordered and shown or hidden per player (HereSphere, DeoVR, Playa) on the Sections page. Each section has its own settings behind ⚙ on that page: how many scenes it shows, the rating and play-count bounds of Hidden gems (rated 80 or more and played at most once by default), the days of Worth a rewatch (30), the tags Top quality (8K or 7K, minus Low Detail) and Passthrough (Alpha, Chroma Key or Passthrough) look for, and whether From your favourite performers lists unplayed scenes only; the tag-based ones stay empty until the library has those tags. The studio, performer and More from families are rows on the same page, with their scene threshold and how many sections at most. **Setup** lets you change every runtime option; changes apply immediately and are stored in `config.json`. The **Log** page shows the last lines the service logged, filterable by level and text, with optional auto-refresh.
 
 `config.json` lives in the directory given by `CONFIG_PATH` (default: a `config` directory next to the binary). In Docker the image sets `CONFIG_PATH=/config`; mount a directory that is writable by uid 65532 (the image's non-root user). The environment variables and flags below only seed the file on first start; after that the file is the source of truth. A variable or flag that is set but differs from the file is ignored, and the log says so at startup. `LISTEN_ADDRESS`, `DISABLE_LOG_COLOR` and `DISABLE_REDACT` are process settings and stay flags.
 
@@ -174,7 +174,7 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `BASE_PATH`
   * Default: empty. Path prefix when a reverse proxy serves Stash-VR under a sub-path and does not send `X-Forwarded-Prefix`. Runtime name: `base_path`.
 * `SMART_SECTION_SIZE`
-  * Default: `50` (10 to 500). Number of scenes in each smart section. Runtime name: `smart_section_size`.
+  * Default: `50` (10 to 500). Default number of scenes in each smart section; a section's own Scenes shown setting overrides it. Runtime name: `smart_section_size`.
 * `GENERATE_SUMMARY_IDS`
   * Default: `false`. Adds a hidden short id derived from each scene's summary tags, so scenes with the same tag set can be found together in HereSphere. Runtime name: `generate_summary_ids`.
 * `DEOVR_AUTOLOAD`
@@ -189,12 +189,9 @@ Open Stash-VR in a browser (for example `http://localhost:9666`). The Players pa
 * `DATE_WRITEBACK`
   * Default: `false`
   * Also write dates found that way back to Stash. Runtime name: `date_writeback`.
-* `AUTO_STUDIO_MIN`, `AUTO_PERFORMER_MIN`
+* `AUTO_STUDIO_MIN`, `AUTO_PERFORMER_MIN`, `MORE_FROM_PERFORMERS`
   * Default: `0` (off)
-  * Generate a section per studio or performer with at least this many scenes, up to 50 of each. Runtime names: `auto_studio_min`, `auto_performer_min`.
-* `MORE_FROM_PERFORMERS`
-  * Default: `0` (off), at most 50
-  * Generate a "More from <performer>" section with unplayed scenes for this many of the performers your watch history features most (male performers left out). Runtime name: `more_from_performers`.
+  * First run only: creates the Studio sections, Performer sections or More from your performers row on the Sections page, switched on with this scene threshold (or, for More from, this many performers). From then on the rows are edited on the Sections page and these values are ignored. A config.json from an earlier release with `auto_studio_min`, `auto_performer_min` or `more_from_performers` set is converted the same way once.
 * `FUNSCRIPT_INDEX_PATH`
   * Default: empty (off)
   * Absolute path to the timestampTrade plugin's `funscript_index.sqlite`; scripts it lists for a scene are offered as alternates in HereSphere. Runtime name: `funscript_index_path`.
@@ -354,15 +351,17 @@ scene are written, never a single fuzzy match. A stash-box that errors is
 asked again after six hours, a scene with no answer after 30 days.
 
 HereSphere also gets `Watched:yes`/`Watched:no` and, for scenes with a
-saved position, `Resume:12:34` tags. With `auto_studio_min` or
-`auto_performer_min` set, studios and performers with enough scenes become
-sections of their own; they show on the Sections page with an "auto" badge
-and can be ordered, renamed or hidden like any other section. With
-`more_from_performers` set, the performers your watch history features
-most (weighted like the Recommended for you history, male performers left
-out) each get a "More from <performer>" section of their unplayed scenes,
-best rated first, placed after Recommended for you until you move it; a
-performer with nothing unplayed is skipped.
+saved position, `Resume:12:34` tags. With the Studio sections or Performer
+sections row switched on, studios and performers with at least the row's
+scene threshold become sections of their own, largest first up to the row's
+limit; they show on the Sections page under their family row with an
+"auto" badge and can be ordered, renamed or hidden like any other section,
+and hiding the family row for a player hides all of them there. With More
+from your performers switched on, the performers your watch history
+features most (weighted like the Recommended for you history, male
+performers left out) each get a "More from <performer>" section of their
+unplayed scenes, best rated first, placed after Recommended for you until
+you move it; a performer with nothing unplayed is skipped.
 
 #### Recommended for you
 
@@ -544,7 +543,7 @@ Open the Stash-VR address (for example `http://<host>:9666`) in DeoVR's browser;
 
 ### Very large libraries
 
-Current HereSphere versions handle large libraries (tested with about 13,000 scenes in 50,000 section entries). If a player struggles, show fewer sections to it: untick them for that player on the Sections page, or lower `smart_section_size`.
+Current HereSphere versions handle large libraries (tested with about 13,000 scenes in 50,000 section entries). If a player struggles, show fewer sections to it: untick them for that player on the Sections page, or lower Scenes per smart section there.
 
 ### Missing thumbnail images in DeoVR
 
