@@ -444,6 +444,40 @@ func TestSet_AutoSectionMinBounds(t *testing.T) {
 	}
 }
 
+func TestSet_MoreFromPerformersBounds(t *testing.T) {
+	seed := seedFor(t)
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []int{-1, 51} {
+		cfg := Application()
+		cfg.MoreFromPerformers = bad
+		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
+			t.Errorf("expected more_from_performers %d to be rejected as invalid, got %v", bad, err)
+		}
+	}
+	for _, good := range []int{0, 50, 5} {
+		cfg := Application()
+		cfg.MoreFromPerformers = good
+		if _, err := Set(cfg); err != nil {
+			t.Fatalf("more_from_performers %d: %v", good, err)
+		}
+	}
+	data, err := os.ReadFile(FilePath(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"more_from_performers": 5`) {
+		t.Fatalf("expected the setting persisted, got %s", data)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := Application().MoreFromPerformers; got != 5 {
+		t.Fatalf("expected the file value 5, got %d", got)
+	}
+}
+
 func TestLoad_AutoSectionMinsSeedAndFile(t *testing.T) {
 	seed := seedFor(t)
 	seed.AutoStudioMin = 5
@@ -906,7 +940,7 @@ func TestSettingValues_CoverEveryPersistedSetting(t *testing.T) {
 		envKeyForceHTTPS, envKeyBasePath, envKeyDeovrAutoload, envKeyPerformerFacets, envKeyDateLookup,
 		envKeyDateWriteback, envKeyFunscriptIndexPath, envKeyHeatmapHeightPx, envKeyExcludeSortName,
 		envKeyGenerateSummaryIds, envKeySmartSectionSize, envKeyAutoStudioMin, envKeyAutoPerformerMin,
-		envKeyCoverBadgeQuality, envKeyCoverBadgeFormat, envKeyCoverBadgePass, envKeyCoverBadgeDuration,
+		envKeyMoreFromPerformers, envKeyCoverBadgeQuality, envKeyCoverBadgeFormat, envKeyCoverBadgePass, envKeyCoverBadgeDuration,
 		envKeyCoverBadgeRate, envKeyLearnStudio, envKeyCorrectVertical,
 	}
 	values := settingValues(&ApplicationConfig{})

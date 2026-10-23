@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/rs/zerolog"
@@ -384,6 +385,47 @@ func TestPutConfig_PersistsAutoSectionMinsAndRebuildsIndex(t *testing.T) {
 	body["auto_studio_min"] = -1
 	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for a negative threshold, got %d", rec.Code)
+	}
+}
+
+func TestPutConfig_MoreFromPerformersRoundTrip(t *testing.T) {
+	lib, h := newEnv(t, &fakeStash{})
+	if _, out := do(t, h, http.MethodGet, "/config", nil); out["more_from_performers"] != float64(0) {
+		t.Fatalf("expected more_from_performers 0 by default, got %v", out["more_from_performers"])
+	}
+	body := map[string]any{
+		"stash_graphql_url": "http://stash:9999/graphql",
+		"favorite_tag":      "FAVORITE", "exclude_sort_name": "hidden", "generate_summary_ids": false,
+		"heatmap_height_px": 0, "force_https": false, "log_level": "info", "smart_section_size": 50,
+		"more_from_performers": 5,
+	}
+
+	rec, out := do(t, h, http.MethodPut, "/config", body)
+
+	if rec.Code != 200 || out["more_from_performers"] != float64(5) {
+		t.Fatalf("expected 200 with the setting, got %d %v", rec.Code, out)
+	}
+	if cfg := config.Application(); cfg.MoreFromPerformers != 5 {
+		t.Fatalf("expected the setting stored, got %d", cfg.MoreFromPerformers)
+	}
+	if _, out := do(t, h, http.MethodGet, "/config", nil); out["more_from_performers"] != float64(5) {
+		t.Fatalf("expected GET to return 5, got %v", out["more_from_performers"])
+	}
+	if lib.IndexBuiltAt() != (time.Time{}) {
+		t.Fatal("changing the setting must drop the index")
+	}
+
+	delete(body, "more_from_performers")
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != 200 {
+		t.Fatalf("expected 200 without the field, got %d %s", rec.Code, rec.Body.String())
+	}
+	if cfg := config.Application(); cfg.MoreFromPerformers != 5 {
+		t.Fatal("expected the setting kept when the field is missing")
+	}
+
+	body["more_from_performers"] = 51
+	if rec, _ := do(t, h, http.MethodPut, "/config", body); rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 above the limit, got %d", rec.Code)
 	}
 }
 

@@ -130,7 +130,8 @@ func TestSetup_RendersAutoSectionInputs(t *testing.T) {
 
 	body := getPage(t, h, "/setup", nil).Body.String()
 
-	for _, want := range []string{`name="auto_studio_min"`, `name="auto_performer_min"`, "Studio sections from N scenes", "Performer sections from N scenes", "0 turns it off. Up to 50 of each, largest first."} {
+	for _, want := range []string{`name="auto_studio_min"`, `name="auto_performer_min"`, "Studio sections from N scenes", "Performer sections from N scenes", "0 turns it off. Up to 50 of each, largest first.",
+		`name="more_from_performers" type="number" min="0" max="50"`, "More from your performers"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("setup missing %q", want)
 		}

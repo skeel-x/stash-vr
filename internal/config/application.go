@@ -31,6 +31,7 @@ const (
 	envKeySmartSectionSize   = "SMART_SECTION_SIZE"
 	envKeyAutoStudioMin      = "AUTO_STUDIO_MIN"
 	envKeyAutoPerformerMin   = "AUTO_PERFORMER_MIN"
+	envKeyMoreFromPerformers = "MORE_FROM_PERFORMERS"
 	envKeyCoverBadgeQuality  = "COVER_BADGE_QUALITY"
 	envKeyCoverBadgeFormat   = "COVER_BADGE_FORMAT"
 	envKeyCoverBadgePass     = "COVER_BADGE_PASSTHROUGH"
@@ -63,6 +64,9 @@ type ApplicationConfig struct {
 	SmartSectionSize   int
 	AutoStudioMin      int
 	AutoPerformerMin   int
+	// MoreFromPerformers is how many "More from <performer>" sections to
+	// generate for the performers the watch history features most.
+	MoreFromPerformers int
 	ExcludeSortName    string
 	ConfigPath         string
 	GenerateSummaryIds bool
@@ -138,6 +142,9 @@ func registerFlags(fs *pflag.FlagSet, bind func(key string, flag *pflag.Flag) er
 	fs.Int(envKeyAutoPerformerMin, 0, "Generate a section for every performer with at least this many scenes (0 turns it off)")
 	_ = bind(envKeyAutoPerformerMin, fs.Lookup(envKeyAutoPerformerMin))
 
+	fs.Int(envKeyMoreFromPerformers, 0, "Generate a More from <performer> section for this many of the performers you watch most (0 turns it off)")
+	_ = bind(envKeyMoreFromPerformers, fs.Lookup(envKeyMoreFromPerformers))
+
 	fs.String(envKeyExcludeSortName, "hidden", "Exclude tags with this sort name")
 	_ = bind(envKeyExcludeSortName, fs.Lookup(envKeyExcludeSortName))
 
@@ -204,6 +211,7 @@ func Init() error {
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
 		AutoStudioMin:      viper.GetInt(envKeyAutoStudioMin),
 		AutoPerformerMin:   viper.GetInt(envKeyAutoPerformerMin),
+		MoreFromPerformers: viper.GetInt(envKeyMoreFromPerformers),
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),
 		ConfigPath:         viper.GetString(envKeyUserConfigPath),
 		GenerateSummaryIds: viper.GetBool(envKeyGenerateSummaryIds),
@@ -255,6 +263,7 @@ func settingValues(c *ApplicationConfig) map[string]any {
 		envKeySmartSectionSize:   c.SmartSectionSize,
 		envKeyAutoStudioMin:      c.AutoStudioMin,
 		envKeyAutoPerformerMin:   c.AutoPerformerMin,
+		envKeyMoreFromPerformers: c.MoreFromPerformers,
 		envKeyCoverBadgeQuality:  c.CoverBadges.Quality,
 		envKeyCoverBadgeFormat:   c.CoverBadges.Format,
 		envKeyCoverBadgePass:     c.CoverBadges.Passthrough,

@@ -87,6 +87,7 @@ type ConfigView struct {
 	SmartSectionSize    int                `json:"smart_section_size"`
 	AutoStudioMin       int                `json:"auto_studio_min"`
 	AutoPerformerMin    int                `json:"auto_performer_min"`
+	MoreFromPerformers  int                `json:"more_from_performers"`
 	CoverBadges         config.CoverBadges `json:"cover_badges"`
 	LearnStudioProfiles bool               `json:"learn_studio_profiles"`
 	CorrectVertical     bool               `json:"correct_vertical_stereo"`
@@ -119,6 +120,7 @@ type configInput struct {
 	SmartSectionSize   *int                `json:"smart_section_size"`
 	AutoStudioMin      *int                `json:"auto_studio_min"`
 	AutoPerformerMin   *int                `json:"auto_performer_min"`
+	MoreFromPerformers *int                `json:"more_from_performers"`
 	CoverBadges        *coverBadgesInput   `json:"cover_badges"`
 	LearnStudio        *bool               `json:"learn_studio_profiles"`
 	CorrectVertical    *bool               `json:"correct_vertical_stereo"`
@@ -195,6 +197,7 @@ func MaskedConfig(cfg config.ApplicationConfig) ConfigView {
 		SmartSectionSize:    cfg.SmartSectionSize,
 		AutoStudioMin:       cfg.AutoStudioMin,
 		AutoPerformerMin:    cfg.AutoPerformerMin,
+		MoreFromPerformers:  cfg.MoreFromPerformers,
 		CoverBadges:         cfg.CoverBadges,
 		LearnStudioProfiles: cfg.LearnStudioProfiles,
 		CorrectVertical:     cfg.CorrectVerticalStereo,
@@ -417,6 +420,9 @@ func (h *apiHandler) putConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.AutoPerformerMin != nil {
 		next.AutoPerformerMin = *in.AutoPerformerMin
+	}
+	if in.MoreFromPerformers != nil {
+		next.MoreFromPerformers = *in.MoreFromPerformers
 	}
 	in.CoverBadges.apply(&next.CoverBadges)
 	if in.LearnStudio != nil {

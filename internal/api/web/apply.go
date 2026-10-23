@@ -18,9 +18,9 @@ func ApplyChanges(prev, next config.ApplicationConfig, lib *library.Service) {
 		lib.SetStashClient(stash.NewClient(next.StashGraphQLUrl, next.StashApiKey, next.StashTLSInsecure))
 		log.Info().Msg("Stash connection settings changed, caches cleared")
 	}
-	if prev.AutoStudioMin != next.AutoStudioMin || prev.AutoPerformerMin != next.AutoPerformerMin {
+	if prev.AutoStudioMin != next.AutoStudioMin || prev.AutoPerformerMin != next.AutoPerformerMin || prev.MoreFromPerformers != next.MoreFromPerformers {
 		lib.ResetSections()
-		log.Info().Int("studio_min", next.AutoStudioMin).Int("performer_min", next.AutoPerformerMin).Msg("Auto section thresholds changed, index will be rebuilt")
+		log.Info().Int("studio_min", next.AutoStudioMin).Int("performer_min", next.AutoPerformerMin).Int("more_from_performers", next.MoreFromPerformers).Msg("Auto section settings changed, index will be rebuilt")
 	}
 	if prev.CoverBadges != next.CoverBadges {
 		coverbadge.ResetCache()

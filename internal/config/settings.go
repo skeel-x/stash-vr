@@ -252,6 +252,9 @@ const configFileName = "config.json"
 // auto_performer_min.
 const MaxAutoSectionMin = 10000
 
+// MaxMoreFromPerformers is the largest accepted more_from_performers.
+const MaxMoreFromPerformers = 50
+
 // ErrInvalid marks a settings value rejected by Validate, so API callers can
 // tell a bad request from a failed write.
 var ErrInvalid = errors.New("invalid settings")
@@ -278,6 +281,7 @@ type fileConfig struct {
 	SmartSectionSize   *int             `json:"smart_section_size,omitempty"`
 	AutoStudioMin      *int             `json:"auto_studio_min,omitempty"`
 	AutoPerformerMin   *int             `json:"auto_performer_min,omitempty"`
+	MoreFromPerformers *int             `json:"more_from_performers,omitempty"`
 	ForceHTTPS         *bool            `json:"force_https,omitempty"`
 	BasePath           *string          `json:"base_path,omitempty"`
 	DeovrAutoload      *bool            `json:"deovr_autoload,omitempty"`
@@ -481,6 +485,9 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	if fc.AutoPerformerMin != nil {
 		base.AutoPerformerMin = *fc.AutoPerformerMin
 	}
+	if fc.MoreFromPerformers != nil {
+		base.MoreFromPerformers = *fc.MoreFromPerformers
+	}
 	if fc.ForceHTTPS != nil {
 		base.ForceHTTPS = *fc.ForceHTTPS
 	}
@@ -642,6 +649,9 @@ func Validate(c ApplicationConfig) error {
 	if c.AutoPerformerMin < 0 || c.AutoPerformerMin > MaxAutoSectionMin {
 		return fmt.Errorf("%w: auto_performer_min must be between 0 and %d, got %d", ErrInvalid, MaxAutoSectionMin, c.AutoPerformerMin)
 	}
+	if c.MoreFromPerformers < 0 || c.MoreFromPerformers > MaxMoreFromPerformers {
+		return fmt.Errorf("%w: more_from_performers must be between 0 and %d, got %d", ErrInvalid, MaxMoreFromPerformers, c.MoreFromPerformers)
+	}
 	// An empty favorite tag is allowed: it disables favorite sync
 	// (see library.Service.UpdateFavorite).
 	if c.ExcludeSortName == "" {
@@ -668,6 +678,7 @@ func write(path string, c ApplicationConfig) error {
 		SmartSectionSize:   &c.SmartSectionSize,
 		AutoStudioMin:      &c.AutoStudioMin,
 		AutoPerformerMin:   &c.AutoPerformerMin,
+		MoreFromPerformers: &c.MoreFromPerformers,
 		ForceHTTPS:         &c.ForceHTTPS,
 		BasePath:           &c.BasePath,
 		DeovrAutoload:      &c.DeovrAutoload,

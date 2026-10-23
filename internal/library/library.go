@@ -53,6 +53,8 @@ type Service struct {
 	muRec  sync.Mutex
 	rec    *recCache
 	recGen uint64
+	// moreFrom caches the More from <performer> sections the same way.
+	moreFrom *moreFromCache
 	// recPlayed holds the scenes played since the recommendation was
 	// computed (and when), so a scene that just entered Continue watching
 	// leaves Recommended for you at once instead of when the cache
@@ -92,8 +94,8 @@ func (libraryService *Service) SetStashClient(client graphql.Client) {
 	libraryService.ResetCaches()
 }
 
-// ResetCaches drops cached scenes, tags, stats and recommendations; the
-// next index request refetches everything.
+// ResetCaches drops cached scenes, tags, stats, recommendations and
+// performer rankings; the next index request refetches everything.
 func (libraryService *Service) ResetCaches() {
 	libraryService.muVdCache.Lock()
 	libraryService.vdCache = make(map[string]*VideoData)
@@ -110,6 +112,7 @@ func (libraryService *Service) ResetCaches() {
 
 	libraryService.muRec.Lock()
 	libraryService.rec = nil
+	libraryService.moreFrom = nil
 	libraryService.recGen++
 	libraryService.muRec.Unlock()
 
