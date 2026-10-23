@@ -1,6 +1,7 @@
 package library
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -60,6 +61,8 @@ type SectionRow struct {
 	Disabled   bool
 	Smart      bool
 	Auto       bool     // generated for a studio or performer with enough scenes
+	Family     bool     // an auto section family's row: settings only, lists no scenes
+	Parent     string   // for a generated section, the id of its family row
 	HiddenIn   []string // players the section is hidden from while enabled
 }
 
@@ -337,12 +340,30 @@ func (libraryService *Service) GetSavedFilterSceneSetsFor(ctx context.Context, p
 	return visible, nil
 }
 
+// familyDef is an auto section family's row: it carries the family's
+// settings and the sections it generates are listed after it.
+type familyDef struct {
+	ID    string
+	Name  string
+	After string // row id this family follows while it has no override
+}
+
+func familyDefs() []familyDef {
+	return []familyDef{
+		{ID: config.FamilyMoreFrom, Name: "More from your performers", After: smartPrefix + "recommended"},
+		{ID: config.FamilyStudio, Name: "Studio sections"},
+		{ID: config.FamilyPerformer, Name: "Performer sections"},
+	}
+}
+
 // sectionRows applies the ordering rule: smart sections without an override
 // first (default state), then overrides in saved order, then remaining saved
-// filters in the given order, then auto sections without an override
-// (enabled). A smart or auto section without an override whose After names
-// a smart section is placed directly after that section's row instead.
-func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []AutoSection, overrides []config.Filter) []SectionRow {
+// filters in the given order, then family rows without an override (off),
+// then auto sections without an override (enabled). A smart section or
+// family whose After names a listed row is placed directly after that row
+// instead, and an auto section without an override directly after its
+// family's row.
+func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, families []familyDef, auto []AutoSection, overrides []config.Filter) []SectionRow {
 	overridden := make(map[string]config.Filter, len(overrides))
 	for _, o := range overrides {
 		overridden[o.ID] = o
@@ -350,6 +371,10 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []Auto
 	smartByID := make(map[string]SmartSection, len(smart))
 	for _, s := range smart {
 		smartByID[s.ID()] = s
+	}
+	familyByID := make(map[string]familyDef, len(families))
+	for _, f := range families {
+		familyByID[f.ID] = f
 	}
 	savedByID := make(map[string]gql.SavedFilterParts, len(saved))
 	for _, sf := range saved {
@@ -359,48 +384,61 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []Auto
 	for _, a := range auto {
 		autoByID[a.ID] = a
 	}
-
-	rows := make([]SectionRow, 0, len(smart)+len(saved)+len(auto))
-	var placed []placedRow
-	anchored := func(after string) bool {
-		_, ok := smartByID[smartPrefix+after]
-		return ok && after != ""
+	// anchored reports whether a row id can be placed after: smart
+	// sections and families are always listed, with or without override.
+	anchored := func(id string) bool {
+		_, isSmart := smartByID[id]
+		_, isFamily := familyByID[id]
+		return isSmart || isFamily
 	}
+
+	rows := make([]SectionRow, 0, len(smart)+len(saved)+len(families)+len(auto))
+	var placed []placedRow
 	for _, s := range smart {
 		if _, ok := overridden[s.ID()]; ok {
 			continue
 		}
-		if anchored(s.After) {
-			placed = append(placed, placedRow{row: defaultSmartRow(s), after: s.After})
+		if s.After != "" && anchored(smartPrefix+s.After) {
+			placed = append(placed, placedRow{row: defaultSmartRow(s), after: smartPrefix + s.After})
 			continue
 		}
 		rows = append(rows, defaultSmartRow(s))
+	}
+	// An override pins a row relative to the other overridden rows only:
+	// a row whose After names a row that has no override (the page saves
+	// every row at once, so this is a row created by a migration or by
+	// hand) still follows its anchor.
+	followsDefault := func(after string) bool {
+		_, ok := overridden[after]
+		return after != "" && !ok && anchored(after)
 	}
 	seen := make(map[string]struct{}, len(overrides))
 	for _, o := range overrides {
 		seen[o.ID] = struct{}{}
 		if s, ok := smartByID[o.ID]; ok {
-			name := o.Name
-			if name == "" {
-				name = s.Name
+			row := SectionRow{ID: o.ID, SourceName: s.Name, Name: cmp.Or(o.Name, s.Name), Disabled: o.Disabled, Smart: true, HiddenIn: o.HiddenIn}
+			if followsDefault(smartPrefix + s.After) {
+				placed = append(placed, placedRow{row: row, after: smartPrefix + s.After})
+				continue
 			}
-			rows = append(rows, SectionRow{ID: o.ID, SourceName: s.Name, Name: name, Disabled: o.Disabled, Smart: true, HiddenIn: o.HiddenIn})
+			rows = append(rows, row)
+			continue
+		}
+		if f, ok := familyByID[o.ID]; ok {
+			row := SectionRow{ID: o.ID, SourceName: f.Name, Name: cmp.Or(o.Name, f.Name), Disabled: o.Disabled, Family: true, HiddenIn: o.HiddenIn}
+			if followsDefault(f.After) {
+				placed = append(placed, placedRow{row: row, after: f.After})
+				continue
+			}
+			rows = append(rows, row)
 			continue
 		}
 		if sf, ok := savedByID[o.ID]; ok {
-			name := o.Name
-			if name == "" {
-				name = sf.Name
-			}
-			rows = append(rows, SectionRow{ID: o.ID, SourceName: sf.Name, Name: name, Disabled: o.Disabled, HiddenIn: o.HiddenIn})
+			rows = append(rows, SectionRow{ID: o.ID, SourceName: sf.Name, Name: cmp.Or(o.Name, sf.Name), Disabled: o.Disabled, HiddenIn: o.HiddenIn})
 			continue
 		}
 		if a, ok := autoByID[o.ID]; ok {
-			name := o.Name
-			if name == "" {
-				name = a.Name
-			}
-			rows = append(rows, SectionRow{ID: o.ID, SourceName: a.Name, Name: name, Disabled: o.Disabled, Auto: true, HiddenIn: o.HiddenIn})
+			rows = append(rows, SectionRow{ID: o.ID, SourceName: a.Name, Name: cmp.Or(o.Name, a.Name), Disabled: o.Disabled, Auto: true, Parent: a.Family, HiddenIn: o.HiddenIn})
 		}
 	}
 	for _, sf := range saved {
@@ -409,13 +447,24 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []Auto
 		}
 		rows = append(rows, SectionRow{ID: sf.Id, SourceName: sf.Name, Name: sf.Name})
 	}
+	for _, f := range families {
+		if _, ok := seen[f.ID]; ok {
+			continue
+		}
+		row := SectionRow{ID: f.ID, SourceName: f.Name, Name: f.Name, Disabled: true, Family: true}
+		if f.After != "" && anchored(f.After) {
+			placed = append(placed, placedRow{row: row, after: f.After})
+			continue
+		}
+		rows = append(rows, row)
+	}
 	for _, a := range auto {
 		if _, ok := seen[a.ID]; ok {
 			continue
 		}
-		row := SectionRow{ID: a.ID, SourceName: a.Name, Name: a.Name, Auto: true}
-		if anchored(a.After) {
-			placed = append(placed, placedRow{row: row, after: a.After})
+		row := SectionRow{ID: a.ID, SourceName: a.Name, Name: a.Name, Auto: true, Parent: a.Family}
+		if a.Family != "" && anchored(a.Family) {
+			placed = append(placed, placedRow{row: row, after: a.Family})
 			continue
 		}
 		rows = append(rows, row)
@@ -424,7 +473,7 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, auto []Auto
 }
 
 // placedRow is a row without an override that goes directly after the
-// smart section its after names.
+// row whose id after names.
 type placedRow struct {
 	row   SectionRow
 	after string
@@ -435,16 +484,16 @@ func defaultSmartRow(s SmartSection) SectionRow {
 	return SectionRow{ID: s.ID(), SourceName: s.Name, Name: s.Name, Disabled: !s.Default, Smart: true}
 }
 
-// placeAfter inserts each section directly after the row of the smart
-// section its after names, behind any section already placed there, so
-// sections sharing an anchor keep their given order. A section whose
-// anchor has no row yet (it is placed after a later one) goes to the top,
-// where smart sections without an override go by default.
+// placeAfter inserts each section directly after the row its after names,
+// behind any section already placed there, so sections sharing an anchor
+// keep their given order. A section whose anchor has no row yet (it is
+// placed after a later one) goes to the top, where smart sections without
+// an override go by default.
 func placeAfter(rows []SectionRow, placed []placedRow) []SectionRow {
 	anchorOf := make(map[string]string, len(placed))
 	front := 0
 	for _, p := range placed {
-		anchor := smartPrefix + p.after
+		anchor := p.after
 		at := slices.IndexFunc(rows, func(r SectionRow) bool { return r.ID == anchor })
 		if at < 0 {
 			rows = slices.Insert(rows, front, p.row)
@@ -511,7 +560,7 @@ func (libraryService *Service) SectionRows(ctx context.Context) ([]SectionRow, e
 	if err != nil {
 		return nil, err
 	}
-	return sectionRows(saved, smartSections(), auto, config.Application().Filters), nil
+	return sectionRows(saved, smartSections(), familyDefs(), auto, config.Application().Filters), nil
 }
 
 func (libraryService *Service) getSources(ctx context.Context, auto []AutoSection) ([]sectionSource, error) {
@@ -532,9 +581,18 @@ func (libraryService *Service) getSources(ctx context.Context, auto []AutoSectio
 	for i := range auto {
 		autoByID[auto[i].ID] = &auto[i]
 	}
+	rows := sectionRows(saved, smart, familyDefs(), auto, config.Application().Filters)
+	// A family row lists no scenes itself but its hidden players apply to
+	// every section it generated, on top of the child's own.
+	familyHidden := map[string][]string{}
+	for _, row := range rows {
+		if row.Family {
+			familyHidden[row.ID] = row.HiddenIn
+		}
+	}
 	var sources []sectionSource
-	for _, row := range sectionRows(saved, smart, auto, config.Application().Filters) {
-		if row.Disabled {
+	for _, row := range rows {
+		if row.Disabled || row.Family {
 			continue
 		}
 		if s, ok := smartByID[row.ID]; ok {
@@ -542,10 +600,26 @@ func (libraryService *Service) getSources(ctx context.Context, auto []AutoSectio
 		} else if sf, ok := savedByID[row.ID]; ok {
 			sources = append(sources, sectionSource{row: row, saved: sf})
 		} else if a, ok := autoByID[row.ID]; ok {
+			if hidden := familyHidden[a.Family]; len(hidden) > 0 {
+				row.HiddenIn = mergeHidden(row.HiddenIn, hidden)
+			}
 			sources = append(sources, sectionSource{row: row, auto: a})
 		}
 	}
 	return sources, nil
+}
+
+// mergeHidden is the union of two hidden_in lists, sorted so equal sets
+// compare equal.
+func mergeHidden(a, b []string) []string {
+	out := slices.Clone(a)
+	for _, p := range b {
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // resolveSections queries the scenes of every source. A source that fails
@@ -553,7 +627,7 @@ func (libraryService *Service) getSources(ctx context.Context, auto []AutoSectio
 // already know their scenes) failed is the index itself the failure, so a
 // Stash that answers nothing is not cached as an empty library.
 func (libraryService *Service) resolveSections(ctx context.Context, sources []sectionSource) ([]SavedFilterSceneSet, error) {
-	size := config.Application().SmartSectionSize
+	global := config.Application().SmartSectionSize
 	sections := make([]SavedFilterSceneSet, len(sources))
 
 	wg := sync.WaitGroup{}
@@ -573,6 +647,7 @@ func (libraryService *Service) resolveSections(ctx context.Context, sources []se
 			// A section that blows up (a saved filter shaped in a way the
 			// converter does not expect, say) is skipped, not the index.
 			defer util.RecoverLog(flog.WithContext(ctx), "resolve section, skipping it")
+			size := sectionSize(src.row.ID, global)
 
 			if src.smart != nil && src.smart.ids != nil {
 				ids, err := src.smart.ids(libraryService, ctx, size)

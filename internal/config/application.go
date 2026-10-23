@@ -62,15 +62,15 @@ type ApplicationConfig struct {
 	FunscriptIndexPath string
 	HeatmapHeightPx    int
 	SmartSectionSize   int
-	AutoStudioMin      int
-	AutoPerformerMin   int
-	// MoreFromPerformers is how many "More from <performer>" sections to
-	// generate for the performers the watch history features most.
-	MoreFromPerformers int
-	ExcludeSortName    string
-	ConfigPath         string
-	GenerateSummaryIds bool
-	CoverBadges        CoverBadges
+	// legacyStudioMin, legacyPerformerMin and legacyMoreFrom are the
+	// AUTO_STUDIO_MIN, AUTO_PERFORMER_MIN and MORE_FROM_PERFORMERS seeds.
+	// Since the family rows on the Sections page took over, they only
+	// create those rows on a first load and are never persisted.
+	legacyStudioMin, legacyPerformerMin, legacyMoreFrom int
+	ExcludeSortName                                     string
+	ConfigPath                                          string
+	GenerateSummaryIds                                  bool
+	CoverBadges                                         CoverBadges
 	// LearnStudioProfiles gives a scene without a HereSphere profile of
 	// its own the newest one saved for a scene of the same studio and lens.
 	LearnStudioProfiles bool
@@ -136,13 +136,13 @@ func registerFlags(fs *pflag.FlagSet, bind func(key string, flag *pflag.Flag) er
 	fs.Int(envKeySmartSectionSize, 50, "Number of scenes in each smart section")
 	_ = bind(envKeySmartSectionSize, fs.Lookup(envKeySmartSectionSize))
 
-	fs.Int(envKeyAutoStudioMin, 0, "Generate a section for every studio with at least this many scenes (0 turns it off)")
+	fs.Int(envKeyAutoStudioMin, 0, "First run only: creates the Studio sections row on the Sections page, switched on with this scene threshold")
 	_ = bind(envKeyAutoStudioMin, fs.Lookup(envKeyAutoStudioMin))
 
-	fs.Int(envKeyAutoPerformerMin, 0, "Generate a section for every performer with at least this many scenes (0 turns it off)")
+	fs.Int(envKeyAutoPerformerMin, 0, "First run only: creates the Performer sections row on the Sections page, switched on with this scene threshold")
 	_ = bind(envKeyAutoPerformerMin, fs.Lookup(envKeyAutoPerformerMin))
 
-	fs.Int(envKeyMoreFromPerformers, 0, "Generate a More from <performer> section for this many of the performers you watch most (0 turns it off)")
+	fs.Int(envKeyMoreFromPerformers, 0, "First run only: creates the More from your performers row on the Sections page, switched on for this many performers")
 	_ = bind(envKeyMoreFromPerformers, fs.Lookup(envKeyMoreFromPerformers))
 
 	fs.String(envKeyExcludeSortName, "hidden", "Exclude tags with this sort name")
@@ -209,9 +209,9 @@ func Init() error {
 		FunscriptIndexPath: viper.GetString(envKeyFunscriptIndexPath),
 		HeatmapHeightPx:    viper.GetInt(envKeyHeatmapHeightPx),
 		SmartSectionSize:   viper.GetInt(envKeySmartSectionSize),
-		AutoStudioMin:      viper.GetInt(envKeyAutoStudioMin),
-		AutoPerformerMin:   viper.GetInt(envKeyAutoPerformerMin),
-		MoreFromPerformers: viper.GetInt(envKeyMoreFromPerformers),
+		legacyStudioMin:    viper.GetInt(envKeyAutoStudioMin),
+		legacyPerformerMin: viper.GetInt(envKeyAutoPerformerMin),
+		legacyMoreFrom:     viper.GetInt(envKeyMoreFromPerformers),
 		ExcludeSortName:    viper.GetString(envKeyExcludeSortName),
 		ConfigPath:         viper.GetString(envKeyUserConfigPath),
 		GenerateSummaryIds: viper.GetBool(envKeyGenerateSummaryIds),
@@ -261,9 +261,6 @@ func settingValues(c *ApplicationConfig) map[string]any {
 		envKeyExcludeSortName:    c.ExcludeSortName,
 		envKeyGenerateSummaryIds: c.GenerateSummaryIds,
 		envKeySmartSectionSize:   c.SmartSectionSize,
-		envKeyAutoStudioMin:      c.AutoStudioMin,
-		envKeyAutoPerformerMin:   c.AutoPerformerMin,
-		envKeyMoreFromPerformers: c.MoreFromPerformers,
 		envKeyCoverBadgeQuality:  c.CoverBadges.Quality,
 		envKeyCoverBadgeFormat:   c.CoverBadges.Format,
 		envKeyCoverBadgePass:     c.CoverBadges.Passthrough,

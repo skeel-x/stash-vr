@@ -51,6 +51,9 @@ func Run(ctx context.Context) error {
 	if m := config.MigratedRules(); len(m) > 0 {
 		log.Info().Strs("tags", m).Msg("Dropped default video rules keyed on studio labels; measured tags from vrQualityTags replace them")
 	}
+	if m := config.MigratedFamilies(); len(m) > 0 {
+		log.Info().Strs("rows", m).Msg("Auto section settings moved to the Sections page; rows created from the old values")
+	}
 	log.Info().Str("config", fmt.Sprintf("%+v", config.Application().Redacted())).Send()
 
 	cfg := config.Application()

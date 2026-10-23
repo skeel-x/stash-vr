@@ -14,23 +14,53 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// maxAutoSectionsPerKind caps how many studio and how many performer
-// sections are generated, so a low threshold cannot flood the players.
-const maxAutoSectionsPerKind = 50
-
 // AutoSection is a section generated for a studio or performer with enough
 // scenes, or for a performer the watch history features. ID is
 // "studio:<id>", "performer:<id>" or "auto:morefrom:<id>"; Ids are in the
 // order the grouping query returned them (newest first), or best first
-// for More from <performer>.
+// for More from <performer>. Family is the id of the family row that
+// generated it (config.FamilyStudio, FamilyPerformer or FamilyMoreFrom);
+// the section is listed after that row while it has no override of its
+// own.
 type AutoSection struct {
-	ID    string
-	Name  string
-	Ids   []string
-	Count int
-	// After is the key of the smart section this one follows while it has
-	// no override row; empty keeps the default auto placement (last).
-	After string
+	ID     string
+	Name   string
+	Ids    []string
+	Count  int
+	Family string
+}
+
+// familySpec is what a family row says: whether the family is on, the
+// scene threshold, how many sections at most, and how many scenes each.
+type familySpec struct {
+	on               bool
+	min, limit, size int
+}
+
+// familyFor reads the family's row from cfg. No row or a disabled row
+// means off; missing options take the defaults, More from has its own
+// smaller limit so switching it on cannot flood a headset.
+func familyFor(cfg config.ApplicationConfig, id string) familySpec {
+	for _, f := range cfg.Filters {
+		if f.ID != id {
+			continue
+		}
+		var o config.SectionOptions
+		if f.Options != nil {
+			o = *f.Options
+		}
+		limit := config.DefaultFamilyLimit
+		if id == config.FamilyMoreFrom {
+			limit = config.DefaultMoreFromLimit
+		}
+		return familySpec{
+			on:    !f.Disabled,
+			min:   intOr(o.MinScenes, config.DefaultFamilyMinScenes),
+			limit: intOr(o.Limit, limit),
+			size:  intOr(o.Size, cfg.SmartSectionSize),
+		}
+	}
+	return familySpec{}
 }
 
 // autoGroup collects the scenes of one studio or performer.
@@ -41,11 +71,12 @@ type autoGroup struct {
 }
 
 // groupScenes turns the grouping query result into auto sections: every
-// studio with at least studioMin scenes and every performer with at least
-// performerMin scenes (a minimum of 0 turns that kind off), largest first
-// and then by name, at most maxAutoSectionsPerKind of each. Studios come
-// before performers; performer sections are named "@ <name>".
-func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene, studioMin, performerMin int) []AutoSection {
+// studio with at least the studio family's threshold and every performer
+// with at least the performer family's (a family that is off contributes
+// none), largest first and then by name, at most the family's limit of
+// each. Studios come before performers; performer sections are named
+// "@ <name>".
+func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene, studio, performer familySpec) []AutoSection {
 	studios := map[string]*autoGroup{}
 	performers := map[string]*autoGroup{}
 	add := func(groups map[string]*autoGroup, id, name, sceneID string) {
@@ -64,10 +95,10 @@ func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeS
 		if s == nil {
 			continue
 		}
-		if studioMin > 0 && s.Studio != nil {
+		if studio.on && s.Studio != nil {
 			add(studios, s.Studio.Id, s.Studio.Name, s.Id)
 		}
-		if performerMin > 0 {
+		if performer.on {
 			for _, p := range s.Performers {
 				if p != nil {
 					add(performers, p.Id, p.Name, s.Id)
@@ -75,19 +106,20 @@ func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeS
 			}
 		}
 	}
-	out := pickGroups(studios, studioMin, "studio:", "")
-	return append(out, pickGroups(performers, performerMin, "performer:", "@ ")...)
+	out := pickGroups(studios, studio, "studio:", "", config.FamilyStudio)
+	return append(out, pickGroups(performers, performer, "performer:", "@ ", config.FamilyPerformer)...)
 }
 
-// pickGroups keeps the groups with at least min scenes, ordered by count
-// descending, then name, then id, capped at maxAutoSectionsPerKind.
-func pickGroups(groups map[string]*autoGroup, minScenes int, idPrefix, namePrefix string) []AutoSection {
-	if minScenes <= 0 {
+// pickGroups keeps the groups with at least the family's threshold of
+// scenes, ordered by count descending, then name, then id, capped at the
+// family's limit.
+func pickGroups(groups map[string]*autoGroup, spec familySpec, idPrefix, namePrefix, family string) []AutoSection {
+	if !spec.on {
 		return nil
 	}
 	var kept []*autoGroup
 	for _, g := range groups {
-		if len(g.ids) >= minScenes {
+		if len(g.ids) >= spec.min {
 			kept = append(kept, g)
 		}
 	}
@@ -98,45 +130,46 @@ func pickGroups(groups map[string]*autoGroup, minScenes int, idPrefix, namePrefi
 			cmp.Compare(a.id, b.id),
 		)
 	})
-	if len(kept) > maxAutoSectionsPerKind {
-		kept = kept[:maxAutoSectionsPerKind]
+	if len(kept) > spec.limit {
+		kept = kept[:spec.limit]
 	}
 	out := make([]AutoSection, len(kept))
 	for i, g := range kept {
-		out[i] = AutoSection{ID: idPrefix + g.id, Name: namePrefix + g.name, Ids: g.ids, Count: len(g.ids)}
+		out[i] = AutoSection{ID: idPrefix + g.id, Name: namePrefix + g.name, Ids: g.ids, Count: len(g.ids), Family: family}
 	}
 	return out
 }
 
 // autoSectionsOn reports whether any auto section family is switched on.
 func autoSectionsOn(cfg *config.ApplicationConfig) bool {
-	return cfg.AutoStudioMin > 0 || cfg.AutoPerformerMin > 0 || cfg.MoreFromPerformers > 0
+	return familyFor(*cfg, config.FamilyStudio).on || familyFor(*cfg, config.FamilyPerformer).on || familyFor(*cfg, config.FamilyMoreFrom).on
 }
 
-// fetchAutoSections runs the grouping query when either threshold is on
-// and ranks the performers when More from <performer> is on. buildIndex
-// calls it once per rebuild; everyone else reads the result cached with
-// the index through autoSections.
+// fetchAutoSections runs the grouping query when the studio or performer
+// family is on and ranks the performers when More from <performer> is on.
+// buildIndex calls it once per rebuild; everyone else reads the result
+// cached with the index through autoSections.
 func (libraryService *Service) fetchAutoSections(ctx context.Context) ([]AutoSection, error) {
 	cfg := config.Application()
+	studio, performer, more := familyFor(cfg, config.FamilyStudio), familyFor(cfg, config.FamilyPerformer), familyFor(cfg, config.FamilyMoreFrom)
 	var out []AutoSection
-	if cfg.AutoStudioMin > 0 || cfg.AutoPerformerMin > 0 {
+	if studio.on || performer.on {
 		resp, err := gql.FindSceneGroupings(ctx, libraryService.Client())
 		if err != nil {
 			return nil, fmt.Errorf("FindSceneGroupings: %w", err)
 		}
 		if resp.FindScenes != nil {
-			out = groupScenes(resp.FindScenes.Scenes, cfg.AutoStudioMin, cfg.AutoPerformerMin)
+			out = groupScenes(resp.FindScenes.Scenes, studio, performer)
 		}
 	}
-	if cfg.MoreFromPerformers > 0 {
+	if more.on {
 		// A failed ranking costs these sections, not the studio and
 		// performer ones.
-		more, err := libraryService.moreFromPerformers(ctx, cfg.MoreFromPerformers, cfg.SmartSectionSize)
+		sections, err := libraryService.moreFromPerformers(ctx, more.limit, more.size)
 		if err != nil {
 			log.Ctx(ctx).Warn().Err(err).Msg("Failed to rank performers, skipping the More from sections")
 		}
-		out = append(out, more...)
+		out = append(out, sections...)
 	}
 	return out, nil
 }
@@ -251,7 +284,7 @@ func moreFromSections(scenes []*recScene, now time.Time, n, size int) []AutoSect
 		for j, s := range c.unplayed {
 			ids[j] = s.Id
 		}
-		out[i] = AutoSection{ID: moreFromPrefix + c.id, Name: "More from " + c.name, Ids: ids, Count: len(ids), After: "recommended"}
+		out[i] = AutoSection{ID: moreFromPrefix + c.id, Name: "More from " + c.name, Ids: ids, Count: len(ids), Family: config.FamilyMoreFrom}
 	}
 	return out
 }

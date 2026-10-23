@@ -35,8 +35,18 @@ func autoIDs(sections []AutoSection) []string {
 	return out
 }
 
+// loadAutoConfig loads a config with the studio and performer families
+// switched on at the given thresholds (0 leaves that family off) ahead of
+// filters.
 func loadAutoConfig(t *testing.T, studioMin, performerMin int, filters []config.Filter) {
 	t.Helper()
+	var rows []config.Filter
+	if studioMin > 0 {
+		rows = append(rows, config.Filter{ID: config.FamilyStudio, Options: &config.SectionOptions{MinScenes: &studioMin}})
+	}
+	if performerMin > 0 {
+		rows = append(rows, config.Filter{ID: config.FamilyPerformer, Options: &config.SectionOptions{MinScenes: &performerMin}})
+	}
 	err := config.Load(config.ApplicationConfig{
 		ListenAddress:    ":9666",
 		StashGraphQLUrl:  "http://stash:9999/graphql",
@@ -45,9 +55,7 @@ func loadAutoConfig(t *testing.T, studioMin, performerMin int, filters []config.
 		ExcludeSortName:  "hidden",
 		SmartSectionSize: 50,
 		ConfigPath:       t.TempDir(),
-		Filters:          filters,
-		AutoStudioMin:    studioMin,
-		AutoPerformerMin: performerMin,
+		Filters:          append(rows, filters...),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +75,7 @@ func TestGroupScenes_ThresholdsAndOrdering(t *testing.T) {
 		groupingRow("6", "", "", cara, cara), // listed twice: counts once
 	}
 
-	got := groupScenes(scenes, 2, 2)
+	got := groupScenes(scenes, fam(2), fam(2))
 
 	want := []string{"studio:s2", "studio:s1", "performer:p1", "performer:p2", "performer:p3"}
 	if fmt.Sprint(autoIDs(got)) != fmt.Sprint(want) {
@@ -83,10 +91,10 @@ func TestGroupScenes_ThresholdsAndOrdering(t *testing.T) {
 		t.Fatalf("performer Cara wrong: %+v", got[4])
 	}
 
-	if ids := autoIDs(groupScenes(scenes, 3, 0)); len(ids) != 0 {
+	if ids := autoIDs(groupScenes(scenes, fam(3), fam(0))); len(ids) != 0 {
 		t.Fatalf("no studio reaches 3 scenes and performers are off, got %v", ids)
 	}
-	if ids := autoIDs(groupScenes(scenes, 0, 3)); fmt.Sprint(ids) != "[performer:p1]" {
+	if ids := autoIDs(groupScenes(scenes, fam(0), fam(3))); fmt.Sprint(ids) != "[performer:p1]" {
 		t.Fatalf("only Alice reaches 3 scenes, got %v", ids)
 	}
 }
@@ -100,7 +108,7 @@ func TestGroupScenes_CapsEachKindAtFifty(t *testing.T) {
 		}
 	}
 
-	got := groupScenes(scenes, 1, 1)
+	got := groupScenes(scenes, fam(1), fam(1))
 
 	if len(got) != 100 {
 		t.Fatalf("expected 50 studios and 50 performers, got %d", len(got))
@@ -121,7 +129,7 @@ func TestSectionRows_AutoRowsAfterEverythingElseAndOverridable(t *testing.T) {
 		{ID: "performer:gone"}, // dropped below the threshold since saved
 	}
 
-	rows := sectionRows(saved, nil, auto, overrides)
+	rows := sectionRows(saved, nil, nil, auto, overrides)
 
 	got := make([]string, len(rows))
 	for i, r := range rows {
@@ -191,9 +199,10 @@ func TestGetSections_AutoStudioSectionUsesGroupingIds(t *testing.T) {
 	if n := stash.groupingQueries(); n != 1 {
 		t.Fatalf("grouping must be cached with the index, got %d queries", n)
 	}
-	last := rows[len(rows)-1]
-	if last.ID != "studio:s1" || !last.Auto {
-		t.Fatalf("Sections page should list the auto row last, got %+v", last)
+	ids := rowIDs(rows)
+	fam, child := slices.Index(ids, config.FamilyStudio), slices.Index(ids, "studio:s1")
+	if fam < 0 || child != fam+1 || !rows[child].Auto || rows[child].Parent != config.FamilyStudio {
+		t.Fatalf("Sections page should list the auto row right after its family row, got %v", ids)
 	}
 }
 

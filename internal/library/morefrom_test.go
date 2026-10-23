@@ -75,7 +75,7 @@ func TestMoreFromSections(t *testing.T) {
 	}
 
 	got := moreFromSections(library, recNow, 5, 50)
-	if got[0].Name != "More from Alice" || got[0].After != "recommended" || got[0].Count != 3 {
+	if got[0].Name != "More from Alice" || got[0].Family != config.FamilyMoreFrom || got[0].Count != 3 {
 		t.Fatalf("Alice section wrong: %+v", got[0])
 	}
 	// Best rated first, unrated last, newest first among equals; scene 1
@@ -128,18 +128,26 @@ func TestMoreFromSections_OnlyPlayedHistoryCounts(t *testing.T) {
 	}
 }
 
+// moreFromRows is the More from family row switched on for n performers,
+// none for 0.
+func moreFromRows(n int) []config.Filter {
+	if n <= 0 {
+		return nil
+	}
+	return []config.Filter{{ID: config.FamilyMoreFrom, Options: &config.SectionOptions{Limit: &n}}}
+}
+
 func loadMoreFromConfig(t *testing.T, n int, filters []config.Filter) {
 	t.Helper()
 	err := config.Load(config.ApplicationConfig{
-		ListenAddress:      ":9666",
-		StashGraphQLUrl:    "http://stash:9999/graphql",
-		FavoriteTag:        "FAVORITE",
-		LogLevel:           "info",
-		ExcludeSortName:    "hidden",
-		SmartSectionSize:   50,
-		ConfigPath:         t.TempDir(),
-		Filters:            filters,
-		MoreFromPerformers: n,
+		ListenAddress:    ":9666",
+		StashGraphQLUrl:  "http://stash:9999/graphql",
+		FavoriteTag:      "FAVORITE",
+		LogLevel:         "info",
+		ExcludeSortName:  "hidden",
+		SmartSectionSize: 50,
+		ConfigPath:       t.TempDir(),
+		Filters:          append(moreFromRows(n), filters...),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -196,7 +204,7 @@ func TestGetSections_MoreFromFollowsRecommendedAndIsCached(t *testing.T) {
 		t.Fatal(err)
 	}
 	at := slices.IndexFunc(rows, func(r SectionRow) bool { return r.ID == "auto:morefrom:p1" })
-	if at < 0 || !rows[at].Auto || rows[at].Disabled || rows[at].SourceName != "More from Alice" || rows[at-1].ID != "smart:recommended" {
+	if at < 0 || !rows[at].Auto || rows[at].Disabled || rows[at].SourceName != "More from Alice" || rows[at].Parent != config.FamilyMoreFrom || rows[at-1].ID != config.FamilyMoreFrom || rows[at-2].ID != "smart:recommended" {
 		t.Fatalf("Sections page row wrong: %v", rows)
 	}
 	if n := svc.AutoSectionCount(); n != 1 {
@@ -279,7 +287,7 @@ func TestGetSections_MoreFromHonoursOverrides(t *testing.T) {
 func TestGetSections_MoreFromQueryErrorKeepsOtherAutoSections(t *testing.T) {
 	loadMoreFromConfig(t, 3, nil)
 	cfg := config.Application()
-	cfg.AutoStudioMin = 2
+	cfg.Filters = append(cfg.Filters, config.Filter{ID: config.FamilyStudio, Options: &config.SectionOptions{MinScenes: intp(2)}})
 	if _, err := config.Set(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -323,18 +331,18 @@ func TestGetSections_JustPlayedSceneLeavesMoreFromAtOnce(t *testing.T) {
 func TestSectionRows_AutoSectionAfterSmartAnchor(t *testing.T) {
 	auto := []AutoSection{
 		{ID: "studio:s1", Name: "Beta", Ids: []string{"1"}, Count: 1},
-		{ID: "auto:morefrom:p1", Name: "More from Alice", Ids: []string{"2"}, Count: 1, After: "recommended"},
-		{ID: "auto:morefrom:p2", Name: "More from Cara", Ids: []string{"3"}, Count: 1, After: "recommended"},
-		{ID: "auto:morefrom:p3", Name: "More from Dee", Ids: []string{"4"}, Count: 1, After: "nosuch"},
+		{ID: "auto:morefrom:p1", Name: "More from Alice", Ids: []string{"2"}, Count: 1, Family: config.FamilyMoreFrom},
+		{ID: "auto:morefrom:p2", Name: "More from Cara", Ids: []string{"3"}, Count: 1, Family: config.FamilyMoreFrom},
+		{ID: "auto:morefrom:p3", Name: "More from Dee", Ids: []string{"4"}, Count: 1, Family: "nosuch"},
 	}
 	overrides := []config.Filter{{ID: "smart:recommended"}, {ID: "smart:continue"}}
 
-	rows := sectionRows(nil, smartSections(), auto, overrides)
+	rows := sectionRows(nil, smartSections(), familyDefs(), auto, overrides)
 
 	got := rowIDs(rows)
 	rec := slices.Index(got, "smart:recommended")
-	if rec < 0 || got[rec+1] != "auto:morefrom:p1" || got[rec+2] != "auto:morefrom:p2" {
-		t.Fatalf("expected the More from rows in order right after Recommended, got %v", got)
+	if rec < 0 || got[rec+1] != config.FamilyMoreFrom || got[rec+2] != "auto:morefrom:p1" || got[rec+3] != "auto:morefrom:p2" {
+		t.Fatalf("expected the More from family and its rows in order right after Recommended, got %v", got)
 	}
 	if got[len(got)-2] != "studio:s1" || got[len(got)-1] != "auto:morefrom:p3" {
 		t.Fatalf("expected an unanchored auto row last, got %v", got)

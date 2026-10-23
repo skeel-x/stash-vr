@@ -254,12 +254,9 @@ func normalizeVideoRules(rules []VideoRule) {
 
 const configFileName = "config.json"
 
-// MaxAutoSectionMin is the largest accepted auto_studio_min and
-// auto_performer_min.
+// MaxAutoSectionMin is the largest accepted scene threshold of the studio
+// and performer section families.
 const MaxAutoSectionMin = 10000
-
-// MaxMoreFromPerformers is the largest accepted more_from_performers.
-const MaxMoreFromPerformers = 50
 
 // ErrInvalid marks a settings value rejected by Validate, so API callers can
 // tell a bad request from a failed write.
@@ -277,14 +274,16 @@ var validLogLevels = map[string]struct{}{
 // fileConfig is the persisted subset of ApplicationConfig. Pointer fields let
 // a file that lacks a key fall back to the seed (flags/env/defaults).
 type fileConfig struct {
-	StashGraphQLUrl    *string          `json:"stash_graphql_url,omitempty"`
-	StashApiKey        *string          `json:"stash_api_key,omitempty"`
-	StashTLSInsecure   *bool            `json:"stash_tls_insecure,omitempty"`
-	FavoriteTag        *string          `json:"favorite_tag,omitempty"`
-	ExcludeSortName    *string          `json:"exclude_sort_name,omitempty"`
-	GenerateSummaryIds *bool            `json:"generate_summary_ids,omitempty"`
-	HeatmapHeightPx    *int             `json:"heatmap_height_px,omitempty"`
-	SmartSectionSize   *int             `json:"smart_section_size,omitempty"`
+	StashGraphQLUrl    *string `json:"stash_graphql_url,omitempty"`
+	StashApiKey        *string `json:"stash_api_key,omitempty"`
+	StashTLSInsecure   *bool   `json:"stash_tls_insecure,omitempty"`
+	FavoriteTag        *string `json:"favorite_tag,omitempty"`
+	ExcludeSortName    *string `json:"exclude_sort_name,omitempty"`
+	GenerateSummaryIds *bool   `json:"generate_summary_ids,omitempty"`
+	HeatmapHeightPx    *int    `json:"heatmap_height_px,omitempty"`
+	SmartSectionSize   *int    `json:"smart_section_size,omitempty"`
+	// The three auto section knobs of earlier releases: read so Load can
+	// turn them into family rows, never written again.
 	AutoStudioMin      *int             `json:"auto_studio_min,omitempty"`
 	AutoPerformerMin   *int             `json:"auto_performer_min,omitempty"`
 	MoreFromPerformers *int             `json:"more_from_performers,omitempty"`
@@ -369,6 +368,7 @@ func resolveConfigDir(configPath string) (string, error) {
 // file-driven. A file that cannot be parsed is an error naming the path.
 func Load(seed ApplicationConfig) error {
 	migrated = nil
+	migratedFamilies = nil
 	dir, err := resolveConfigDir(seed.ConfigPath)
 	if err != nil {
 		return fmt.Errorf("resolve config dir: %w", err)
@@ -389,6 +389,7 @@ func Load(seed ApplicationConfig) error {
 	data, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
+		migratedFamilies = migrateFamilies(&seed, fileConfig{})
 		if err := Validate(seed); err != nil {
 			return err
 		}
@@ -413,6 +414,7 @@ func Load(seed ApplicationConfig) error {
 		merged.VideoRules = kept
 		migrated = dropped
 	}
+	migratedFamilies = migrateFamilies(&merged, fc)
 	if merged.BasePath, err = NormalizeBasePath(merged.BasePath); err != nil {
 		return fmt.Errorf("config %s: %w", path, err)
 	}
@@ -422,7 +424,7 @@ func Load(seed ApplicationConfig) error {
 	mu.Lock()
 	store(cloneConfig(merged))
 	mu.Unlock()
-	if len(migrated) > 0 {
+	if len(migrated) > 0 || len(migratedFamilies) > 0 {
 		if err := write(path, merged); err != nil {
 			return fmt.Errorf("%w: %w", ErrSeedNotPersisted, err)
 		}
@@ -435,6 +437,49 @@ func Load(seed ApplicationConfig) error {
 func MigratedRules() []string { return migrated }
 
 var migrated []string
+
+// MigratedFamilies lists the family rows the last Load created from the
+// legacy auto_studio_min, auto_performer_min and more_from_performers
+// keys or their env seeds; the caller logs them.
+func MigratedFamilies() []string { return migratedFamilies }
+
+var migratedFamilies []string
+
+// migrateFamilies creates a family row for each legacy knob still in the
+// file (or, when the file lacks the key, set through its env seed) that
+// has no row yet, switched on with the knob as its threshold or limit.
+// Rows that exist are left alone, so the Sections page stays in charge
+// once a user has saved it.
+func migrateFamilies(c *ApplicationConfig, fc fileConfig) []string {
+	has := map[string]bool{}
+	for _, f := range c.Filters {
+		has[f.ID] = true
+	}
+	pick := func(file *int, seed int) int {
+		if file != nil {
+			return *file
+		}
+		return seed
+	}
+	var made []string
+	add := func(id string, v int, opt SectionOptions) {
+		if v <= 0 || has[id] {
+			return
+		}
+		c.Filters = append(c.Filters, Filter{ID: id, Options: &opt})
+		made = append(made, id)
+	}
+	if v := pick(fc.AutoStudioMin, c.legacyStudioMin); v > 0 {
+		add(FamilyStudio, v, SectionOptions{MinScenes: &v})
+	}
+	if v := pick(fc.AutoPerformerMin, c.legacyPerformerMin); v > 0 {
+		add(FamilyPerformer, v, SectionOptions{MinScenes: &v})
+	}
+	if v := pick(fc.MoreFromPerformers, c.legacyMoreFrom); v > 0 {
+		add(FamilyMoreFrom, v, SectionOptions{Limit: &v})
+	}
+	return made
+}
 
 // legacyLabelRules are default rules from earlier releases keyed on
 // studio or stash-box labels. They switched passthrough or a projection on
@@ -492,15 +537,6 @@ func applyFile(base ApplicationConfig, fc fileConfig) ApplicationConfig {
 	}
 	if fc.SmartSectionSize != nil {
 		base.SmartSectionSize = *fc.SmartSectionSize
-	}
-	if fc.AutoStudioMin != nil {
-		base.AutoStudioMin = *fc.AutoStudioMin
-	}
-	if fc.AutoPerformerMin != nil {
-		base.AutoPerformerMin = *fc.AutoPerformerMin
-	}
-	if fc.MoreFromPerformers != nil {
-		base.MoreFromPerformers = *fc.MoreFromPerformers
 	}
 	if fc.ForceHTTPS != nil {
 		base.ForceHTTPS = *fc.ForceHTTPS
@@ -658,15 +694,6 @@ func Validate(c ApplicationConfig) error {
 	if c.SmartSectionSize < 10 || c.SmartSectionSize > 500 {
 		return fmt.Errorf("%w: smart_section_size must be between 10 and 500, got %d", ErrInvalid, c.SmartSectionSize)
 	}
-	if c.AutoStudioMin < 0 || c.AutoStudioMin > MaxAutoSectionMin {
-		return fmt.Errorf("%w: auto_studio_min must be between 0 and %d, got %d", ErrInvalid, MaxAutoSectionMin, c.AutoStudioMin)
-	}
-	if c.AutoPerformerMin < 0 || c.AutoPerformerMin > MaxAutoSectionMin {
-		return fmt.Errorf("%w: auto_performer_min must be between 0 and %d, got %d", ErrInvalid, MaxAutoSectionMin, c.AutoPerformerMin)
-	}
-	if c.MoreFromPerformers < 0 || c.MoreFromPerformers > MaxMoreFromPerformers {
-		return fmt.Errorf("%w: more_from_performers must be between 0 and %d, got %d", ErrInvalid, MaxMoreFromPerformers, c.MoreFromPerformers)
-	}
 	// An empty favorite tag is allowed: it disables favorite sync
 	// (see library.Service.UpdateFavorite).
 	if c.ExcludeSortName == "" {
@@ -691,9 +718,6 @@ func write(path string, c ApplicationConfig) error {
 		GenerateSummaryIds: &c.GenerateSummaryIds,
 		HeatmapHeightPx:    &c.HeatmapHeightPx,
 		SmartSectionSize:   &c.SmartSectionSize,
-		AutoStudioMin:      &c.AutoStudioMin,
-		AutoPerformerMin:   &c.AutoPerformerMin,
-		MoreFromPerformers: &c.MoreFromPerformers,
 		ForceHTTPS:         &c.ForceHTTPS,
 		BasePath:           &c.BasePath,
 		DeovrAutoload:      &c.DeovrAutoload,

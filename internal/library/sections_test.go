@@ -254,26 +254,27 @@ func TestSectionRows_MixesSavedFiltersAndSmartSections(t *testing.T) {
 		{ID: "smart:recent", Disabled: true},
 	}
 
-	rows := sectionRows(saved, smartSections(), nil, overrides)
+	rows := sectionRows(saved, smartSections(), familyDefs(), nil, overrides)
 
 	got := make([]string, len(rows))
 	for i, r := range rows {
 		got[i] = r.ID
 	}
-	// Un-overridden smart sections first (continue, recommended after it,
-	// unwatched, toprated, withscript, noscript and the rest), then
-	// overrides in order (99 dropped), then the remaining saved filter.
-	want := []string{"smart:continue", "smart:recommended", "smart:unwatched", "smart:toprated", "smart:withscript", "smart:noscript", "smart:favperf", "smart:gems", "smart:rewatch", "smart:topquality", "smart:passthrough", "11", "smart:random", "smart:recent", "10"}
+	// Un-overridden smart sections first (continue, recommended after it
+	// with the More from family behind, unwatched, toprated, withscript,
+	// noscript and the rest), then overrides in order (99 dropped), then
+	// the remaining saved filter, then the other two families.
+	want := []string{"smart:continue", "smart:recommended", "auto:morefrom", "smart:unwatched", "smart:toprated", "smart:withscript", "smart:noscript", "smart:favperf", "smart:gems", "smart:rewatch", "smart:topquality", "smart:passthrough", "11", "smart:random", "smart:recent", "10", "auto:studio", "auto:performer"}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
-	if rows[11].Name != "Anal (2D)" || rows[11].SourceName != "2D Anal" || rows[11].Smart {
-		t.Fatalf("renamed saved filter row wrong: %+v", rows[11])
+	if rows[12].Name != "Anal (2D)" || rows[12].SourceName != "2D Anal" || rows[12].Smart {
+		t.Fatalf("renamed saved filter row wrong: %+v", rows[12])
 	}
-	if !rows[2].Disabled {
+	if !rows[3].Disabled {
 		t.Fatal("unwatched should be off by default")
 	}
-	if !rows[13].Disabled {
+	if !rows[14].Disabled {
 		t.Fatal("recent was disabled by its override")
 	}
 }
@@ -306,7 +307,7 @@ func TestSectionRows_ListsEverySmartSectionWithDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "[smart:continue smart:recommended smart:recent smart:unwatched smart:toprated smart:random smart:withscript smart:noscript smart:favperf smart:gems smart:rewatch smart:topquality smart:passthrough]"
+	want := "[smart:continue smart:recommended auto:morefrom smart:recent smart:unwatched smart:toprated smart:random smart:withscript smart:noscript smart:favperf smart:gems smart:rewatch smart:topquality smart:passthrough auto:studio auto:performer]"
 	if got := rowIDs(rows); fmt.Sprint(got) != want {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
@@ -316,8 +317,8 @@ func TestSectionRows_ListsEverySmartSectionWithDefaults(t *testing.T) {
 	if r := rows[1]; r.Name != "Recommended for you" || r.Disabled || !r.Smart {
 		t.Fatalf("recommended should be on by default, got %+v", r)
 	}
-	if !rows[3].Disabled {
-		t.Fatalf("unwatched should be off by default, got %+v", rows[3])
+	if !rows[4].Disabled {
+		t.Fatalf("unwatched should be off by default, got %+v", rows[4])
 	}
 }
 
@@ -586,14 +587,14 @@ func TestSectionRows_SmartSectionWithAfterFollowsItsAnchor(t *testing.T) {
 	saved := []gql.SavedFilterParts{{Id: "10", Name: "Landing"}}
 
 	// No overrides: the anchor is a default row, the new one follows it.
-	if got := rowIDs(sectionRows(saved, smart, nil, nil)); fmt.Sprint(got) != "[smart:a smart:new smart:b smart:c 10]" {
+	if got := rowIDs(sectionRows(saved, smart, nil, nil, nil)); fmt.Sprint(got) != "[smart:a smart:new smart:b smart:c 10]" {
 		t.Fatalf("default rows = %v", got)
 	}
 
 	// Existing overrides: the landing row stays first, the new section
 	// follows its overridden anchor instead of jumping to the top.
 	overrides := []config.Filter{{ID: "10"}, {ID: "smart:b"}, {ID: "smart:a", Name: "Renamed"}, {ID: "smart:c", Disabled: true}}
-	rows := sectionRows(saved, smart, nil, overrides)
+	rows := sectionRows(saved, smart, nil, nil, overrides)
 	if got := rowIDs(rows); fmt.Sprint(got) != "[10 smart:b smart:a smart:new smart:c]" {
 		t.Fatalf("overridden rows = %v", got)
 	}
@@ -603,13 +604,13 @@ func TestSectionRows_SmartSectionWithAfterFollowsItsAnchor(t *testing.T) {
 
 	// An override for the new section itself wins over After.
 	overrides = append([]config.Filter{{ID: "smart:new", Disabled: true}}, overrides...)
-	if got := rowIDs(sectionRows(saved, smart, nil, overrides)); fmt.Sprint(got) != "[smart:new 10 smart:b smart:a smart:c]" {
+	if got := rowIDs(sectionRows(saved, smart, nil, nil, overrides)); fmt.Sprint(got) != "[smart:new 10 smart:b smart:a smart:c]" {
 		t.Fatalf("rows with override for new = %v", got)
 	}
 
 	// An anchor that does not exist falls back to the default placement.
 	smart[2].After = "missing"
-	if got := rowIDs(sectionRows(saved, smart, nil, overrides[1:])); fmt.Sprint(got) != "[smart:new 10 smart:b smart:a smart:c]" {
+	if got := rowIDs(sectionRows(saved, smart, nil, nil, overrides[1:])); fmt.Sprint(got) != "[smart:new 10 smart:b smart:a smart:c]" {
 		t.Fatalf("rows with missing anchor = %v", got)
 	}
 }
@@ -621,7 +622,7 @@ func TestSectionRows_SeveralSectionsAfterOneAnchorKeepTheirOrder(t *testing.T) {
 		{Key: "y", Name: "Y", Default: true, After: "a"},
 	}
 	overrides := []config.Filter{{ID: "smart:a"}}
-	if got := rowIDs(sectionRows(nil, smart, nil, overrides)); fmt.Sprint(got) != "[smart:a smart:x smart:y]" {
+	if got := rowIDs(sectionRows(nil, smart, nil, nil, overrides)); fmt.Sprint(got) != "[smart:a smart:x smart:y]" {
 		t.Fatalf("rows = %v", got)
 	}
 }
@@ -637,7 +638,7 @@ func TestSectionRows_ChainedAfterFollowsPlacedAnchor(t *testing.T) {
 	overrides := []config.Filter{{ID: "10"}, {ID: "smart:a"}}
 	saved := []gql.SavedFilterParts{{Id: "10", Name: "Landing"}}
 	// z's anchor w is placed only after z, so z falls back to the top.
-	if got := rowIDs(sectionRows(saved, smart, nil, overrides)); fmt.Sprint(got) != "[smart:z 10 smart:a smart:x smart:y smart:w]" {
+	if got := rowIDs(sectionRows(saved, smart, nil, nil, overrides)); fmt.Sprint(got) != "[smart:z 10 smart:a smart:x smart:y smart:w]" {
 		t.Fatalf("rows = %v", got)
 	}
 }

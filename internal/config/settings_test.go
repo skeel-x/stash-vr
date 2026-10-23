@@ -413,101 +413,83 @@ func TestLoad_DateSettingsSeedAndFile(t *testing.T) {
 	}
 }
 
-func TestSet_AutoSectionMinBounds(t *testing.T) {
+func TestLoad_MigratesFamilyKnobsIntoRows(t *testing.T) {
 	seed := seedFor(t)
-	if err := Load(seed); err != nil {
-		t.Fatal(err)
-	}
-	for _, bad := range []int{-1, 10001} {
-		cfg := Application()
-		cfg.AutoStudioMin = bad
-		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
-			t.Errorf("expected auto_studio_min %d to be rejected as invalid, got %v", bad, err)
-		}
-		cfg = Application()
-		cfg.AutoPerformerMin = bad
-		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
-			t.Errorf("expected auto_performer_min %d to be rejected as invalid, got %v", bad, err)
-		}
-	}
-	cfg := Application()
-	cfg.AutoStudioMin = 20
-	cfg.AutoPerformerMin = 10000
-	if _, err := Set(cfg); err != nil {
+	seed.legacyPerformerMin = 7 // env seed; the file has no performer key
+	path := filepath.Join(seed.ConfigPath, "config.json")
+	body := `{"stash_graphql_url":"http://stash:9999/graphql","auto_studio_min":20,"more_from_performers":5,
+		"filters":[{"id":"auto:morefrom:9","name":"Alice","hidden_in":["playa"]}]}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := Load(seed); err != nil {
 		t.Fatal(err)
 	}
-	if got := Application(); got.AutoStudioMin != 20 || got.AutoPerformerMin != 10000 {
-		t.Fatalf("expected persisted 20 and 10000, got %d and %d", got.AutoStudioMin, got.AutoPerformerMin)
+	rows := map[string]Filter{}
+	for _, f := range Application().Filters {
+		rows[f.ID] = f
+	}
+	if r := rows[FamilyStudio]; r.Disabled || r.Options == nil || r.Options.MinScenes == nil || *r.Options.MinScenes != 20 {
+		t.Fatalf("studio family = %+v", r)
+	}
+	if r := rows[FamilyPerformer]; r.Disabled || r.Options == nil || r.Options.MinScenes == nil || *r.Options.MinScenes != 7 {
+		t.Fatalf("performer family from env seed = %+v", r)
+	}
+	if r := rows[FamilyMoreFrom]; r.Disabled || r.Options == nil || r.Options.Limit == nil || *r.Options.Limit != 5 {
+		t.Fatalf("more-from family = %+v", r)
+	}
+	if r := rows["auto:morefrom:9"]; r.Name != "Alice" || !slices.Equal(r.HiddenIn, []string{"playa"}) {
+		t.Fatalf("child override must survive, got %+v", r)
+	}
+	if got := strings.Join(MigratedFamilies(), ","); got != "auto:studio,auto:performer,auto:morefrom" {
+		t.Fatalf("MigratedFamilies = %q", got)
+	}
+	data, _ := os.ReadFile(path)
+	if strings.Contains(string(data), "auto_studio_min") || strings.Contains(string(data), "more_from_performers") {
+		t.Fatalf("old keys must not be written again, got %s", data)
+	}
+	if !strings.Contains(string(data), `"id": "auto:studio"`) {
+		t.Fatalf("family rows must be persisted, got %s", data)
+	}
+	// A second load finds the rows and migrates nothing, even with the env seed still set.
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if len(MigratedFamilies()) != 0 {
+		t.Fatalf("second load migrated %v", MigratedFamilies())
 	}
 }
 
-func TestSet_MoreFromPerformersBounds(t *testing.T) {
+func TestLoad_ExistingFamilyRowWinsOverOldKey(t *testing.T) {
 	seed := seedFor(t)
-	if err := Load(seed); err != nil {
+	path := filepath.Join(seed.ConfigPath, "config.json")
+	body := `{"stash_graphql_url":"http://stash:9999/graphql","auto_studio_min":20,
+		"filters":[{"id":"auto:studio","disabled":true,"options":{"min_scenes":3}}]}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
-	}
-	for _, bad := range []int{-1, 51} {
-		cfg := Application()
-		cfg.MoreFromPerformers = bad
-		if _, err := Set(cfg); !errors.Is(err, ErrInvalid) {
-			t.Errorf("expected more_from_performers %d to be rejected as invalid, got %v", bad, err)
-		}
-	}
-	for _, good := range []int{0, 50, 5} {
-		cfg := Application()
-		cfg.MoreFromPerformers = good
-		if _, err := Set(cfg); err != nil {
-			t.Fatalf("more_from_performers %d: %v", good, err)
-		}
-	}
-	data, err := os.ReadFile(FilePath(seed))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), `"more_from_performers": 5`) {
-		t.Fatalf("expected the setting persisted, got %s", data)
 	}
 	if err := Load(seed); err != nil {
 		t.Fatal(err)
 	}
-	if got := Application().MoreFromPerformers; got != 5 {
-		t.Fatalf("expected the file value 5, got %d", got)
+	f := Application().Filters[0]
+	if !f.Disabled || *f.Options.MinScenes != 3 || len(MigratedFamilies()) != 0 {
+		t.Fatalf("row must be kept as is, got %+v migrated %v", f, MigratedFamilies())
 	}
 }
 
-func TestLoad_AutoSectionMinsSeedAndFile(t *testing.T) {
+func TestLoad_SeedsFamilyRowsOnFirstRun(t *testing.T) {
 	seed := seedFor(t)
-	seed.AutoStudioMin = 5
-
+	seed.legacyStudioMin = 12
 	if err := Load(seed); err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	data, err := os.ReadFile(FilePath(seed))
-	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `"auto_studio_min": 5`) || !strings.Contains(string(data), `"auto_performer_min": 0`) {
-		t.Fatalf("expected both thresholds persisted, got %s", data)
+	rows := Application().Filters
+	if len(rows) != 1 || rows[0].ID != FamilyStudio || rows[0].Disabled || *rows[0].Options.MinScenes != 12 {
+		t.Fatalf("rows = %+v", rows)
 	}
-
-	if err := os.WriteFile(FilePath(seed), []byte(`{"auto_studio_min":0,"auto_performer_min":7}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := Load(seed); err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if got := Application(); got.AutoStudioMin != 0 || got.AutoPerformerMin != 7 {
-		t.Fatalf("expected the file values 0 and 7, got %d and %d", got.AutoStudioMin, got.AutoPerformerMin)
-	}
-
-	if err := os.WriteFile(FilePath(seed), []byte(`{"auto_performer_min":-3}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := Load(seed); !errors.Is(err, ErrInvalid) {
-		t.Fatalf("expected a negative threshold in the file to be rejected, got %v", err)
+	data, _ := os.ReadFile(FilePath(seed))
+	if !strings.Contains(string(data), `"id": "auto:studio"`) || strings.Contains(string(data), "auto_studio_min") {
+		t.Fatalf("first-run file must hold the row, not the old key: %s", data)
 	}
 }
 
@@ -939,8 +921,7 @@ func TestSettingValues_CoverEveryPersistedSetting(t *testing.T) {
 		envKeyStashGraphQLUrl, envKeyStashApiKey, envKeyStashTLSInsecure, envKeyFavoriteTag, envKeyLogLevel,
 		envKeyForceHTTPS, envKeyBasePath, envKeyDeovrAutoload, envKeyPerformerFacets, envKeyDateLookup,
 		envKeyDateWriteback, envKeyFunscriptIndexPath, envKeyHeatmapHeightPx, envKeyExcludeSortName,
-		envKeyGenerateSummaryIds, envKeySmartSectionSize, envKeyAutoStudioMin, envKeyAutoPerformerMin,
-		envKeyMoreFromPerformers, envKeyCoverBadgeQuality, envKeyCoverBadgeFormat, envKeyCoverBadgePass, envKeyCoverBadgeDuration,
+		envKeyGenerateSummaryIds, envKeySmartSectionSize, envKeyCoverBadgeQuality, envKeyCoverBadgeFormat, envKeyCoverBadgePass, envKeyCoverBadgeDuration,
 		envKeyCoverBadgeRate, envKeyLearnStudio, envKeyCorrectVertical,
 	}
 	values := settingValues(&ApplicationConfig{})

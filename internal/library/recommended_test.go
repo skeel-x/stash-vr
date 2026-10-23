@@ -253,9 +253,9 @@ func TestSectionRows_RecommendedJoinsExistingOrderAfterContinue(t *testing.T) {
 		{ID: "smart:noscript", Disabled: true},
 	}
 
-	rows := sectionRows(saved, smartSections(), nil, overrides)
+	rows := sectionRows(saved, smartSections(), familyDefs(), nil, overrides)
 
-	want := "[10 smart:random smart:continue smart:recommended 11 smart:recent smart:unwatched smart:toprated smart:withscript smart:noscript smart:favperf smart:gems smart:rewatch smart:topquality smart:passthrough]"
+	want := "[10 smart:random smart:continue smart:recommended auto:morefrom 11 smart:recent smart:unwatched smart:toprated smart:withscript smart:noscript smart:favperf smart:gems smart:rewatch smart:topquality smart:passthrough auto:studio auto:performer]"
 	if got := rowIDs(rows); fmt.Sprint(got) != want {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
