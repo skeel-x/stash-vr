@@ -101,12 +101,12 @@ func SectionSchema(id string) []OptionField {
 		return []OptionField{sizeField, {Key: "tags", Label: "Any of these tags", Kind: OptionTags, Default: joinTags(DefaultPassthroughTags), Help: "Comma separated."}}
 	case FamilyStudio:
 		return []OptionField{
-			{Key: "min_scenes", Label: "From N scenes", Kind: OptionInt, Min: 1, Max: MaxAutoSectionMin, Default: strconv.Itoa(DefaultFamilyMinScenes)},
-			{Key: "limit", Label: "At most N sections", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultFamilyLimit), Help: "Largest first."}}
+			{Key: "min_scenes", Label: "Only studios with at least N scenes", Kind: OptionInt, Min: 1, Max: MaxAutoSectionMin, Default: strconv.Itoa(DefaultFamilyMinScenes), Help: "A studio with fewer scenes gets no section."},
+			{Key: "limit", Label: "At most N sections", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultFamilyLimit), Help: "The studios with the most scenes; the rest get none."}}
 	case FamilyPerformer:
 		return []OptionField{
-			{Key: "min_scenes", Label: "From N scenes", Kind: OptionInt, Min: 1, Max: MaxAutoSectionMin, Default: strconv.Itoa(DefaultFamilyMinScenes)},
-			{Key: "limit", Label: "At most N sections", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultFamilyLimit), Help: "Largest first."},
+			{Key: "min_scenes", Label: "Only performers with at least N scenes", Kind: OptionInt, Min: 1, Max: MaxAutoSectionMin, Default: strconv.Itoa(DefaultFamilyMinScenes), Help: "A performer with fewer scenes gets no section."},
+			{Key: "limit", Label: "At most N sections", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultFamilyLimit), Help: "The performers with the most scenes; the rest get none."},
 			{Key: "exclude_male", Label: "Leave out male performers", Kind: OptionBool}}
 	case FamilyMoreFrom:
 		return []OptionField{
