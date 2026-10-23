@@ -389,7 +389,7 @@ func Load(seed ApplicationConfig) error {
 	data, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		migratedFamilies = migrateFamilies(&seed, fileConfig{})
+		migratedFamilies = migrateFamilies(&seed, fileConfig{}, true)
 		if err := Validate(seed); err != nil {
 			return err
 		}
@@ -414,7 +414,7 @@ func Load(seed ApplicationConfig) error {
 		merged.VideoRules = kept
 		migrated = dropped
 	}
-	migratedFamilies = migrateFamilies(&merged, fc)
+	migratedFamilies = migrateFamilies(&merged, fc, false)
 	if merged.BasePath, err = NormalizeBasePath(merged.BasePath); err != nil {
 		return fmt.Errorf("config %s: %w", path, err)
 	}
@@ -446,11 +446,14 @@ func MigratedFamilies() []string { return migratedFamilies }
 var migratedFamilies []string
 
 // migrateFamilies creates a family row for each legacy knob still in the
-// file (or, when the file lacks the key, set through its env seed) that
-// has no row yet, switched on with the knob as its threshold or limit.
-// Rows that exist are left alone, so the Sections page stays in charge
-// once a user has saved it.
-func migrateFamilies(c *ApplicationConfig, fc fileConfig) []string {
+// file that has no row yet, switched on with the knob as its threshold or
+// limit; on a first run (no file) the env seeds play that part. Rows that
+// exist are left alone, so the Sections page stays in charge once a user
+// has saved it, and a Reset followed by a restart does not bring a family
+// back from an env var. A new row goes right before the first override
+// of a section it generated, so a saved layout keeps its shape; without
+// one it goes last.
+func migrateFamilies(c *ApplicationConfig, fc fileConfig, firstRun bool) []string {
 	has := map[string]bool{}
 	for _, f := range c.Filters {
 		has[f.ID] = true
@@ -459,24 +462,31 @@ func migrateFamilies(c *ApplicationConfig, fc fileConfig) []string {
 		if file != nil {
 			return *file
 		}
-		return seed
+		if firstRun {
+			return seed
+		}
+		return 0
 	}
 	var made []string
-	add := func(id string, v int, opt SectionOptions) {
+	add := func(id, childPrefix string, v int, opt SectionOptions) {
 		if v <= 0 || has[id] {
 			return
 		}
-		c.Filters = append(c.Filters, Filter{ID: id, Options: &opt})
+		at := slices.IndexFunc(c.Filters, func(f Filter) bool { return strings.HasPrefix(f.ID, childPrefix) })
+		if at < 0 {
+			at = len(c.Filters)
+		}
+		c.Filters = slices.Insert(c.Filters, at, Filter{ID: id, Options: &opt})
 		made = append(made, id)
 	}
 	if v := pick(fc.AutoStudioMin, c.legacyStudioMin); v > 0 {
-		add(FamilyStudio, v, SectionOptions{MinScenes: &v})
+		add(FamilyStudio, "studio:", v, SectionOptions{MinScenes: &v})
 	}
 	if v := pick(fc.AutoPerformerMin, c.legacyPerformerMin); v > 0 {
-		add(FamilyPerformer, v, SectionOptions{MinScenes: &v})
+		add(FamilyPerformer, "performer:", v, SectionOptions{MinScenes: &v})
 	}
 	if v := pick(fc.MoreFromPerformers, c.legacyMoreFrom); v > 0 {
-		add(FamilyMoreFrom, v, SectionOptions{Limit: &v})
+		add(FamilyMoreFrom, FamilyMoreFrom+":", v, SectionOptions{Limit: &v})
 	}
 	return made
 }

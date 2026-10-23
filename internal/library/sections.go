@@ -412,8 +412,21 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, families []
 		_, ok := overridden[after]
 		return after != "" && !ok && anchored(after)
 	}
+	// Family rows alone in the override list came from a migration, not
+	// from a save of the page: they keep their default placement so the
+	// generated sections stay where the old setting put them.
+	pageSaved := false
+	for _, o := range overrides {
+		if _, isFamily := familyByID[o.ID]; !isFamily {
+			pageSaved = true
+			break
+		}
+	}
 	seen := make(map[string]struct{}, len(overrides))
 	for _, o := range overrides {
+		if _, isFamily := familyByID[o.ID]; isFamily && !pageSaved {
+			continue
+		}
 		seen[o.ID] = struct{}{}
 		if s, ok := smartByID[o.ID]; ok {
 			row := SectionRow{ID: o.ID, SourceName: s.Name, Name: cmp.Or(o.Name, s.Name), Disabled: o.Disabled, Smart: true, HiddenIn: o.HiddenIn}
@@ -452,6 +465,9 @@ func sectionRows(saved []gql.SavedFilterParts, smart []SmartSection, families []
 			continue
 		}
 		row := SectionRow{ID: f.ID, SourceName: f.Name, Name: f.Name, Disabled: true, Family: true}
+		if o, ok := overridden[f.ID]; ok {
+			row.Name, row.Disabled, row.HiddenIn = cmp.Or(o.Name, f.Name), o.Disabled, o.HiddenIn
+		}
 		if f.After != "" && anchored(f.After) {
 			placed = append(placed, placedRow{row: row, after: f.After})
 			continue

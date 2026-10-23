@@ -415,7 +415,7 @@ func TestLoad_DateSettingsSeedAndFile(t *testing.T) {
 
 func TestLoad_MigratesFamilyKnobsIntoRows(t *testing.T) {
 	seed := seedFor(t)
-	seed.legacyPerformerMin = 7 // env seed; the file has no performer key
+	seed.legacyPerformerMin = 7 // env seed: ignored once a file exists
 	path := filepath.Join(seed.ConfigPath, "config.json")
 	body := `{"stash_graphql_url":"http://stash:9999/graphql","auto_studio_min":20,"more_from_performers":5,
 		"filters":[{"id":"auto:morefrom:9","name":"Alice","hidden_in":["playa"]}]}`
@@ -432,8 +432,8 @@ func TestLoad_MigratesFamilyKnobsIntoRows(t *testing.T) {
 	if r := rows[FamilyStudio]; r.Disabled || r.Options == nil || r.Options.MinScenes == nil || *r.Options.MinScenes != 20 {
 		t.Fatalf("studio family = %+v", r)
 	}
-	if r := rows[FamilyPerformer]; r.Disabled || r.Options == nil || r.Options.MinScenes == nil || *r.Options.MinScenes != 7 {
-		t.Fatalf("performer family from env seed = %+v", r)
+	if r, ok := rows[FamilyPerformer]; ok {
+		t.Fatalf("an env seed must not create rows once a file exists, got %+v", r)
 	}
 	if r := rows[FamilyMoreFrom]; r.Disabled || r.Options == nil || r.Options.Limit == nil || *r.Options.Limit != 5 {
 		t.Fatalf("more-from family = %+v", r)
@@ -441,7 +441,7 @@ func TestLoad_MigratesFamilyKnobsIntoRows(t *testing.T) {
 	if r := rows["auto:morefrom:9"]; r.Name != "Alice" || !slices.Equal(r.HiddenIn, []string{"playa"}) {
 		t.Fatalf("child override must survive, got %+v", r)
 	}
-	if got := strings.Join(MigratedFamilies(), ","); got != "auto:studio,auto:performer,auto:morefrom" {
+	if got := strings.Join(MigratedFamilies(), ","); got != "auto:studio,auto:morefrom" {
 		t.Fatalf("MigratedFamilies = %q", got)
 	}
 	data, _ := os.ReadFile(path)
@@ -457,6 +457,50 @@ func TestLoad_MigratesFamilyKnobsIntoRows(t *testing.T) {
 	}
 	if len(MigratedFamilies()) != 0 {
 		t.Fatalf("second load migrated %v", MigratedFamilies())
+	}
+}
+
+func TestLoad_EnvSeedDoesNotReapplyAfterReset(t *testing.T) {
+	seed := seedFor(t)
+	seed.legacyStudioMin = 20
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if len(MigratedFamilies()) != 1 {
+		t.Fatalf("first run must create the row, got %v", MigratedFamilies())
+	}
+	// Reset to Stash order drops every row; a restart must not bring the
+	// family back from the env var.
+	cfg := Application()
+	cfg.Filters = nil
+	if _, err := Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(Application().Filters); n != 0 || len(MigratedFamilies()) != 0 {
+		t.Fatalf("rows after reset and restart = %d, migrated %v", n, MigratedFamilies())
+	}
+}
+
+func TestLoad_MigratedFamilyRowSitsBeforeItsFirstChild(t *testing.T) {
+	seed := seedFor(t)
+	path := filepath.Join(seed.ConfigPath, "config.json")
+	body := `{"stash_graphql_url":"http://stash:9999/graphql","auto_studio_min":20,"more_from_performers":5,
+		"filters":[{"id":"smart:continue"},{"id":"auto:morefrom:9","name":"Alice"},{"id":"10"},{"id":"studio:5"},{"id":"studio:6"}]}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Load(seed); err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, f := range Application().Filters {
+		ids = append(ids, f.ID)
+	}
+	if got := strings.Join(ids, " "); got != "smart:continue auto:morefrom auto:morefrom:9 10 auto:studio studio:5 studio:6" {
+		t.Fatalf("rows = %s", got)
 	}
 }
 

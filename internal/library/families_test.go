@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"stash-vr/internal/config"
+	"stash-vr/internal/stash/gql"
 )
 
 // fam is a family spec switched on with the given threshold and the default
@@ -154,5 +155,25 @@ func TestSectionRows_OverriddenFamilyStillFollowsDefaultAnchor(t *testing.T) {
 	ids = rowIDs(sectionRows(nil, smartSections(), familyDefs(), nil, overrides))
 	if slices.Index(ids, config.FamilyMoreFrom)+1 != slices.Index(ids, "smart:recommended") {
 		t.Fatalf("rows = %v", ids)
+	}
+}
+
+func TestSectionRows_MigratedFamilyAloneKeepsDefaultPlacement(t *testing.T) {
+	// A migration created the family row; the page was never saved, so no
+	// other row is overridden and the family keeps its default place at
+	// the end, behind the saved filters, with its children.
+	saved := []gql.SavedFilterParts{{Id: "10", Name: "A"}, {Id: "11", Name: "B"}}
+	auto := []AutoSection{{ID: "studio:s1", Name: "Beta", Family: config.FamilyStudio}}
+	overrides := []config.Filter{{ID: config.FamilyStudio, Options: &config.SectionOptions{MinScenes: intp(20)}}}
+	ids := rowIDs(sectionRows(saved, smartSections(), familyDefs(), auto, overrides))
+	if got := fmt.Sprint(ids[len(ids)-5:]); got != "[10 11 auto:studio studio:s1 auto:performer]" {
+		t.Fatalf("tail = %s", got)
+	}
+	// Once the page has been saved (any non-family row overridden), the
+	// saved order is what counts.
+	overrides = append(overrides, config.Filter{ID: "10"})
+	ids = rowIDs(sectionRows(saved, smartSections(), familyDefs(), auto, overrides))
+	if slices.Index(ids, config.FamilyStudio)+2 != slices.Index(ids, "10") || slices.Index(ids, "studio:s1") != slices.Index(ids, config.FamilyStudio)+1 {
+		t.Fatalf("saved order must win: %v", ids)
 	}
 }
