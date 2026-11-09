@@ -3354,9 +3354,11 @@ type SceneFilterType struct {
 	Created_at    *TimestampCriterionInput     `json:"created_at,omitempty"`
 	Custom_fields []*CustomFieldCriterionInput `json:"custom_fields,omitempty"`
 	// Filter by date
-	Date     *DateCriterionInput   `json:"date,omitempty"`
-	Details  *StringCriterionInput `json:"details,omitempty"`
-	Director *StringCriterionInput `json:"director,omitempty"`
+	Date *DateCriterionInput `json:"date,omitempty"`
+	// Filter by production date
+	Production_date *DateCriterionInput   `json:"production_date,omitempty"`
+	Details         *StringCriterionInput `json:"details,omitempty"`
+	Director        *StringCriterionInput `json:"director,omitempty"`
 	// Filter Scenes by duplication criteria
 	Duplicated *DuplicationCriterionInput `json:"duplicated,omitempty"`
 	// Filter by duration (in seconds)
@@ -3484,6 +3486,9 @@ func (v *SceneFilterType) GetCustom_fields() []*CustomFieldCriterionInput { retu
 
 // GetDate returns SceneFilterType.Date, and is useful for accessing the field via an interface.
 func (v *SceneFilterType) GetDate() *DateCriterionInput { return v.Date }
+
+// GetProduction_date returns SceneFilterType.Production_date, and is useful for accessing the field via an interface.
+func (v *SceneFilterType) GetProduction_date() *DateCriterionInput { return v.Production_date }
 
 // GetDetails returns SceneFilterType.Details, and is useful for accessing the field via an interface.
 func (v *SceneFilterType) GetDetails() *StringCriterionInput { return v.Details }

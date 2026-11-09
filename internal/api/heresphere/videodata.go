@@ -191,7 +191,7 @@ func setSubtitles(vd *library.VideoData, dto *videoDataDto) {
 		dto.Subtitles = append(dto.Subtitles, subtitleDto{
 			Name:     fmt.Sprintf("%s.%s", c.Language_code, c.Caption_type),
 			Language: c.Language_code,
-			Url:      stash.ApiKeyed(fmt.Sprintf("%s?lang=%s&type=%s", *vd.SceneParts.Paths.Caption, c.Language_code, c.Caption_type)),
+			Url:      stash.ApiKeyed(stash.WithQuery(*vd.SceneParts.Paths.Caption, fmt.Sprintf("lang=%s&type=%s", c.Language_code, c.Caption_type))),
 		})
 	}
 }
@@ -271,6 +271,11 @@ func profileLink(ctx context.Context, baseUrl string, vd *library.VideoData, f l
 	return ""
 }
 
+// setMediaSources lists the stream urls. Stash keys them itself when it
+// runs without authentication; with authentication Stash 0.32 signs them
+// instead, and a signature expires (4 hours by default) while the headset
+// keeps playing from its cached document. The key is added either way:
+// Stash honours it once the signature has lapsed.
 func setMediaSources(vd *library.VideoData, dto *videoDataDto) {
 	streams := []stash.Stream{stash.GetDirectStream(vd.SceneParts), stash.GetTranscodingStream(vd.SceneParts)}
 	for _, stream := range streams {
@@ -280,7 +285,7 @@ func setMediaSources(vd *library.VideoData, dto *videoDataDto) {
 		for _, s := range stream.Sources {
 			vs := sourceDto{
 				Resolution: s.Resolution,
-				Url:        s.Url,
+				Url:        stash.ApiKeyed(s.Url),
 			}
 			e.Sources = append(e.Sources, vs)
 		}

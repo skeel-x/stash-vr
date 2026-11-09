@@ -3633,6 +3633,8 @@ input SceneFilterType {
     custom_fields: [CustomFieldCriterionInput!]
     "Filter by date"
     date: DateCriterionInput
+    "Filter by production date"
+    production_date: DateCriterionInput
     details: StringCriterionInput
     director: StringCriterionInput
     "Filter Scenes by duplication criteria"

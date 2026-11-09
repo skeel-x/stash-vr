@@ -90,9 +90,10 @@ func setStreamSources(vd *library.VideoData, dto *videoDataDto) {
 			VideoSources: make([]videoSourceDto, len(stream.Sources)),
 		}
 		for j, source := range stream.Sources {
+			// Keyed as well as signed: see setMediaSources in heresphere.
 			dto.Encodings[i].VideoSources[j] = videoSourceDto{
 				Resolution: source.Resolution,
-				Url:        source.Url,
+				Url:        stash.ApiKeyed(source.Url),
 			}
 		}
 	}

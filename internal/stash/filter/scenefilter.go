@@ -95,6 +95,8 @@ func setSceneFilterCriterion(ctx context.Context, criterionType string, criterio
 		return set(&sceneFilter.Date, criterionValue, parseDateCriterionInput)
 	case "details":
 		return set(&sceneFilter.Details, criterionValue, parseStringCriterionInput)
+	case "production_date":
+		return set(&sceneFilter.Production_date, criterionValue, parseDateCriterionInput)
 	case "director":
 		return set(&sceneFilter.Director, criterionValue, parseStringCriterionInput)
 	case "duplicated":

@@ -99,19 +99,20 @@ func TestSavedFilterToSceneFilter_NilFiltersAreTolerated(t *testing.T) {
 func TestSavedFilterToSceneFilter_ConvertsWellFormedCriteria(t *testing.T) {
 	dir := gql.SortDirectionEnumDesc
 	sf := sceneFilter(map[string]any{
-		"title":       map[string]any{"modifier": "INCLUDES", "value": "vr"},
-		"duration":    map[string]any{"modifier": "GREATER_THAN", "value": map[string]any{"value": 60.0}},
-		"date":        map[string]any{"modifier": "IS_NULL"},
-		"tags":        map[string]any{"modifier": "INCLUDES_ALL", "value": map[string]any{"items": []any{map[string]any{"id": "7"}}, "excluded": []any{map[string]any{"id": "8"}}, "depth": -1.0}},
-		"performers":  map[string]any{"modifier": "INCLUDES", "value": []any{map[string]any{"id": "3"}}},
-		"orientation": map[string]any{"value": []any{"portrait"}},
-		"has_markers": map[string]any{"value": "true"},
-		"organized":   map[string]any{"value": "true"},
-		"resolution":  map[string]any{"modifier": "GREATER_THAN", "value": "4k"},
-		"captions":    map[string]any{"modifier": "INCLUDES", "value": "English"},
-		"created_at":  map[string]any{"modifier": "GREATER_THAN", "value": map[string]any{"value": "2024-01-01"}},
-		"duplicated":  map[string]any{"value": map[string]any{"phash": true}},
-		"unknown":     map[string]any{"value": "ignored"},
+		"title":           map[string]any{"modifier": "INCLUDES", "value": "vr"},
+		"duration":        map[string]any{"modifier": "GREATER_THAN", "value": map[string]any{"value": 60.0}},
+		"date":            map[string]any{"modifier": "IS_NULL"},
+		"production_date": map[string]any{"modifier": "LESS_THAN", "value": map[string]any{"value": "2020-01-01"}},
+		"tags":            map[string]any{"modifier": "INCLUDES_ALL", "value": map[string]any{"items": []any{map[string]any{"id": "7"}}, "excluded": []any{map[string]any{"id": "8"}}, "depth": -1.0}},
+		"performers":      map[string]any{"modifier": "INCLUDES", "value": []any{map[string]any{"id": "3"}}},
+		"orientation":     map[string]any{"value": []any{"portrait"}},
+		"has_markers":     map[string]any{"value": "true"},
+		"organized":       map[string]any{"value": "true"},
+		"resolution":      map[string]any{"modifier": "GREATER_THAN", "value": "4k"},
+		"captions":        map[string]any{"modifier": "INCLUDES", "value": "English"},
+		"created_at":      map[string]any{"modifier": "GREATER_THAN", "value": map[string]any{"value": "2024-01-01"}},
+		"duplicated":      map[string]any{"value": map[string]any{"phash": true}},
+		"unknown":         map[string]any{"value": "ignored"},
 	})
 	sf.Find_filter = &gql.SavedFilterPartsFind_filterSavedFindFilterType{Sort: util.Ptr("random_123"), Direction: &dir}
 
@@ -128,6 +129,9 @@ func TestSavedFilterToSceneFilter_ConvertsWellFormedCriteria(t *testing.T) {
 	}
 	if s.Date == nil || s.Date.Modifier != gql.CriterionModifierIsNull || s.Date.Value != "" {
 		t.Fatalf("date: %+v", s.Date)
+	}
+	if s.Production_date == nil || s.Production_date.Modifier != gql.CriterionModifierLessThan || s.Production_date.Value != "2020-01-01" {
+		t.Fatalf("production_date: %+v", s.Production_date)
 	}
 	if s.Tags == nil || len(s.Tags.Value) != 1 || s.Tags.Value[0] != "7" || len(s.Tags.Excludes) != 1 || s.Tags.Excludes[0] != "8" || s.Tags.Depth == nil || *s.Tags.Depth != -1 {
 		t.Fatalf("tags: %+v", s.Tags)

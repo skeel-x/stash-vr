@@ -424,6 +424,10 @@ func TestSetSubtitles(t *testing.T) {
 		{name: "empty caption path", sp: &gql.SceneParts{Captions: captions, Paths: &gql.ScenePartsPathsScenePathsType{Caption: util.Ptr("")}}},
 		{name: "listed, nil entry skipped", sp: &gql.SceneParts{Captions: captions, Paths: &gql.ScenePartsPathsScenePathsType{Caption: caption}},
 			want: []string{"http://stash/scene/9/caption?lang=en&type=srt", "http://stash/scene/9/caption?lang=de&type=vtt"}},
+		// Stash 0.32 signs the caption path when it uses authentication, so
+		// the language and type must join the query it already carries.
+		{name: "signed caption path keeps its query", sp: &gql.SceneParts{Captions: captions, Paths: &gql.ScenePartsPathsScenePathsType{Caption: util.Ptr("http://stash/scene/9/caption?cid=c&expires=1&signature=s")}},
+			want: []string{"http://stash/scene/9/caption?cid=c&expires=1&signature=s&lang=en&type=srt", "http://stash/scene/9/caption?cid=c&expires=1&signature=s&lang=de&type=vtt"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -438,5 +442,36 @@ func TestSetSubtitles(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Stash 0.32 hands API clients signed stream urls that expire (4 hours by
+// default) instead of keyed ones. The headset plays from the cached document
+// long after that, so every stream url it gets must also carry the API key,
+// which Stash keeps honouring once the signature has expired.
+func TestSetMediaSources_KeysSignedStreams(t *testing.T) {
+	if err := config.Load(config.ApplicationConfig{
+		ListenAddress: ":9666", StashGraphQLUrl: "http://stash:9999/graphql", StashApiKey: "secret", FavoriteTag: "FAVORITE",
+		LogLevel: "debug", ExcludeSortName: "hidden", SmartSectionSize: 50, ConfigPath: t.TempDir(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sp := &gql.SceneParts{Id: "9",
+		Files: []*gql.ScenePartsFilesVideoFile{{Basename: "nine.mp4", Duration: 100, Height: 1080}},
+		Paths: &gql.ScenePartsPathsScenePathsType{Stream: util.Ptr("http://stash/scene/9/stream?cid=c&expires=1&signature=s")},
+		SceneStreams: []*gql.ScenePartsSceneStreamsSceneStreamEndpoint{
+			{Url: "http://stash/scene/9/stream.mp4?cid=c&expires=1&resolution=STANDARD&signature=s", Mime_type: util.Ptr("video/mp4"), Label: util.Ptr("MP4 (1080p)")},
+		},
+	}
+	var dto videoDataDto
+	setMediaSources(&library.VideoData{SceneParts: sp}, &dto)
+	if len(dto.Media) != 2 || len(dto.Media[0].Sources) != 1 || len(dto.Media[1].Sources) != 1 {
+		t.Fatalf("media = %+v", dto.Media)
+	}
+	for _, m := range dto.Media {
+		u := m.Sources[0].Url
+		if !strings.Contains(u, "signature=s") || !strings.Contains(u, "&apikey=secret") {
+			t.Fatalf("%s stream must keep the signature and add the key, got %q", m.Name, u)
+		}
 	}
 }
