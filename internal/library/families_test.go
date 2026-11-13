@@ -207,3 +207,62 @@ func TestFamilyFor_ReadsExcludeMale(t *testing.T) {
 		t.Fatal("excludeMale must come from the row")
 	}
 }
+
+func TestFamilyFor_ReadsPerformerPicks(t *testing.T) {
+	cfg := config.ApplicationConfig{SmartSectionSize: 40, Filters: []config.Filter{
+		{ID: config.FamilyPerformer, Options: &config.SectionOptions{Performers: []string{"p1", "p3"}}},
+	}}
+	got := familyFor(cfg, config.FamilyPerformer)
+	if !got.on || len(got.picked) != 2 || !got.picked["p1"] || !got.picked["p3"] || got.picked["p2"] {
+		t.Fatalf("picked = %+v", got)
+	}
+	if familyFor(cfg, config.FamilyStudio).picked != nil {
+		t.Fatal("studio family never has picks")
+	}
+}
+
+func TestGroupScenes_PickedPerformersBypassCapAndMale(t *testing.T) {
+	male := gql.GenderEnumMale
+	alice := [2]string{"p1", "Alice"}
+	bob := [2]string{"p2", "Bob"}
+	cara := [2]string{"p3", "Cara"}
+	dee := [2]string{"p4", "Dee"}
+	scenes := []*groupingScene{
+		groupingRow("1", "", "", alice, bob),
+		groupingRow("2", "", "", alice, bob, cara),
+		groupingRow("3", "", "", alice, dee),
+		groupingRow("4", "", "", dee),
+		groupingRow("5", "", "", dee),
+	}
+	for _, s := range scenes {
+		for _, p := range s.Performers {
+			if p.Id == "p2" {
+				p.Gender = &male
+			}
+		}
+	}
+	spec := familySpec{on: true, min: 1, limit: 1, excludeMale: true, picked: map[string]bool{"p2": true, "p1": true, "p9": true}}
+
+	got := groupScenes(scenes, familySpec{}, spec)
+
+	// Both picks get a section: Bob although male and although the cap is
+	// one; Dee, the largest unpicked performer, gets none; p9 has no scenes.
+	if ids := autoIDs(got); fmt.Sprint(ids) != "[performer:p1 performer:p2]" {
+		t.Fatalf("ids = %v", ids)
+	}
+	if got[1].Name != "@ Bob" || fmt.Sprint(got[1].Ids) != "[1 2]" || got[1].Family != config.FamilyPerformer {
+		t.Fatalf("Bob = %+v", got[1])
+	}
+
+	// The threshold still applies to a pick.
+	spec.min = 3
+	if ids := autoIDs(groupScenes(scenes, familySpec{}, spec)); fmt.Sprint(ids) != "[performer:p1]" {
+		t.Fatalf("min 3: ids = %v", ids)
+	}
+
+	// No picks: today's behaviour, cap and male exclusion apply.
+	spec.min, spec.picked = 1, nil
+	if ids := autoIDs(groupScenes(scenes, familySpec{}, spec)); fmt.Sprint(ids) != "[performer:p1]" {
+		t.Fatalf("no picks: ids = %v (Alice and Dee tie at 3, Alice by name; Bob male; cap 1)", ids)
+	}
+}

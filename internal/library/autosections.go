@@ -37,6 +37,31 @@ type familySpec struct {
 	on               bool
 	min, limit, size int
 	excludeMale      bool
+	// picked, when non-empty, lists the performers that get a section:
+	// those and no other, whatever limit and excludeMale say.
+	picked map[string]bool
+}
+
+// wants reports whether the performer family makes a section for p: a
+// picked performer when any are picked, otherwise any performer, male
+// ones left out when asked (unknown gender is kept).
+func (spec familySpec) wants(p *gql.FindSceneGroupingsFindScenesFindScenesResultTypeScenesScenePerformersPerformer) bool {
+	if len(spec.picked) > 0 {
+		return spec.picked[p.Id]
+	}
+	return !spec.excludeMale || p.Gender == nil || *p.Gender != gql.GenderEnumMale
+}
+
+// pickedSet is the ids as a set, nil for none.
+func pickedSet(ids []string) map[string]bool {
+	if len(ids) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out
 }
 
 // familyFor reads the family's row from cfg. No row or a disabled row
@@ -61,6 +86,7 @@ func familyFor(cfg config.ApplicationConfig, id string) familySpec {
 			limit:       intOr(o.Limit, limit),
 			size:        intOr(o.Size, cfg.SmartSectionSize),
 			excludeMale: boolOr(o.ExcludeMale, false),
+			picked:      pickedSet(o.Performers),
 		}
 	}
 	return familySpec{}
@@ -78,8 +104,10 @@ type autoGroup struct {
 // with at least the performer group's (a group that is off contributes
 // none; the performer group can leave out male performers, ones of
 // unknown gender are kept), largest first and then by name, at most the
-// group's limit of each. Studios come before performers; performer
-// sections are named "@ <name>".
+// group's limit of each. A performer group with picked performers makes
+// sections for those alone, whatever its limit and male exclusion say.
+// Studios come before performers; performer sections are named
+// "@ <name>".
 func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeScenesScene, studio, performer familySpec) []AutoSection {
 	studios := map[string]*autoGroup{}
 	performers := map[string]*autoGroup{}
@@ -104,7 +132,7 @@ func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeS
 		}
 		if performer.on {
 			for _, p := range s.Performers {
-				if p == nil || performer.excludeMale && p.Gender != nil && *p.Gender == gql.GenderEnumMale {
+				if p == nil || !performer.wants(p) {
 					continue
 				}
 				add(performers, p.Id, p.Name, s.Id)
@@ -117,7 +145,7 @@ func groupScenes(scenes []*gql.FindSceneGroupingsFindScenesFindScenesResultTypeS
 
 // pickGroups keeps the groups with at least the family's threshold of
 // scenes, ordered by count descending, then name, then id, capped at the
-// family's limit.
+// family's limit unless the family has picked performers.
 func pickGroups(groups map[string]*autoGroup, spec familySpec, idPrefix, namePrefix, family string) []AutoSection {
 	if !spec.on {
 		return nil
@@ -135,7 +163,7 @@ func pickGroups(groups map[string]*autoGroup, spec familySpec, idPrefix, namePre
 			cmp.Compare(a.id, b.id),
 		)
 	})
-	if len(kept) > spec.limit {
+	if len(spec.picked) == 0 && len(kept) > spec.limit {
 		kept = kept[:spec.limit]
 	}
 	out := make([]AutoSection, len(kept))
