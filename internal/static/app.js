@@ -623,7 +623,10 @@
     const markSet = (sec) => {
       const gear = sec.querySelector('.gear');
       if (!gear) return;
-      const any = Array.from(sec.querySelectorAll('.opts [data-key]')).some((i) => (i.type === 'checkbox' ? i.checked : i.value.trim() !== ''));
+      const any = Array.from(sec.querySelectorAll('.opts [data-key]')).some((i) => {
+        if (i.dataset.kind === 'performers') return i.querySelector('input:checked') !== null;
+        return i.type === 'checkbox' ? i.checked : i.value.trim() !== '';
+      });
       gear.classList.toggle('set', any);
     };
     table.addEventListener('click', (e) => {
@@ -641,6 +644,11 @@
       sec.querySelectorAll('.opts [data-key]').forEach((i) => {
         const k = i.dataset.key;
         if (i.dataset.kind === 'bool') { if (i.checked) out[k] = true; return; }
+        if (i.dataset.kind === 'performers') {
+          const ids = Array.from(i.querySelectorAll('input:checked')).map((c) => c.dataset.id);
+          if (ids.length) out[k] = ids;
+          return;
+        }
         if (i.dataset.kind === 'tags') {
           const tags = i.value.split(',').map((s) => s.trim()).filter(Boolean);
           if (tags.length) out[k] = tags;

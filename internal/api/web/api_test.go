@@ -36,8 +36,11 @@ type fakeStash struct {
 	// scenesErr fails the scene query, as an unreachable Stash does when
 	// the Setup page looks up profile titles.
 	scenesErr error
-	mu        sync.Mutex
-	calls     map[string]int
+	// performersErr fails the starred performer query, as an unreachable
+	// Stash does on the Sections page.
+	performersErr error
+	mu            sync.Mutex
+	calls         map[string]int
 }
 
 func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *graphql.Response) error {
@@ -70,6 +73,13 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 		payload = `{"findScenes":{"scenes":[{"id":"1","title":"One","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"one.mp4","duration":100,"path":"/one.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/1/screenshot","stream":"http://stash:9999/scene/1/stream"},"tags":[]},{"id":"2","title":"Two","created_at":"2024-01-01T00:00:00Z","files":[{"basename":"two.mp4","duration":100,"path":"/two.mp4","height":1080,"video_codec":"h264"}],"paths":{"screenshot":"http://stash:9999/scene/2/screenshot","stream":"http://stash:9999/scene/2/stream"},"tags":[]}]}}`
 	case "FindSceneGroupings":
 		payload = `{"findScenes":{"scenes":[{"id":"1","studio":{"id":"7","name":"Studio Seven"},"performers":[]},{"id":"2","studio":{"id":"7","name":"Studio Seven"},"performers":[]}]}}`
+	case "FindStarredPerformers":
+		if f.performersErr != nil {
+			return f.performersErr
+		}
+		payload = `{"findPerformers":{"performers":[{"id":"p1","name":"Alice","scene_count":3,"favorite":true},{"id":"p2","name":"Bea","scene_count":5,"favorite":true}]}}`
+	case "FindPerformersByIds":
+		payload = `{"findPerformers":{"performers":[{"id":"p9","name":"Zoe","scene_count":1,"favorite":false}]}}`
 	case "FindSampleSceneCover":
 		payload = `{"findScenes":{"scenes":[{"paths":{"screenshot":"http://stash:9999/scene/1/screenshot"}}]}}`
 	default:
@@ -390,6 +400,34 @@ func TestPutSections_RejectsBadOptionWithoutSaving(t *testing.T) {
 	}
 	if after := config.Application(); after.SmartSectionSize != before.SmartSectionSize || len(after.Filters) != len(before.Filters) {
 		t.Fatal("a rejected save must change nothing")
+	}
+}
+
+func TestPutSections_RoundTripsPerformerPicks(t *testing.T) {
+	_, h := newEnv(t, &fakeStash{})
+
+	rec, out := do(t, h, http.MethodPut, "/sections", map[string]any{
+		"filters": []map[string]any{{"id": "auto:performer", "options": map[string]any{"performers": []string{" p1 ", "p2", "p1"}}}},
+	})
+
+	if rec.Code != 200 {
+		t.Fatalf("code %d: %v", rec.Code, out)
+	}
+	if got := config.Application().Filters[0].Options.Performers; fmt.Sprint(got) != "[p1 p2]" {
+		t.Fatalf("stored picks = %v", got)
+	}
+	many := make([]string, 51)
+	for i := range many {
+		many[i] = fmt.Sprint(i)
+	}
+	rec, out = do(t, h, http.MethodPut, "/sections", map[string]any{
+		"filters": []map[string]any{{"id": "auto:performer", "options": map[string]any{"performers": many}}},
+	})
+	if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(out["error"]), "holds 51 performers, at most 50") {
+		t.Fatalf("51 picks: %d %v", rec.Code, out)
+	}
+	if got := config.Application().Filters[0].Options.Performers; fmt.Sprint(got) != "[p1 p2]" {
+		t.Fatalf("a rejected save must change nothing, got %v", got)
 	}
 }
 

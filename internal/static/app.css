@@ -142,6 +142,11 @@ table.sections .fields .field{display:flex;flex-direction:column;gap:4px;margin:
 table.sections .fields .field input{margin:0;min-height:44px;padding:0 8px;color:var(--text);font-size:16px}
 table.sections .fields .field.check{flex-direction:row;align-items:center;gap:10px;align-self:end;min-height:44px;color:var(--text);font-size:16px}
 table.sections .fields .field.check input{width:26px;height:26px;min-height:0;flex:none}
+table.sections .fields .field.pick{flex-basis:100%;min-width:0;border:0;padding:0;margin:0}
+table.sections .fields .field.pick legend{padding:0;margin-bottom:4px}
+table.sections .pick-list{display:flex;flex-wrap:wrap;gap:4px 16px}
+table.sections .pick-item{display:flex;align-items:center;gap:10px;min-height:44px;margin:0;color:var(--text);font-size:16px}
+table.sections .fields .field.pick .pick-item input{width:26px;height:26px;min-height:0;flex:none}
 table.sections .fields small{color:var(--muted)}
 .rules{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}
 .rule{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}

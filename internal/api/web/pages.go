@@ -70,6 +70,11 @@ func (r FilterRow) Placeholder(f config.OptionField) string {
 // Tuned reports whether any setting is saved for the row.
 func (r FilterRow) Tuned() bool { return r.Options != nil }
 
+// Picked reports whether the row's options list the performer id.
+func (r FilterRow) Picked(id string) bool {
+	return r.Options != nil && slices.Contains(r.Options.Performers, id)
+}
+
 // ShowIn reports whether the section is listed in player: it must be
 // enabled and not hidden for that player.
 func (r FilterRow) ShowIn(player string) bool {
@@ -100,14 +105,18 @@ type pageData struct {
 	// SmartSectionSize is the global section size the Sections page edits.
 	SmartSectionSize int
 	FilterError      string
-	VideoRules       []config.VideoRule
-	Profiles         []ProfileOption
-	Projections      []string
-	Stereos          []string
-	Lenses           []string
-	LogLines         []string
-	Random           []RandomScene
-	DateStats        library.DateStats
+	// Performers backs the Performer sections picker; PerformerError says
+	// why it could not be loaded.
+	Performers     []library.PickablePerformer
+	PerformerError string
+	VideoRules     []config.VideoRule
+	Profiles       []ProfileOption
+	Projections    []string
+	Stereos        []string
+	Lenses         []string
+	LogLines       []string
+	Random         []RandomScene
+	DateStats      library.DateStats
 }
 
 // ruleRow is what the rule-row template renders: one rule with the option
@@ -342,6 +351,14 @@ func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
 	options := make(map[string]*config.SectionOptions, len(cfg.Filters))
 	for i := range cfg.Filters {
 		options[cfg.Filters[i].ID] = cfg.Filters[i].Options
+	}
+	var picked []string
+	if o := options[config.FamilyPerformer]; o != nil {
+		picked = o.Performers
+	}
+	if data.Performers, err = h.lib.PickablePerformers(r.Context(), picked); err != nil {
+		data.PerformerError = err.Error()
+		data.Performers = library.UnknownPerformers(picked)
 	}
 	for _, row := range rows {
 		data.FilterRows = append(data.FilterRows, FilterRow{

@@ -864,3 +864,60 @@ func TestSections_RendersSettingsRowsFromSchema(t *testing.T) {
 		}
 	}
 }
+
+func TestSections_RendersThePerformerPicker(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{})
+	cfg := config.Application()
+	cfg.Filters = append(cfg.Filters, config.Filter{ID: config.FamilyPerformer, Options: &config.SectionOptions{Performers: []string{"p1", "p9"}}})
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := getPage(t, PagesRouter(lib), "/sections", nil).Body.String()
+	for _, want := range []string{
+		`<fieldset class="field pick" data-key="performers" data-kind="performers"><legend>Only these starred performers</legend>`,
+		`<input type="checkbox" data-id="p1" aria-label="Alice" checked> Alice <small>3 scenes</small>`,
+		`<input type="checkbox" data-id="p2" aria-label="Bea"> Bea <small>5 scenes</small>`,
+		`<input type="checkbox" data-id="p9" aria-label="Zoe" checked> Zoe <small>1 scenes, no longer starred</small>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sections page lacks %q", want)
+		}
+	}
+	if n := strings.Count(body, `data-kind="performers"`); n != 1 {
+		t.Errorf("the picker belongs to the performer row only, found %d", n)
+	}
+}
+
+func TestSections_PickerKeepsPicksWhenStashIsDown(t *testing.T) {
+	lib, _ := newEnv(t, &fakeStash{performersErr: errors.New("dial tcp: refused")})
+	cfg := config.Application()
+	cfg.Filters = append(cfg.Filters, config.Filter{ID: config.FamilyPerformer, Options: &config.SectionOptions{Performers: []string{"p1"}}})
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := getPage(t, PagesRouter(lib), "/sections", nil).Body.String()
+	for _, want := range []string{
+		`Could not load performers from Stash: FindStarredPerformers: dial tcp: refused`,
+		`<input type="checkbox" data-id="p1" aria-label="Performer p1" checked> Performer p1 <small>not loaded</small>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sections page lacks %q", want)
+		}
+	}
+}
+
+func TestAppJS_SerialisesThePerformerPicker(t *testing.T) {
+	js, err := fs.ReadFile(static.Fs, "app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`if (i.dataset.kind === 'performers') {`,
+		`querySelectorAll('input:checked')).map((c) => c.dataset.id)`,
+		`i.querySelector('input:checked') !== null`,
+	} {
+		if !strings.Contains(string(js), want) {
+			t.Errorf("app.js lacks %q", want)
+		}
+	}
+}
