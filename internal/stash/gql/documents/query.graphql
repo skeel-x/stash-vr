@@ -401,11 +401,9 @@ query FindStarredPerformers {
   }
 }
 
-query FindPerformersByIds($ids: [ID!]) {
-  findPerformers(ids: $ids, filter: { per_page: -1 }) {
-    performers {
-      ...PickablePerformerParts
-    }
+query FindPickablePerformer($id: ID!) {
+  findPerformer(id: $id) {
+    ...PickablePerformerParts
   }
 }
 

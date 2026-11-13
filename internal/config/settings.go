@@ -338,6 +338,7 @@ func cloneConfig(c ApplicationConfig) ApplicationConfig {
 			c := *o
 			c.Tags = slices.Clone(o.Tags)
 			c.ExcludeTags = slices.Clone(o.ExcludeTags)
+			c.Performers = slices.Clone(o.Performers)
 			out.Filters[i].Options = &c
 		}
 	}

@@ -91,11 +91,18 @@ func TestSectionOptions_ValueFormatsSetFields(t *testing.T) {
 }
 
 func TestCloneConfig_CopiesOptionTagLists(t *testing.T) {
-	c := ApplicationConfig{Filters: []Filter{{ID: "smart:topquality", Options: &SectionOptions{Tags: []string{"8K"}}}}}
+	c := ApplicationConfig{Filters: []Filter{
+		{ID: "smart:topquality", Options: &SectionOptions{Tags: []string{"8K"}}},
+		{ID: FamilyPerformer, Options: &SectionOptions{Performers: []string{"72"}}},
+	}}
 	out := cloneConfig(c)
 	out.Filters[0].Options.Tags[0] = "7K"
 	if c.Filters[0].Options.Tags[0] != "8K" {
 		t.Fatal("clone must not share the tag list")
+	}
+	out.Filters[1].Options.Performers[0] = "1"
+	if c.Filters[1].Options.Performers[0] != "72" {
+		t.Fatal("clone must not share the performer picks")
 	}
 }
 

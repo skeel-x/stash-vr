@@ -78,8 +78,8 @@ func (f *fakeStash) MakeRequest(_ context.Context, req *graphql.Request, resp *g
 			return f.performersErr
 		}
 		payload = `{"findPerformers":{"performers":[{"id":"p1","name":"Alice","scene_count":3,"favorite":true},{"id":"p2","name":"Bea","scene_count":5,"favorite":true}]}}`
-	case "FindPerformersByIds":
-		payload = `{"findPerformers":{"performers":[{"id":"p9","name":"Zoe","scene_count":1,"favorite":false}]}}`
+	case "FindPickablePerformer":
+		payload = `{"findPerformer":{"id":"p9","name":"Zoe","scene_count":1,"favorite":false}}`
 	case "FindSampleSceneCover":
 		payload = `{"findScenes":{"scenes":[{"paths":{"screenshot":"http://stash:9999/scene/1/screenshot"}}]}}`
 	default:

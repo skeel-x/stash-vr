@@ -286,8 +286,10 @@ type PickablePerformer struct {
 }
 
 // PickablePerformers lists the starred performers plus any picked id the
-// starred list lacks (looked up by id, so an unstarred pick keeps its
-// name), by name then id. Ids Stash no longer knows are left out.
+// starred list lacks (looked up one by one, so an unstarred pick keeps
+// its name), by name then id. Ids Stash no longer knows are left out:
+// findPerformer answers null for them, where a by-ids query would fail
+// as a whole.
 func (libraryService *Service) PickablePerformers(ctx context.Context, picked []string) ([]PickablePerformer, error) {
 	resp, err := gql.FindStarredPerformers(ctx, libraryService.Client())
 	if err != nil {
@@ -311,17 +313,13 @@ func (libraryService *Service) PickablePerformers(ctx context.Context, picked []
 			missing = append(missing, id)
 		}
 	}
-	if len(missing) > 0 {
-		more, err := gql.FindPerformersByIds(ctx, libraryService.Client(), missing)
+	for _, id := range missing {
+		one, err := gql.FindPickablePerformer(ctx, libraryService.Client(), id)
 		if err != nil {
-			return nil, fmt.Errorf("FindPerformersByIds: %w", err)
+			return nil, fmt.Errorf("FindPickablePerformer %s: %w", id, err)
 		}
-		if more.FindPerformers != nil {
-			for _, p := range more.FindPerformers.Performers {
-				if p != nil {
-					out = append(out, PickablePerformer{ID: p.Id, Name: p.Name, SceneCount: p.Scene_count, Starred: p.Favorite})
-				}
-			}
+		if p := one.FindPerformer; p != nil {
+			out = append(out, PickablePerformer{ID: p.Id, Name: p.Name, SceneCount: p.Scene_count, Starred: p.Favorite})
 		}
 	}
 	slices.SortFunc(out, func(a, b PickablePerformer) int {
