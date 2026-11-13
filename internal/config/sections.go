@@ -25,6 +25,9 @@ const (
 	// MaxFamilyLimit caps how many sections a family may generate, so a
 	// low threshold cannot flood the players.
 	MaxFamilyLimit = 50
+	// MaxPickedPerformers caps how many starred performers the Performer
+	// sections row may tick; the same ceiling as its cap.
+	MaxPickedPerformers = MaxFamilyLimit
 )
 
 // Default tag names for the tag-based sections; vrQualityTags manages the
@@ -49,6 +52,7 @@ type SectionOptions struct {
 	MinScenes     *int     `json:"min_scenes,omitempty"`
 	Limit         *int     `json:"limit,omitempty"`
 	ExcludeMale   *bool    `json:"exclude_male,omitempty"`
+	Performers    []string `json:"performers,omitempty"`
 }
 
 // OptionKind is how a setting is entered: a number, a tick, or tag names.
@@ -58,6 +62,9 @@ const (
 	OptionInt  OptionKind = "int"
 	OptionBool OptionKind = "bool"
 	OptionTags OptionKind = "tags"
+	// OptionPerformers is a list of Stash performer ids, ticked from the
+	// starred performers.
+	OptionPerformers OptionKind = "performers"
 )
 
 // Is reports whether the kind is s; for templates, which cannot compare a
@@ -107,7 +114,9 @@ func SectionSchema(id string) []OptionField {
 		return []OptionField{
 			{Key: "min_scenes", Label: "Only performers with at least N scenes", Kind: OptionInt, Min: 1, Max: MaxAutoSectionMin, Default: strconv.Itoa(DefaultFamilyMinScenes), Help: "A performer with fewer scenes gets no section."},
 			{Key: "limit", Label: "At most N sections", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultFamilyLimit), Help: "The performers with the most scenes; the rest get none."},
-			{Key: "exclude_male", Label: "Leave out male performers", Kind: OptionBool}}
+			{Key: "exclude_male", Label: "Leave out male performers", Kind: OptionBool},
+			{Key: "performers", Label: "Only these starred performers", Kind: OptionPerformers,
+				Help: "Tick performers to give each her own section, whatever the cap and the male exclusion say; untick all for every performer with enough scenes."}}
 	case FamilyMoreFrom:
 		return []OptionField{
 			{Key: "limit", Label: "At most N performers", Kind: OptionInt, Min: 1, Max: MaxFamilyLimit, Default: strconv.Itoa(DefaultMoreFromLimit), Help: "The ones you watch most."},
@@ -148,6 +157,7 @@ func (o *SectionOptions) set() []setOption {
 	add("min_scenes", o.MinScenes, nil, nil)
 	add("limit", o.Limit, nil, nil)
 	add("exclude_male", nil, o.ExcludeMale, nil)
+	add("performers", nil, nil, o.Performers)
 	return out
 }
 
@@ -193,6 +203,16 @@ func validateOptions(i int, f *Filter) error {
 		if fld := schema[at]; fld.Kind == OptionInt && (*s.n < fld.Min || *s.n > fld.Max) {
 			return fmt.Errorf("%w: filters[%d].options.%s must be between %d and %d, got %d", ErrInvalid, i, s.key, fld.Min, fld.Max, *s.n)
 		}
+		if fld := schema[at]; fld.Kind == OptionPerformers {
+			if len(s.tags) > MaxPickedPerformers {
+				return fmt.Errorf("%w: filters[%d].options.%s holds %d performers, at most %d", ErrInvalid, i, s.key, len(s.tags), MaxPickedPerformers)
+			}
+			for j, id := range s.tags {
+				if strings.TrimSpace(id) == "" {
+					return fmt.Errorf("%w: filters[%d].options.%s[%d] is blank", ErrInvalid, i, s.key, j)
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -208,8 +228,22 @@ func cleanTags(tags []string) []string {
 	return out
 }
 
-// normalizeFilters cleans tag lists in place and drops an options object
-// with nothing set, so a cleared form stores no options.
+// uniqueIds trims the ids, drops blanks and repeats, keeps the order; nil
+// when none remain.
+func uniqueIds(ids []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, id := range cleanTags(ids) {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// normalizeFilters cleans tag and id lists in place and drops an options
+// object with nothing set, so a cleared form stores no options.
 func normalizeFilters(filters []Filter) {
 	for i := range filters {
 		o := filters[i].Options
@@ -218,6 +252,7 @@ func normalizeFilters(filters []Filter) {
 		}
 		o.Tags = cleanTags(o.Tags)
 		o.ExcludeTags = cleanTags(o.ExcludeTags)
+		o.Performers = uniqueIds(o.Performers)
 		if len(o.set()) == 0 {
 			filters[i].Options = nil
 		}

@@ -2,6 +2,8 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -107,5 +109,66 @@ func TestSectionSchema_ExcludeMaleOnlyForPerformerGroup(t *testing.T) {
 	}
 	if (&SectionOptions{ExcludeMale: boolp(true)}).Value("exclude_male") != "true" {
 		t.Fatal("Value must report the tick")
+	}
+}
+
+func TestValidateFilters_PerformerPicks(t *testing.T) {
+	ok := []Filter{{ID: FamilyPerformer, Options: &SectionOptions{Performers: []string{"72", "515"}}}}
+	if err := validateFilters(ok); err != nil {
+		t.Fatal(err)
+	}
+	many := make([]string, MaxPickedPerformers+1)
+	for i := range many {
+		many[i] = strconv.Itoa(i + 1)
+	}
+	cases := []struct {
+		name string
+		f    Filter
+		want string
+	}{
+		{"not on studio", Filter{ID: FamilyStudio, Options: &SectionOptions{Performers: []string{"1"}}}, "filters[0].options.performers is not a setting of auto:studio"},
+		{"not on smart", Filter{ID: "smart:favperf", Options: &SectionOptions{Performers: []string{"1"}}}, "filters[0].options.performers is not a setting of smart:favperf"},
+		{"too many", Filter{ID: FamilyPerformer, Options: &SectionOptions{Performers: many}}, "filters[0].options.performers holds 51 performers, at most 50"},
+		{"blank id", Filter{ID: FamilyPerformer, Options: &SectionOptions{Performers: []string{"1", " "}}}, "filters[0].options.performers[1] is blank"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := validateFilters([]Filter{c.f})
+			if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("err = %v, want ErrInvalid containing %q", err, c.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeFilters_CleansPerformerPicks(t *testing.T) {
+	f := []Filter{
+		{ID: FamilyPerformer, Options: &SectionOptions{Performers: []string{" 72 ", "", "515", "72"}}},
+		{ID: FamilyPerformer, Options: &SectionOptions{Performers: []string{" ", ""}}},
+	}
+	normalizeFilters(f)
+	if got := f[0].Options.Performers; fmt.Sprint(got) != "[72 515]" {
+		t.Fatalf("performers = %v, want [72 515]", got)
+	}
+	if f[1].Options != nil {
+		t.Fatalf("blank picks must store no options, got %+v", f[1].Options)
+	}
+	if v := f[0].Options.Value("performers"); v != "72, 515" {
+		t.Fatalf("Value = %q", v)
+	}
+}
+
+func TestSectionSchema_PerformerFamilyListsThePicker(t *testing.T) {
+	s := SectionSchema(FamilyPerformer)
+	last := s[len(s)-1]
+	if last.Key != "performers" || last.Kind != OptionPerformers || last.Label != "Only these starred performers" {
+		t.Fatalf("last field = %+v", last)
+	}
+	for _, id := range []string{FamilyStudio, FamilyMoreFrom, "smart:favperf"} {
+		for _, f := range SectionSchema(id) {
+			if f.Key == "performers" {
+				t.Fatalf("%s must not list performers", id)
+			}
+		}
 	}
 }
