@@ -847,6 +847,105 @@ func (v *FindPerformerResponse) GetFindPerformer() *FindPerformerFindPerformer {
 	return v.FindPerformer
 }
 
+// FindPerformersByIdsFindPerformersFindPerformersResultType includes the requested fields of the GraphQL type FindPerformersResultType.
+type FindPerformersByIdsFindPerformersFindPerformersResultType struct {
+	Performers []*FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer `json:"performers"`
+}
+
+// GetPerformers returns FindPerformersByIdsFindPerformersFindPerformersResultType.Performers, and is useful for accessing the field via an interface.
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultType) GetPerformers() []*FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer {
+	return v.Performers
+}
+
+// FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer includes the requested fields of the GraphQL type Performer.
+type FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer struct {
+	PickablePerformerParts `json:"-"`
+}
+
+// GetId returns FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer.Id, and is useful for accessing the field via an interface.
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer) GetId() string {
+	return v.PickablePerformerParts.Id
+}
+
+// GetName returns FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer.Name, and is useful for accessing the field via an interface.
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer) GetName() string {
+	return v.PickablePerformerParts.Name
+}
+
+// GetScene_count returns FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer.Scene_count, and is useful for accessing the field via an interface.
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer) GetScene_count() int {
+	return v.PickablePerformerParts.Scene_count
+}
+
+// GetFavorite returns FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer.Favorite, and is useful for accessing the field via an interface.
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer) GetFavorite() bool {
+	return v.PickablePerformerParts.Favorite
+}
+
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.PickablePerformerParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Scene_count int `json:"scene_count"`
+
+	Favorite bool `json:"favorite"`
+}
+
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer) __premarshalJSON() (*__premarshalFindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer, error) {
+	var retval __premarshalFindPerformersByIdsFindPerformersFindPerformersResultTypePerformersPerformer
+
+	retval.Id = v.PickablePerformerParts.Id
+	retval.Name = v.PickablePerformerParts.Name
+	retval.Scene_count = v.PickablePerformerParts.Scene_count
+	retval.Favorite = v.PickablePerformerParts.Favorite
+	return &retval, nil
+}
+
+// FindPerformersByIdsResponse is returned by FindPerformersByIds on success.
+type FindPerformersByIdsResponse struct {
+	// A function which queries Performer objects
+	FindPerformers *FindPerformersByIdsFindPerformersFindPerformersResultType `json:"findPerformers"`
+}
+
+// GetFindPerformers returns FindPerformersByIdsResponse.FindPerformers, and is useful for accessing the field via an interface.
+func (v *FindPerformersByIdsResponse) GetFindPerformers() *FindPerformersByIdsFindPerformersFindPerformersResultType {
+	return v.FindPerformers
+}
+
 // FindRecommendationScenesFindScenesFindScenesResultType includes the requested fields of the GraphQL type FindScenesResultType.
 type FindRecommendationScenesFindScenesFindScenesResultType struct {
 	Scenes []*FindRecommendationScenesFindScenesFindScenesResultTypeScenesScene `json:"scenes"`
@@ -1612,6 +1711,105 @@ type FindScenesResponse struct {
 // GetFindScenes returns FindScenesResponse.FindScenes, and is useful for accessing the field via an interface.
 func (v *FindScenesResponse) GetFindScenes() *FindScenesFindScenesFindScenesResultType {
 	return v.FindScenes
+}
+
+// FindStarredPerformersFindPerformersFindPerformersResultType includes the requested fields of the GraphQL type FindPerformersResultType.
+type FindStarredPerformersFindPerformersFindPerformersResultType struct {
+	Performers []*FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer `json:"performers"`
+}
+
+// GetPerformers returns FindStarredPerformersFindPerformersFindPerformersResultType.Performers, and is useful for accessing the field via an interface.
+func (v *FindStarredPerformersFindPerformersFindPerformersResultType) GetPerformers() []*FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer {
+	return v.Performers
+}
+
+// FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer includes the requested fields of the GraphQL type Performer.
+type FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer struct {
+	PickablePerformerParts `json:"-"`
+}
+
+// GetId returns FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Id, and is useful for accessing the field via an interface.
+func (v *FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetId() string {
+	return v.PickablePerformerParts.Id
+}
+
+// GetName returns FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Name, and is useful for accessing the field via an interface.
+func (v *FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetName() string {
+	return v.PickablePerformerParts.Name
+}
+
+// GetScene_count returns FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Scene_count, and is useful for accessing the field via an interface.
+func (v *FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetScene_count() int {
+	return v.PickablePerformerParts.Scene_count
+}
+
+// GetFavorite returns FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer.Favorite, and is useful for accessing the field via an interface.
+func (v *FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer) GetFavorite() bool {
+	return v.PickablePerformerParts.Favorite
+}
+
+func (v *FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.PickablePerformerParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalFindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Scene_count int `json:"scene_count"`
+
+	Favorite bool `json:"favorite"`
+}
+
+func (v *FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *FindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer) __premarshalJSON() (*__premarshalFindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer, error) {
+	var retval __premarshalFindStarredPerformersFindPerformersFindPerformersResultTypePerformersPerformer
+
+	retval.Id = v.PickablePerformerParts.Id
+	retval.Name = v.PickablePerformerParts.Name
+	retval.Scene_count = v.PickablePerformerParts.Scene_count
+	retval.Favorite = v.PickablePerformerParts.Favorite
+	return &retval, nil
+}
+
+// FindStarredPerformersResponse is returned by FindStarredPerformers on success.
+type FindStarredPerformersResponse struct {
+	// A function which queries Performer objects
+	FindPerformers *FindStarredPerformersFindPerformersFindPerformersResultType `json:"findPerformers"`
+}
+
+// GetFindPerformers returns FindStarredPerformersResponse.FindPerformers, and is useful for accessing the field via an interface.
+func (v *FindStarredPerformersResponse) GetFindPerformers() *FindStarredPerformersFindPerformersFindPerformersResultType {
+	return v.FindPerformers
 }
 
 // FindStudioByNameFindStudiosFindStudiosResultType includes the requested fields of the GraphQL type FindStudiosResultType.
@@ -3177,6 +3375,26 @@ func (v *PhashDistanceCriterionInput) GetModifier() CriterionModifier { return v
 
 // GetValue returns PhashDistanceCriterionInput.Value, and is useful for accessing the field via an interface.
 func (v *PhashDistanceCriterionInput) GetValue() string { return v.Value }
+
+// PickablePerformerParts includes the GraphQL fields of Performer requested by the fragment PickablePerformerParts.
+type PickablePerformerParts struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Scene_count int    `json:"scene_count"`
+	Favorite    bool   `json:"favorite"`
+}
+
+// GetId returns PickablePerformerParts.Id, and is useful for accessing the field via an interface.
+func (v *PickablePerformerParts) GetId() string { return v.Id }
+
+// GetName returns PickablePerformerParts.Name, and is useful for accessing the field via an interface.
+func (v *PickablePerformerParts) GetName() string { return v.Name }
+
+// GetScene_count returns PickablePerformerParts.Scene_count, and is useful for accessing the field via an interface.
+func (v *PickablePerformerParts) GetScene_count() int { return v.Scene_count }
+
+// GetFavorite returns PickablePerformerParts.Favorite, and is useful for accessing the field via an interface.
+func (v *PickablePerformerParts) GetFavorite() bool { return v.Favorite }
 
 type ResolutionCriterionInput struct {
 	Modifier CriterionModifier `json:"modifier"`
@@ -5164,6 +5382,14 @@ type __FindPerformerInput struct {
 // GetId returns __FindPerformerInput.Id, and is useful for accessing the field via an interface.
 func (v *__FindPerformerInput) GetId() string { return v.Id }
 
+// __FindPerformersByIdsInput is used internally by genqlient
+type __FindPerformersByIdsInput struct {
+	Ids []string `json:"ids"`
+}
+
+// GetIds returns __FindPerformersByIdsInput.Ids, and is useful for accessing the field via an interface.
+func (v *__FindPerformersByIdsInput) GetIds() []string { return v.Ids }
+
 // __FindSceneDimensionsInput is used internally by genqlient
 type __FindSceneDimensionsInput struct {
 	Scene_filter *SceneFilterType `json:"scene_filter,omitempty"`
@@ -5729,6 +5955,48 @@ func FindPerformerByName(
 	return data_, err_
 }
 
+// The query executed by FindPerformersByIds.
+const FindPerformersByIds_Operation = `
+query FindPerformersByIds ($ids: [ID!]) {
+	findPerformers(ids: $ids, filter: {per_page:-1}) {
+		performers {
+			... PickablePerformerParts
+		}
+	}
+}
+fragment PickablePerformerParts on Performer {
+	id
+	name
+	scene_count
+	favorite
+}
+`
+
+func FindPerformersByIds(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	ids []string,
+) (data_ *FindPerformersByIdsResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindPerformersByIds",
+		Query:  FindPerformersByIds_Operation,
+		Variables: &__FindPerformersByIdsInput{
+			Ids: ids,
+		},
+	}
+
+	data_ = &FindPerformersByIdsResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
 // The query executed by FindRecommendationScenes.
 const FindRecommendationScenes_Operation = `
 query FindRecommendationScenes {
@@ -6145,6 +6413,44 @@ func FindScenes(
 	}
 
 	data_ = &FindScenesResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
+
+// The query executed by FindStarredPerformers.
+const FindStarredPerformers_Operation = `
+query FindStarredPerformers {
+	findPerformers(filter: {per_page:-1,sort:"name",direction:ASC}, performer_filter: {filter_favorites:true}) {
+		performers {
+			... PickablePerformerParts
+		}
+	}
+}
+fragment PickablePerformerParts on Performer {
+	id
+	name
+	scene_count
+	favorite
+}
+`
+
+func FindStarredPerformers(
+	ctx_ context.Context,
+	client_ graphql.Client,
+) (data_ *FindStarredPerformersResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "FindStarredPerformers",
+		Query:  FindStarredPerformers_Operation,
+	}
+
+	data_ = &FindStarredPerformersResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(

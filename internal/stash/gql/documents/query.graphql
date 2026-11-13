@@ -389,3 +389,29 @@ fragment StudioParts on Studio {
   ...StudioListParts
   details
 }
+
+query FindStarredPerformers {
+  findPerformers(
+    filter: { per_page: -1, sort: "name", direction: ASC }
+    performer_filter: { filter_favorites: true }
+  ) {
+    performers {
+      ...PickablePerformerParts
+    }
+  }
+}
+
+query FindPerformersByIds($ids: [ID!]) {
+  findPerformers(ids: $ids, filter: { per_page: -1 }) {
+    performers {
+      ...PickablePerformerParts
+    }
+  }
+}
+
+fragment PickablePerformerParts on Performer {
+  id
+  name
+  scene_count
+  favorite
+}

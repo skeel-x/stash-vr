@@ -274,6 +274,75 @@ func (libraryService *Service) GetPerformers(ctx context.Context) ([]Performer, 
 	return performers, nil
 }
 
+// PickablePerformer is a performer the Performer sections picker offers:
+// starred in Stash, or picked earlier and since unstarred. Unknown marks
+// a placeholder for a pick Stash could not be asked about.
+type PickablePerformer struct {
+	ID         string
+	Name       string
+	SceneCount int
+	Starred    bool
+	Unknown    bool
+}
+
+// PickablePerformers lists the starred performers plus any picked id the
+// starred list lacks (looked up by id, so an unstarred pick keeps its
+// name), by name then id. Ids Stash no longer knows are left out.
+func (libraryService *Service) PickablePerformers(ctx context.Context, picked []string) ([]PickablePerformer, error) {
+	resp, err := gql.FindStarredPerformers(ctx, libraryService.Client())
+	if err != nil {
+		return nil, fmt.Errorf("FindStarredPerformers: %w", err)
+	}
+	var out []PickablePerformer
+	seen := map[string]bool{}
+	if resp.FindPerformers != nil {
+		for _, p := range resp.FindPerformers.Performers {
+			if p == nil || seen[p.Id] {
+				continue
+			}
+			seen[p.Id] = true
+			out = append(out, PickablePerformer{ID: p.Id, Name: p.Name, SceneCount: p.Scene_count, Starred: p.Favorite})
+		}
+	}
+	var missing []string
+	for _, id := range picked {
+		if !seen[id] {
+			seen[id] = true
+			missing = append(missing, id)
+		}
+	}
+	if len(missing) > 0 {
+		more, err := gql.FindPerformersByIds(ctx, libraryService.Client(), missing)
+		if err != nil {
+			return nil, fmt.Errorf("FindPerformersByIds: %w", err)
+		}
+		if more.FindPerformers != nil {
+			for _, p := range more.FindPerformers.Performers {
+				if p != nil {
+					out = append(out, PickablePerformer{ID: p.Id, Name: p.Name, SceneCount: p.Scene_count, Starred: p.Favorite})
+				}
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b PickablePerformer) int {
+		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	return out, nil
+}
+
+// UnknownPerformers stands in for the picked ids when Stash cannot be
+// asked, ticked and named by id, so a save keeps them.
+func UnknownPerformers(ids []string) []PickablePerformer {
+	out := make([]PickablePerformer, len(ids))
+	for i, id := range ids {
+		out[i] = PickablePerformer{ID: id, Name: "Performer " + id, Unknown: true}
+	}
+	return out
+}
+
 func (libraryService *Service) GetPerformer(ctx context.Context, id string) (*Performer, error) {
 	resp, err := gql.FindPerformer(ctx, libraryService.Client(), id)
 	if err != nil {
