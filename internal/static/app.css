@@ -148,6 +148,7 @@ table.sections .pick-list{display:flex;flex-wrap:wrap;gap:4px 16px}
 table.sections .pick-item{display:flex;align-items:center;gap:10px;min-height:44px;margin:0;color:var(--text);font-size:16px}
 table.sections .fields .field.pick .pick-item input{width:26px;height:26px;min-height:0;flex:none}
 table.sections .fields small{color:var(--muted)}
+table.sections .fields small.warn{color:var(--warn)}
 .rules{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}
 .rule{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}
 .rule.dragging{opacity:.5}

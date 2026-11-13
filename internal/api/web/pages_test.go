@@ -921,3 +921,43 @@ func TestAppJS_SerialisesThePerformerPicker(t *testing.T) {
 		}
 	}
 }
+
+func TestSections_PickerNotesDoNotContradictWhenStashIsDown(t *testing.T) {
+	// Stash down and nothing picked: the error note alone, not also "No
+	// performer is starred".
+	lib, _ := newEnv(t, &fakeStash{performersErr: errors.New("dial tcp: refused")})
+	body := getPage(t, PagesRouter(lib), "/sections", nil).Body.String()
+	if !strings.Contains(body, "Could not load performers from Stash") || strings.Contains(body, "No performer is starred in Stash yet.") {
+		t.Errorf("page must show the error note only")
+	}
+	if !strings.Contains(body, "Saving keeps the performers ticked below.") {
+		t.Errorf("with saved filters loaded the save still works, say so")
+	}
+}
+
+func TestSections_PickerSkipsStashWhenTheRowsAlreadyFailed(t *testing.T) {
+	stash := &fakeStash{filtersErr: errors.New("dial tcp: refused")}
+	lib, _ := newEnv(t, stash)
+	cfg := config.Application()
+	cfg.Filters = append(cfg.Filters, config.Filter{ID: config.FamilyPerformer, Options: &config.SectionOptions{Performers: []string{"p1"}}})
+	if _, err := config.Set(cfg); err != nil {
+		t.Fatal(err)
+	}
+	body := getPage(t, PagesRouter(lib), "/sections", nil).Body.String()
+	if n := stash.callCount("FindStarredPerformers"); n != 0 {
+		t.Errorf("rows failed to load: expected no performer query, got %d", n)
+	}
+	if strings.Contains(body, "Saving keeps the performers ticked below.") {
+		t.Errorf("save is disabled, do not promise it keeps the picks")
+	}
+}
+
+func TestAppCSS_ColoursThePickerWarning(t *testing.T) {
+	css, err := fs.ReadFile(static.Fs, "app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), "table.sections .fields small.warn{color:var(--warn)}") {
+		t.Error("app.css lacks the warn colour for notes inside a settings row")
+	}
+}

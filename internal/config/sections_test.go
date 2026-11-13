@@ -135,7 +135,7 @@ func TestValidateFilters_PerformerPicks(t *testing.T) {
 	}{
 		{"not on studio", Filter{ID: FamilyStudio, Options: &SectionOptions{Performers: []string{"1"}}}, "filters[0].options.performers is not a setting of auto:studio"},
 		{"not on smart", Filter{ID: "smart:favperf", Options: &SectionOptions{Performers: []string{"1"}}}, "filters[0].options.performers is not a setting of smart:favperf"},
-		{"too many", Filter{ID: FamilyPerformer, Options: &SectionOptions{Performers: many}}, "filters[0].options.performers holds 51 performers, at most 50"},
+		{"too many", Filter{ID: FamilyPerformer, Options: &SectionOptions{Performers: many}}, "filters[0].options.performers of auto:performer holds 51 performers, at most 50"},
 		{"blank id", Filter{ID: FamilyPerformer, Options: &SectionOptions{Performers: []string{"1", " "}}}, "filters[0].options.performers[1] is blank"},
 	}
 	for _, c := range cases {

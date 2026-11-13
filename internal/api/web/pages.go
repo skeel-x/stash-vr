@@ -356,7 +356,12 @@ func (h pageHandler) sections(w http.ResponseWriter, r *http.Request) {
 	if o := options[config.FamilyPerformer]; o != nil {
 		picked = o.Performers
 	}
-	if data.Performers, err = h.lib.PickablePerformers(r.Context(), picked); err != nil {
+	// With the rows unavailable Stash is down and Save is disabled: the
+	// picker shows the picks without asking Stash again.
+	if data.FilterError != "" {
+		data.PerformerError = data.FilterError
+		data.Performers = library.UnknownPerformers(picked)
+	} else if data.Performers, err = h.lib.PickablePerformers(r.Context(), picked); err != nil {
 		data.PerformerError = err.Error()
 		data.Performers = library.UnknownPerformers(picked)
 	}

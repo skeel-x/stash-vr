@@ -205,7 +205,7 @@ func validateOptions(i int, f *Filter) error {
 		}
 		if fld := schema[at]; fld.Kind == OptionPerformers {
 			if len(s.tags) > MaxPickedPerformers {
-				return fmt.Errorf("%w: filters[%d].options.%s holds %d performers, at most %d", ErrInvalid, i, s.key, len(s.tags), MaxPickedPerformers)
+				return fmt.Errorf("%w: filters[%d].options.%s of %s holds %d performers, at most %d", ErrInvalid, i, s.key, f.ID, len(s.tags), MaxPickedPerformers)
 			}
 			for j, id := range s.tags {
 				if strings.TrimSpace(id) == "" {

@@ -33,8 +33,8 @@
           <label class="field">{{.Label}}<input type="text" data-key="{{.Key}}" data-kind="tags" value="{{$row.Value .Key}}" placeholder="{{$row.Placeholder .}}">{{if .Help}}<small>{{.Help}}</small>{{end}}</label>
           {{else if .Kind.Is "performers"}}
           <fieldset class="field pick" data-key="{{.Key}}" data-kind="performers"><legend>{{.Label}}</legend>
-            {{if $.PerformerError}}<small class="warn">Could not load performers from Stash: {{$.PerformerError}}. Saving keeps the performers ticked below.</small>{{end}}
-            {{if not $.Performers}}<small>No performer is starred in Stash yet.</small>{{end}}
+            {{if $.PerformerError}}<small class="warn">Could not load performers from Stash: {{$.PerformerError}}.{{if not $blocked}} Saving keeps the performers ticked below.{{end}}</small>
+            {{else if not $.Performers}}<small>No performer is starred in Stash yet.</small>{{end}}
             <div class="pick-list">{{range $.Performers}}<label class="pick-item"><input type="checkbox" data-id="{{.ID}}" aria-label="{{.Name}}"{{if $row.Picked .ID}} checked{{end}}> {{.Name}} <small>{{if .Unknown}}not loaded{{else}}{{.SceneCount}} scenes{{if not .Starred}}, no longer starred{{end}}{{end}}</small></label>{{end}}</div>
             {{if .Help}}<small>{{.Help}}</small>{{end}}
           </fieldset>
